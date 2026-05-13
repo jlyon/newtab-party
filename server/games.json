@@ -32,6 +32,22 @@
       "description": "18-pair memory match against a cantankerous grandpa who heckles your mistakes, drains patience over time, and occasionally shuffles the cards when you miss.",
       "controls": "Click cards to flip · Match all pairs before Grandpa loses patience",
       "type": "card-game"
+    },
+    {
+      "id": "rock-em-sock-em-wrecking-ball",
+      "name": "Rock Em Sock Em Wrecking Ball",
+      "file": "games/rock-em-sock-em-wrecking-ball.html",
+      "description": "Uncle Earl takes on the HOA board in a fists-vs-clipboards brawl. Punch the suit-wearing enforcers before they reach you. Score 300 to flip the table.",
+      "controls": "← → or A/D to move · Space/Z/X or button to punch",
+      "type": "brawler"
+    },
+    {
+      "id": "smithereens",
+      "name": "Smithereens",
+      "file": "games/smithereens.html",
+      "description": "Turn-based artillery. Adjust angle, charge your shot, and blast TANGO into lawn confetti. Wind changes every round. Four weapons to choose from.",
+      "controls": "← → to adjust angle · Hold Space/Fire to charge · 1–4 to switch weapons",
+      "type": "artillery"
     }
   ]
 }
