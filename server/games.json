@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "blouncerroozal",
+      "name": "BLOUNCERROOZAL",
+      "file": "games/blouncerroozal.html",
+      "description": "Casino chip brick-breaker. Smash gold and silver chips with a shrinking paddle, catch falling chips to trigger multiball mayhem. Score scales with chip value.",
+      "controls": "Mouse or ← → to move · Click or Space to launch · Catch falling chips for multiball",
+      "type": "brick-breaker"
+    },
+    {
+      "id": "shootin-n-crackin",
+      "name": "shootin n crackin",
+      "file": "games/shootin-n-crackin.html",
+      "description": "Pizza Slice vs the IRS. Your bouncing lasers shred briefcase auditors while you dodge the audit boss every 30 seconds. Waves get faster.",
+      "controls": "Arrow keys or WASD to move · Space to shoot · Lasers bounce off walls",
+      "type": "spaceship-shooter"
+    },
+    {
+      "id": "asshole",
+      "name": "asshole",
+      "file": "games/asshole.html",
+      "description": "Bachelorette party choose-your-own-adventure. You are the asshole. There are multiple endings. You will probably earn most of them.",
+      "controls": "Click choices to advance the story",
+      "type": "cyoa"
+    },
+    {
+      "id": "stump-grandpa",
+      "name": "Stump Grandpa",
+      "file": "games/stump-grandpa.html",
+      "description": "18-pair memory match against a cantankerous grandpa who heckles your mistakes, drains patience over time, and occasionally shuffles the cards when you miss.",
+      "controls": "Click cards to flip · Match all pairs before Grandpa loses patience",
+      "type": "card-game"
+    }
+  ]
+}
