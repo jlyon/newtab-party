@@ -7,9 +7,7 @@
     "newtab": "newtab.html"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src http://localhost:3742;"
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://newtab-party.workers.dev http://localhost:8787;"
   },
-  "host_permissions": [
-    "http://localhost:3742/*"
-  ]
+  "host_permissions": ["https://newtab.party/*", "http://localhost:8787/*"]
 }
