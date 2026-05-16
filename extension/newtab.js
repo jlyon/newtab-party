@@ -1,5 +1,4 @@
-// For local dev: 'http://localhost:8787' (wrangler dev default port)
-const SERVER_URL = "https://newtab.party";
+// For local dev: 'http://localhost:8787' (wrangler dev default port)the const SERVER_URL = "https://newtab.party";
 
 // Deterministic daily rotation — must match server's algorithm exactly.
 // Day 0 = 2026-05-01 UTC. Cycles through games in order.
@@ -22,7 +21,6 @@ function todayLabel() {
     timeZone: "UTC",
   });
 }
-
 
 function fmtCountdown(ms) {
   const h = Math.floor(ms / 3600000),
@@ -116,7 +114,7 @@ async function init() {
 async function loadRecentGames() {
   try {
     const recentDays = await fetch(`${SERVER_URL}/api/recent-days`).then((r) =>
-      r.json()
+      r.json(),
     );
     const listEl = document.getElementById("about-game-list");
     listEl.innerHTML = "";
@@ -233,7 +231,7 @@ async function reportScore(gameId, gameName, score) {
     if (!r.ok) return;
     const { id, rank } = await r.json();
     sessionPlayId = id;
-    if (!sessionNameDone && rank <= 10) showNamePrompt(rank);
+    if (!sessionNameDone) showNamePrompt(rank);
   } catch {
     // Server not reachable — score silently dropped
   }

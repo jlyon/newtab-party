@@ -441,12 +441,7 @@ async function reportScore(gameId, gameName, score) {
     if (!r.ok) return;
     const { id, rank } = await r.json();
     sessionPlayId = id;
-    const savedName = localStorage.getItem('playerName');
-    if (savedName) {
-      fetch('/api/plays/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playerName: savedName }) }).catch(()=>{});
-    } else if (!sessionNameDone && rank <= 10) {
-      showNamePrompt(rank);
-    }
+    if (!sessionNameDone) showNamePrompt(rank);
   } catch {}
 }
 
