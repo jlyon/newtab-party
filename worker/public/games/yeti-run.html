@@ -13,7 +13,7 @@
   h1 { margin: 0; font-size: clamp(15px, 4vw, 22px); letter-spacing: 2px; }
   #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; cursor: pointer; }
+    width: min(95vw, calc((100dvh - 80px) * 3.048)); height: auto; display: block; cursor: pointer; }
   #hint { font-size: clamp(10px, 2.5vw, 13px); opacity: 0.5; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }

@@ -17,10 +17,10 @@
   .bpip { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #666; background: transparent; transition: background 0.15s; }
   .bpip.charged { background: #f5a623; border-color: #f5a623; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; }
+    width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
   #controls { display: flex; gap: 8px; max-width: 95vw; }
   @media (pointer: fine) { #controls { display: none; } }
-  @media (pointer: coarse) { canvas { max-height: calc(100dvh - 150px); } }
+  @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 0.621)); } }
   .btn { height: 56px; font-size: 22px; border: 2px solid #444;
     background: #1e1e1e; color: #ccc; cursor: pointer; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; user-select: none;

@@ -18,10 +18,10 @@
       "type": "spaceship-shooter"
     },
     {
-      "id": "asshole",
-      "name": "asshole",
-      "file": "games/asshole.html",
-      "description": "Bachelorette party choose-your-own-adventure. You are the asshole. There are multiple endings. You will probably earn most of them.",
+      "id": "wildcard",
+      "name": "the wildcard",
+      "file": "games/wildcard.html",
+      "description": "Bachelorette party choose-your-own-adventure. You are the wildcard. There are multiple endings. You will probably earn most of them.",
       "controls": "Click choices to advance the story",
       "type": "cyoa"
     },

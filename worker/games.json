@@ -18,9 +18,9 @@
       "type": "spaceship-shooter"
     },
     {
-      "id": "party-foul",
-      "name": "Party Foul",
-      "file": "games/party-foul.html",
+      "id": "the-wildcard",
+      "name": "the wildcard",
+      "file": "games/the-wildcard.html",
       "description": "Bachelorette party choose-your-own-adventure. You are the wild card. There are multiple endings. You will probably earn most of them.",
       "controls": "Click choices to advance the story",
       "type": "cyoa"

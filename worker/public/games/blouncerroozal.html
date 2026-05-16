@@ -27,7 +27,7 @@
       repeating-linear-gradient(45deg, rgba(255,215,0,0.04) 0 8px, transparent 8px 16px);
     border: 2px solid var(--primary);
     box-shadow: 0 0 30px var(--primary), inset 0 0 40px rgba(0,0,0,0.7);
-    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; touch-action: none;
+    width: min(95vw, calc((100dvh - 80px) * 0.875)); height: auto; display: block; touch-action: none;
   }
   #overlay {
     position: fixed; inset: 0; display: none;
