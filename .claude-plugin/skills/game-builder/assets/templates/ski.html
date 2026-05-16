@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
+  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
+    width: min(360px, 88vw); height: auto; display: block; }
+  #controls { display: flex; gap: 10px; width: min(360px, 88vw); }
+  .btn { flex: 1; height: 56px; font-size: 26px; border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-touch-callout: none; }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.45); font-size: 13px; line-height: 1.6; margin: 0 0 28px; font-style: italic; }
+  #start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; font-family: inherit; transition: opacity 0.15s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span>Skier: __PLAYER_NAME__</span>
+    <span id="score">Dist: 0</span>
+    <span id="hi">Best: 0</span>
+  </div>
+  <canvas id="game" width="360" height="540"></canvas>
+  <div id="controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-right">▶</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">← → or A/D to steer · Dodge obstacles, hit gates</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Wipeout!</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Ski again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl  = document.getElementById('score');
+  const hiEl     = document.getElementById('hi');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); started = true; requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const W = canvas.width, H = canvas.height;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME  = '__PLAYER_NAME__';
+  const OBSTACLE     = '__ENEMY_NAME__';           // obstacle name, e.g. "trees", "yetis", "exes"
+  const WIN_DIST     = 0;                           // 0 = endless; e.g. 5000 for a finish line
+  const BASE_SPEED   = 3.5;
+  const SPEED_INC    = 0.0004;                      // ramp per frame
+  const STEER        = 3.5;                         // px per frame when held
+  const GATE_BONUS   = 50;                          // score bonus per gate passed
+  const TREE_SPAWN   = 90;                          // frames between tree spawns (lower = denser)
+  const GATE_SPAWN   = 200;                         // frames between gate pairs
+  const CRASH_MSG    = PLAYER_NAME + ' plowed into a ' + OBSTACLE + '. Spectacular wipeout.';
+  const WIN_MSG      = PLAYER_NAME + ' reached the bottom. Podium energy.';
+  // ==================================
+
+  const SKI_W = 14, SKI_H = 26;
+  const PLAYER_Y = H * 0.72;
+
+  const held = { left: false, right: false };
+  const keys = {};
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
+  addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+
+  let px, obstacles, score, hiScore = 0, spd, frame, running, started;
+
+  function reset() {
+    px = W / 2; obstacles = []; score = 0; spd = BASE_SPEED; frame = 0; running = true; started = false;
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() { scoreEl.textContent = 'Dist: ' + score; hiEl.textContent = 'Best: ' + hiScore; }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function endGame(won) {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = won ? 'You win!' : 'Wipeout!';
+    overMsg.textContent = won ? WIN_MSG : CRASH_MSG;
+    overScore.textContent = 'Distance: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);
+    updateHud(); overlay.style.display = 'flex';
+  }
+
+  function spawnTree() {
+    const x = 20 + Math.random() * (W - 40);
+    obstacles.push({ type: 'tree', x, y: -20, r: 10 + Math.random() * 8 });
+  }
+  function spawnGate() {
+    const cx = 60 + Math.random() * (W - 120);
+    const gap = 70 + Math.random() * 30;
+    obstacles.push({ type: 'gate', cx, y: -10, gap, passed: false });
+  }
+
+  function step() {
+    frame++; spd += SPEED_INC;
+    if (!started) return;
+
+    // steer
+    if (keys['ArrowLeft'] || keys['a'] || held.left)  px -= STEER;
+    if (keys['ArrowRight'] || keys['d'] || held.right) px += STEER;
+    if (tiltX !== 0 && !held.left && !held.right) px += tiltX * STEER;
+    px = Math.max(SKI_W, Math.min(W - SKI_W, px));
+
+    // spawn
+    if (frame % TREE_SPAWN === 0) spawnTree();
+    if (frame % GATE_SPAWN === 0) spawnGate();
+
+    // scroll obstacles
+    for (const o of obstacles) o.y += spd;
+    obstacles = obstacles.filter(o => o.y < H + 30);
+
+    // collision + gate scoring
+    for (const o of obstacles) {
+      if (o.type === 'tree') {
+        const dx = px - o.x, dy = PLAYER_Y - o.y;
+        if (Math.hypot(dx, dy) < o.r + 8) { endGame(false); return; }
+      } else if (o.type === 'gate' && !o.passed) {
+        if (o.y > PLAYER_Y - 10 && o.y < PLAYER_Y + 20) {
+          const inGap = px > o.cx - o.gap/2 && px < o.cx + o.gap/2;
+          o.passed = true;
+          if (inGap) score += GATE_BONUS;
+          // if missed gate, don't crash — just no bonus (remove pole collision for fun)
+        }
+      }
+    }
+
+    score += Math.floor(spd * 0.1);
+    if (WIN_DIST > 0 && score >= WIN_DIST) { endGame(true); return; }
+    updateHud();
+  }
+
+  function drawTree(o) {
+    // triangle tree
+    ctx.fillStyle = '#1a6e1a';
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y - o.r * 1.8);
+    ctx.lineTo(o.x - o.r, o.y + o.r * 0.3);
+    ctx.lineTo(o.x + o.r, o.y + o.r * 0.3);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(o.x - 3, o.y + o.r * 0.3, 6, o.r * 0.7);
+  }
+
+  function drawGate(o) {
+    const lx = o.cx - o.gap / 2, rx = o.cx + o.gap / 2;
+    // left pole (red)
+    ctx.fillStyle = '#dd2222';
+    ctx.fillRect(lx - 4, o.y - 14, 6, 28);
+    ctx.fillStyle = '#ff6666';
+    ctx.fillRect(lx - 14, o.y - 3, 14, 6);
+    // right pole (blue)
+    ctx.fillStyle = '#2233dd';
+    ctx.fillRect(rx - 2, o.y - 14, 6, 28);
+    ctx.fillStyle = '#6688ff';
+    ctx.fillRect(rx, o.y - 3, 14, 6);
+    // gate line (faint)
+    ctx.strokeStyle = o.passed ? '#444' : '#fff';
+    ctx.globalAlpha = 0.25; ctx.lineWidth = 1; ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(lx, o.y); ctx.lineTo(rx, o.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    // snow background
+    ctx.fillStyle = '#e8eef4'; ctx.fillRect(0, 0, W, H);
+    // ski tracks trailing behind player
+    ctx.strokeStyle = 'rgba(180,210,230,0.9)'; ctx.lineWidth = 2;
+    const trackLen = 80;
+    for (const dx of [-5, 5]) {
+      ctx.beginPath();
+      ctx.moveTo(px + dx, PLAYER_Y + SKI_H / 2);
+      ctx.lineTo(px + dx, PLAYER_Y + SKI_H / 2 + trackLen);
+      ctx.stroke();
+    }
+    // obstacles (back to front by y)
+    const sorted = [...obstacles].sort((a, b) => (a.y || 0) - (b.y || 0));
+    for (const o of sorted) {
+      if (o.type === 'tree') drawTree(o);
+      else drawGate(o);
+    }
+    // skier
+    const lean = ((keys['ArrowLeft']||keys['a']||held.left)?-1:0) + ((keys['ArrowRight']||keys['d']||held.right)?1:0);
+    ctx.fillStyle = COL1;
+    ctx.save(); ctx.translate(px, PLAYER_Y); ctx.rotate(lean * 0.18);
+    // body
+    ctx.fillRect(-6, -SKI_H/2, 12, SKI_H);
+    // head
+    ctx.beginPath(); ctx.arc(0, -SKI_H/2 - 6, 6, 0, Math.PI*2); ctx.fill();
+    // skis
+    ctx.fillStyle = COL2;
+    ctx.fillRect(-8, SKI_H/2 - 4, 16, 4);
+    ctx.restore();
+
+    // start prompt
+    if (!started) {
+      ctx.fillStyle = '#333'; ctx.globalAlpha = 0.7;
+      ctx.font = 'bold ' + Math.round(W * 0.045) + 'px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('Press ← / → or buttons to ski', W/2, H/2);
+      ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    }
+    // speed indicator
+    ctx.fillStyle = COL1; ctx.globalAlpha = 0.5;
+    ctx.font = '11px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText('Speed ' + spd.toFixed(1) + 'x', W - 8, H - 8);
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  }
+
+  // swipe support
+  let ts = null;
+  canvas.addEventListener('touchstart', e => { ts = e.touches[0].clientX; started = true; }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    if (ts === null) return;
+    const dx = e.touches[0].clientX - ts;
+    if (dx < -10) { held.left = true; held.right = false; }
+    else if (dx > 10) { held.right = true; held.left = false; }
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => { held.left = false; held.right = false; ts = null; });
+
+  // proportional tilt steering via DeviceOrientation gamma (-90..90 deg = left..right)
+  let tiltX = 0;
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      const g = e.gamma || 0;
+      const DEAD = 8, MAX = 40;
+      const abs = Math.abs(g);
+      if (abs < DEAD) { tiltX = 0; return; }
+      tiltX = Math.sign(g) * Math.min((abs - DEAD) / (MAX - DEAD), 1);
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+
+  function loop() {
+    if (running) step(); draw(); requestAnimationFrame(loop);
+  }
+  document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+})();
+</script>
+</body>
+</html>

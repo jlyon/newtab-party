@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__GAME_NAME__</title>
+<style>
+  :root {
+    --primary: __PRIMARY_COLOR__;
+    --secondary: __SECONDARY_COLOR__;
+    --bg: __BACKGROUND_COLOR__;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg); color: var(--primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  #wrap {
+    max-width: 720px; margin: 0 auto;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 2px; color: var(--secondary); }
+  .sub { opacity: 0.75; margin-bottom: 18px; font-size: 14px; }
+  #hud {
+    display: flex; justify-content: center; gap: 24px;
+    margin-bottom: 22px; font-size: 15px;
+  }
+  #board {
+    display: grid;
+    gap: 10px;
+    justify-content: center;
+  }
+  .card {
+    aspect-ratio: 3/4;
+    perspective: 800px;
+    cursor: pointer;
+  }
+  .inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.35s;
+  }
+  .card.flipped .inner,
+  .card.matched .inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    backface-visibility: hidden;
+    border-radius: 10px;
+    user-select: none;
+  }
+  .front {
+    background: var(--primary);
+    color: var(--bg);
+    font-weight: 800; font-size: 22px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+  }
+  .front::after { content: '?'; }
+  .back {
+    transform: rotateY(180deg);
+    background: var(--secondary);
+    color: var(--bg);
+    font-size: clamp(20px, 6vw, 40px);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+  }
+  .card.matched .back { opacity: 0.6; }
+  #overlay {
+    position: fixed; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.78);
+    flex-direction: column; text-align: center;
+    padding: 20px;
+  }
+  #overlay h2 { color: var(--secondary); font-size: 36px; margin: 0 0 10px; }
+  #overlay button {
+    margin-top: 18px; padding: 10px 22px; font-size: 16px;
+    background: var(--primary); color: var(--bg); border: none;
+    cursor: pointer; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div class="sub">Memory match for __PLAYER_NAME__</div>
+  <div id="hud">
+    <span id="moves">Moves: 0</span>
+    <span id="matches">Matches: 0</span>
+    <span id="time">Time: 0s</span>
+  </div>
+  <div id="board"></div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">You did it!</h2>
+  <p id="overMsg">All matched. Iconic.</p>
+  <button id="restart">Play again</button>
+</div>
+<script>
+(() => {
+  const board = document.getElementById('board');
+  const movesEl = document.getElementById('moves');
+  const matchesEl = document.getElementById('matches');
+  const timeEl = document.getElementById('time');
+  const overlay = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // Choose a 4x4 (8 pairs) or 6x6 (18 pairs) grid. The SYMBOLS list must
+  // have AT LEAST as many entries as needed pairs. Customize symbols to fit
+  // the theme (food, animals, emoji, inside jokes, single letters, etc).
+  const GRID = 4; // 4 or 6
+  const SYMBOLS = [
+    '🍕','🌮','🍔','🍩','🍣','🍪','🥑','🍎',
+    '🐙','🐢','🦊','🦄','🐝','🐳','🐸','🦖',
+    '⭐','☄️','🌈'
+  ];
+  const WIN_MSG = '__PLAYER_NAME__ matched everything. Brain: enormous.';
+  // ==================================
+
+  const PAIRS = (GRID * GRID) / 2;
+
+  let cards, flipped, moves, matches, lock, startTime, timer;
+
+  function reset() {
+    overlay.style.display = 'none';
+    moves = 0; matches = 0; flipped = []; lock = false;
+    if (timer) clearInterval(timer);
+    startTime = Date.now();
+    timer = setInterval(() => {
+      const s = Math.floor((Date.now()-startTime)/1000);
+      timeEl.textContent = 'Time: ' + s + 's';
+    }, 200);
+
+    if (SYMBOLS.length < PAIRS) {
+      board.innerHTML = '<p style="color:var(--secondary)">Need at least ' + PAIRS + ' symbols. Got ' + SYMBOLS.length + '.</p>';
+      return;
+    }
+
+    const picks = SYMBOLS.slice(0, PAIRS);
+    const deck = [...picks, ...picks];
+    // shuffle
+    for (let i = deck.length-1; i>0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    board.style.gridTemplateColumns = `repeat(${GRID}, minmax(0, 1fr))`;
+    board.style.maxWidth = (GRID * 90) + 'px';
+    board.innerHTML = '';
+    cards = deck.map((sym, i) => {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.dataset.index = i;
+      el.dataset.symbol = sym;
+      el.innerHTML = `<div class="inner"><div class="face front"></div><div class="face back">${sym}</div></div>`;
+      el.addEventListener('click', () => flip(el));
+      board.appendChild(el);
+      return el;
+    });
+    updateHud();
+  }
+  function updateHud() {
+    movesEl.textContent = 'Moves: ' + moves;
+    matchesEl.textContent = 'Matches: ' + matches + ' / ' + PAIRS;
+  }
+  function flip(el) {
+    if (lock) return;
+    if (el.classList.contains('flipped') || el.classList.contains('matched')) return;
+    el.classList.add('flipped');
+    flipped.push(el);
+    if (flipped.length === 2) {
+      moves++; updateHud();
+      const [a, b] = flipped;
+      if (a.dataset.symbol === b.dataset.symbol) {
+        a.classList.add('matched'); b.classList.add('matched');
+        flipped = [];
+        matches++; updateHud();
+        if (matches === PAIRS) win();
+      } else {
+        lock = true;
+        setTimeout(() => {
+          a.classList.remove('flipped');
+          b.classList.remove('flipped');
+          flipped = []; lock = false;
+        }, 800);
+      }
+    }
+  }
+  function win() {
+    clearInterval(timer);
+    const s = Math.floor((Date.now()-startTime)/1000);
+    overTitle.textContent = 'You win!';
+    overMsg.textContent = WIN_MSG + ' (' + moves + ' moves, ' + s + 's)';
+    overlay.style.display = 'flex';
+  }
+
+  addEventListener('keydown', e => { if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click(); });
+  document.getElementById('restart').addEventListener('click', reset);
+  reset();
+})();
+</script>
+</body>
+</html>

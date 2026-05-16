@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; touch-action: manipulation; overflow-x: hidden; }
+  #wrap { display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 10px 6px; gap: 8px; }
+  h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
+  #hud { display: flex; gap: 14px; font-size: clamp(11px, 3vw, 13px); opacity: 0.8; }
+  #top-row, #tableau { display: flex; gap: clamp(4px, 1.5vw, 8px); width: 100%; max-width: 430px; }
+  #top-row { justify-content: space-between; }
+  .spacer { flex: 1; }
+  .pile {
+    width: var(--cw); height: var(--ch); border-radius: 6px;
+    border: 2px dashed rgba(255,255,255,0.25); cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 22px; opacity: 0.5;
+    position: relative;
+  }
+  .pile.has-card { border-color: transparent; opacity: 1; }
+  .tab-col { flex: 1; position: relative; min-height: var(--ch); }
+  .card {
+    width: var(--cw); height: var(--ch); background: #fff; border-radius: 6px;
+    border: 1px solid #ccc; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: flex-start;
+    padding: 3px 4px; font-size: var(--cf); font-weight: 800;
+    cursor: pointer; user-select: none; position: absolute;
+    box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
+  }
+  .card.red { color: #cc0000; }
+  .card.back { background: var(--primary); cursor: default; }
+  .card.sel { outline: 3px solid var(--secondary); outline-offset: 2px; z-index: 100; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span>Player: __PLAYER_NAME__</span>
+    <span id="score-disp">Score: 0</span>
+    <span id="hi">Best: 0</span>
+  </div>
+  <div id="top-row">
+    <div class="pile" id="stock" title="Stock">🂠</div>
+    <div class="pile" id="waste"></div>
+    <div class="spacer"></div>
+    <div class="pile" id="f0" title="♠">♠</div>
+    <div class="pile" id="f1" title="♥">♥</div>
+    <div class="pile" id="f2" title="♦">♦</div>
+    <div class="pile" id="f3" title="♣">♣</div>
+  </div>
+  <div id="tableau">
+    <div class="tab-col" id="t0"></div>
+    <div class="tab-col" id="t1"></div>
+    <div class="tab-col" id="t2"></div>
+    <div class="tab-col" id="t3"></div>
+    <div class="tab-col" id="t4"></div>
+    <div class="tab-col" id="t5"></div>
+    <div class="tab-col" id="t6"></div>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">You win!</h2>
+  <p id="overMsg"></p>
+  <button id="restart">New game</button>
+</div>
+<script>
+(() => {
+  const scoreDisp = document.getElementById('score-disp');
+  const hiEl      = document.getElementById('hi');
+  const overlay   = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = '__PLAYER_NAME__';
+  const WIN_MSG = PLAYER_NAME + ' beat solitaire. Hall of fame. Probably.';
+  // ==================================
+
+  const SUITS = ['♠','♥','♦','♣'];
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const RV    = Object.fromEntries(RANKS.map((r,i)=>([r,i+1])));
+  const RED   = new Set(['♥','♦']);
+
+  // Responsive card sizing
+  const cw = Math.min(54, Math.floor((Math.min(window.innerWidth,430) - 60) / 7));
+  const ch = Math.round(cw * 1.42);
+  const cf = Math.round(cw * 0.28);
+  document.documentElement.style.setProperty('--cw', cw+'px');
+  document.documentElement.style.setProperty('--ch', ch+'px');
+  document.documentElement.style.setProperty('--cf', cf+'px');
+  const FACE_OFFSET = Math.round(ch * 0.28);  // face-up cascade offset
+  const DOWN_OFFSET = Math.round(ch * 0.17);  // face-down cascade offset
+
+  let stock, waste, found, tab, sel, score, hiScore = 0, moves;
+
+  function makeDeck() {
+    const d = SUITS.flatMap(s => RANKS.map(r => ({r,s,red:RED.has(s),faceUp:false})));
+    for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}
+    return d;
+  }
+  function reset() {
+    const d = makeDeck();
+    tab = Array.from({length:7},()=>[]); stock = []; waste = []; found = [[],[],[],[]];
+    for(let col=0;col<7;col++){
+      for(let row=0;row<=col;row++) tab[col].push({...d.pop(), faceUp: row===col});
+    }
+    stock = d; // remaining 24 cards
+    sel = null; score = 0; moves = 0;
+    overlay.style.display = 'none'; render();
+  }
+
+  function canPlaceOnTab(card, pile) {
+    if (!pile.length) return card.r === 'K';
+    const top = pile[pile.length-1];
+    return top.faceUp && top.red !== card.red && RV[top.r] - RV[card.r] === 1;
+  }
+  function canPlaceOnFound(card, pile) {
+    if (!pile.length) return card.r === 'A';
+    const top = pile[pile.length-1];
+    return top.s === card.s && RV[card.r] - RV[top.r] === 1;
+  }
+
+  function autoFoundation() {
+    // auto-move single card to foundation if safe (all lower cards already there)
+    for (const source of [waste, ...tab]) {
+      if (!source.length) continue;
+      const c = source[source.length-1];
+      if (!c.faceUp) continue;
+      const fi = found.findIndex(f => canPlaceOnFound(c, f));
+      if (fi >= 0) {
+        // only auto if both lower-rank cards of other colors are already in foundation
+        const lower = RV[c.r] - 1;
+        const safeToAuto = lower <= 2 ||
+          found.filter(f => f.length >= lower - 1).length >= 2;
+        if (safeToAuto) {
+          found[fi].push(source.pop());
+          score += 15; moves++;
+          if (source === waste && stock.length === 0 && waste.length === 0) {/* ok */}
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function clickStock() {
+    sel = null;
+    if (stock.length) { const c = stock.pop(); c.faceUp = true; waste.push(c); score += 2; }
+    else { stock = waste.reverse().map(c=>({...c,faceUp:false})); waste = []; score = Math.max(0, score-100); }
+    moves++; render(); checkWin();
+  }
+
+  function handleClick(src, idx) {
+    // src = 'waste' | 'f0-3' | 't0-6'
+    if (src === 'stock') { clickStock(); return; }
+    const pile = getPile(src);
+    // flip face-down tableau top
+    if (src.startsWith('t') && pile.length && !pile[pile.length-1].faceUp) {
+      pile[pile.length-1].faceUp = true; score += 5; moves++; sel = null; render(); return;
+    }
+    if (!sel) {
+      // try to select
+      if (!pile.length) return;
+      const card = pile[idx ?? pile.length-1];
+      if (!card?.faceUp) return;
+      sel = { src, idx: idx ?? pile.length-1 };
+      render(); return;
+    }
+    // try to move sel → src
+    const fromPile = getPile(sel.src);
+    const cards = fromPile.slice(sel.idx); // cards to move
+    if (!cards.length) { sel = null; render(); return; }
+    const card = cards[0];
+    if (src.startsWith('f') && cards.length === 1) {
+      const fi = parseInt(src[1]);
+      if (canPlaceOnFound(card, found[fi])) {
+        found[fi].push(fromPile.pop());
+        score += 15; moves++; flipTabTop(sel.src);
+        sel = null; render(); while(autoFoundation()){render();} checkWin(); return;
+      }
+    }
+    if (src.startsWith('t')) {
+      if (canPlaceOnTab(card, pile)) {
+        pile.push(...fromPile.splice(sel.idx));
+        score += 5; moves++; flipTabTop(sel.src);
+        sel = null; render(); while(autoFoundation()){render();} checkWin(); return;
+      }
+    }
+    // clicking same card = deselect; clicking new face-up card = reselect
+    if (src === sel.src && (idx === undefined || idx === sel.idx)) { sel = null; render(); return; }
+    sel = null;
+    handleClick(src, idx); // reselect new target
+  }
+
+  function getPile(src) {
+    if (src==='waste') return waste;
+    if (src.startsWith('f')) return found[parseInt(src[1])];
+    if (src.startsWith('t')) return tab[parseInt(src[1])];
+    return [];
+  }
+  function flipTabTop(src) {
+    if (!src.startsWith('t')) return;
+    const p = getPile(src);
+    if (p.length && !p[p.length-1].faceUp) { p[p.length-1].faceUp = true; score += 5; }
+  }
+
+  function checkWin() {
+    if (found.every(f => f.length === 13)) {
+      score += 500;
+      if (score > hiScore) { hiScore = score; window.parent.postMessage({ highScore: hiScore }, '*'); }
+      hiEl.textContent = 'Best: ' + hiScore;
+      overTitle.textContent = 'You win!';
+      overMsg.textContent = WIN_MSG + ' (' + moves + ' moves, ' + score + ' pts)';
+      overlay.style.display = 'flex';
+    }
+    scoreDisp.textContent = 'Score: ' + score;
+    hiEl.textContent = 'Best: ' + hiScore;
+  }
+
+  function cardEl(c, src, idx, isTop) {
+    const el = document.createElement('div');
+    el.className = 'card' + (c.red?' red':'') + (!c.faceUp?' back':'');
+    if (c.faceUp && sel?.src===src && idx>=sel.idx) el.classList.add('sel');
+    if (c.faceUp) el.textContent = c.r + c.s;
+    el.style.top = '0';
+    el.addEventListener('click', e => { e.stopPropagation(); handleClick(src, idx); });
+    return el;
+  }
+
+  function render() {
+    // stock
+    const stockEl = document.getElementById('stock');
+    stockEl.innerHTML = stock.length ? '🂠' : '↺';
+    stockEl.className = 'pile has-card';
+    stockEl.onclick = () => handleClick('stock');
+
+    // waste
+    const wasteEl = document.getElementById('waste');
+    wasteEl.innerHTML = '';
+    wasteEl.className = 'pile' + (waste.length ? ' has-card' : '');
+    if (waste.length) {
+      const c = waste[waste.length-1];
+      const el = cardEl(c, 'waste', waste.length-1, true);
+      el.style.position = 'relative';
+      el.style.width = el.style.height = '100%';
+      wasteEl.appendChild(el);
+    } else { wasteEl.textContent = ''; }
+    wasteEl.onclick = e => { if (!e.target.closest('.card')) handleClick('waste'); };
+
+    // foundations
+    for (let i = 0; i < 4; i++) {
+      const f = found[i], el = document.getElementById('f'+i);
+      el.innerHTML = '';
+      el.className = 'pile' + (f.length?' has-card':'');
+      if (f.length) {
+        const c = f[f.length-1];
+        const cd = cardEl(c, 'f'+i, f.length-1, true);
+        cd.style.position = 'relative'; cd.style.width = cd.style.height = '100%';
+        el.appendChild(cd);
+      } else { el.textContent = SUITS[i]; }
+      el.onclick = e => { if(!e.target.closest('.card')) handleClick('f'+i); };
+    }
+
+    // tableau
+    for (let ci = 0; ci < 7; ci++) {
+      const col = tab[ci], el = document.getElementById('t'+ci);
+      el.innerHTML = '';
+      let topY = 0;
+      col.forEach((c, j) => {
+        const cd = cardEl(c, 't'+ci, j, j===col.length-1);
+        cd.style.top = topY + 'px';
+        el.appendChild(cd);
+        topY += c.faceUp ? FACE_OFFSET : DOWN_OFFSET;
+      });
+      el.style.minHeight = (topY + ch) + 'px';
+      el.onclick = e => { if(!e.target.closest('.card')) handleClick('t'+ci); };
+    }
+    scoreDisp.textContent = 'Score: ' + score;
+  }
+
+  addEventListener('keydown', e => {
+    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+  reset();
+})();
+</script>
+</body>
+</html>

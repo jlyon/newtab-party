@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; touch-action: manipulation; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px 12px; gap: 14px; }
+  h1 { margin: 0; font-size: clamp(15px, 4vw, 24px); letter-spacing: 3px; }
+  #credits-row { font-size: clamp(13px, 3.5vw, 17px); }
+  #hand { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .card {
+    width: clamp(56px, 16vw, 72px); height: clamp(80px, 23vw, 102px);
+    background: #fff; border-radius: 8px; border: 1px solid #ccc;
+    display: flex; flex-direction: column; align-items: flex-start;
+    justify-content: flex-start; padding: 6px 8px;
+    font-size: clamp(18px, 5vw, 24px); font-weight: 800;
+    cursor: pointer; user-select: none; position: relative;
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.45);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card.red { color: #cc0000; }
+  .card.held { transform: translateY(-14px); box-shadow: 0 6px 18px var(--secondary);
+    outline: 3px solid var(--secondary); outline-offset: 2px; }
+  .hold-label { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center;
+    font-size: 10px; font-weight: 700; color: var(--secondary); letter-spacing: 1px; }
+  .card.held .hold-label::before { content: 'HOLD'; }
+  #result { font-size: clamp(16px, 4.5vw, 22px); font-weight: 700; color: var(--secondary);
+    min-height: 30px; text-align: center; }
+  #bet-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .chip { padding: 8px 14px; font-size: clamp(12px, 3.5vw, 15px); font-weight: 700;
+    border: 3px solid var(--secondary); background: transparent; color: var(--secondary);
+    cursor: pointer; border-radius: 50px; user-select: none; }
+  .chip:active { background: var(--secondary); color: var(--bg); }
+  .chip.active { background: var(--secondary); color: var(--bg); }
+  #draw-btn { padding: 10px 28px; font-size: clamp(14px, 4vw, 17px); font-weight: 700;
+    border: 2px solid var(--primary); background: transparent; color: var(--primary);
+    cursor: pointer; border-radius: 6px; user-select: none; }
+  #draw-btn:active { background: var(--primary); color: var(--bg); }
+  #draw-btn:disabled { opacity: 0.3; cursor: default; }
+  #pay-table { display: grid; grid-template-columns: auto auto; gap: 2px 14px;
+    font-size: clamp(10px, 2.5vw, 12px); opacity: 0.6; }
+  .pay-row.hit { opacity: 1; color: var(--secondary); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="credits-row">__PLAYER_NAME__ · Credits: <span id="credits">100</span> · Bet: <span id="bet-disp">1</span></div>
+  <div id="hand"></div>
+  <div id="result"></div>
+  <div id="bet-row">
+    <button class="chip active" data-v="1">Bet 1</button>
+    <button class="chip" data-v="2">Bet 2</button>
+    <button class="chip" data-v="5">Bet 5</button>
+    <button id="draw-btn">Deal ▶</button>
+  </div>
+  <div id="pay-table"></div>
+</div>
+<script>
+(() => {
+  const creditsEl = document.getElementById('credits');
+  const betDispEl = document.getElementById('bet-disp');
+  const handEl    = document.getElementById('hand');
+  const resultEl  = document.getElementById('result');
+  const drawBtn   = document.getElementById('draw-btn');
+  const payTable  = document.getElementById('pay-table');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME   = '__PLAYER_NAME__';
+  const START_CREDITS = 100;
+  // Jacks-or-Better pay table (multiplier × bet):
+  const PAY = [
+    { name: 'Royal Flush',    mult: 250 },
+    { name: 'Straight Flush', mult: 50  },
+    { name: 'Four of a Kind', mult: 25  },
+    { name: 'Full House',     mult: 9   },
+    { name: 'Flush',          mult: 6   },
+    { name: 'Straight',       mult: 4   },
+    { name: 'Three of a Kind',mult: 3   },
+    { name: 'Two Pair',       mult: 2   },
+    { name: 'Jacks or Better',mult: 1   },
+  ];
+  // ==================================
+
+  const SUITS = ['♠','♥','♦','♣'];
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const RANK_N = Object.fromEntries(RANKS.map((r,i)=>([r,i+1])));
+  function makeDeck() { return SUITS.flatMap(s => RANKS.map(r => ({r, s, red: s==='♥'||s==='♦'}))); }
+  function shuffle(d) { for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d; }
+
+  function evaluate(hand) {
+    const ranks = hand.map(c => RANK_N[c.r]).sort((a,b)=>a-b);
+    const suits = hand.map(c => c.s);
+    const counts = {};
+    for (const r of ranks) counts[r] = (counts[r]||0)+1;
+    const vals = Object.values(counts).sort((a,b)=>b-a);
+    const flush = suits.every(s=>s===suits[0]);
+    const straight = ranks[4]-ranks[0]===4 && vals[0]===1
+                  || ranks.join(',') === '1,10,11,12,13'; // A-10-J-Q-K
+    const royal = flush && ranks.join(',') === '1,10,11,12,13';
+    if (royal)                       return 'Royal Flush';
+    if (flush && straight)           return 'Straight Flush';
+    if (vals[0]===4)                 return 'Four of a Kind';
+    if (vals[0]===3 && vals[1]===2)  return 'Full House';
+    if (flush)                       return 'Flush';
+    if (straight)                    return 'Straight';
+    if (vals[0]===3)                 return 'Three of a Kind';
+    if (vals[0]===2 && vals[1]===2)  return 'Two Pair';
+    // Jacks or better (one pair J, Q, K, A)
+    if (vals[0]===2) {
+      const paired = Object.entries(counts).find(([r,n])=>n===2);
+      if (paired && +paired[0] >= 11) return 'Jacks or Better';
+    }
+    return null;
+  }
+
+  let deck, hand, held, credits, bet, phase, hiScore = 0;
+
+  function reset() { credits = START_CREDITS; bet = 1; phase = 'deal'; renderPayTable(null); newHand(); }
+
+  function newHand() {
+    deck = shuffle(makeDeck());
+    hand = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
+    held = [false,false,false,false,false];
+    phase = 'hold';
+    drawBtn.textContent = 'Draw ▶';
+    drawBtn.disabled = credits < bet;
+    resultEl.textContent = 'Click cards to HOLD, then Draw.';
+    renderHand(); renderPayTable(null);
+  }
+
+  function draw() {
+    if (phase === 'hold') {
+      credits -= bet; creditsEl.textContent = credits;
+      for (let i = 0; i < 5; i++) if (!held[i]) hand[i] = deck.pop();
+      phase = 'result';
+      drawBtn.textContent = 'Deal ▶';
+      const name = evaluate(hand);
+      const pay = PAY.find(p=>p.name===name);
+      const won = pay ? pay.mult * bet : 0;
+      credits += won; creditsEl.textContent = credits;
+      if (credits > hiScore) { hiScore = credits; window.parent.postMessage({ highScore: hiScore }, '*'); }
+      resultEl.textContent = name ? '🎉 ' + name + ' +' + won + ' cr' : 'No win. Better luck next time.';
+      if (credits <= 0) { credits = START_CREDITS; resultEl.textContent += ' (wallet reloaded!)'; }
+      renderHand(); renderPayTable(name);
+    } else if (phase === 'result') {
+      newHand();
+    }
+  }
+
+  function toggleHold(i) {
+    if (phase !== 'hold') return;
+    held[i] = !held[i];
+    renderHand();
+  }
+
+  function renderHand() {
+    handEl.innerHTML = '';
+    hand.forEach((c, i) => {
+      const el = document.createElement('div');
+      el.className = 'card' + (c.red?' red':'') + (held[i]?' held':'');
+      el.innerHTML = c.r + c.s + '<span class="hold-label"></span>';
+      el.addEventListener('click', () => toggleHold(i));
+      handEl.appendChild(el);
+    });
+  }
+
+  function renderPayTable(winName) {
+    payTable.innerHTML = '';
+    for (const p of PAY) {
+      const r1 = document.createElement('div'); r1.className = 'pay-row' + (p.name===winName?' hit':'');
+      r1.textContent = p.name;
+      const r2 = document.createElement('div'); r2.className = 'pay-row' + (p.name===winName?' hit':'');
+      r2.textContent = p.mult + 'x';
+      payTable.appendChild(r1); payTable.appendChild(r2);
+    }
+  }
+
+  document.querySelectorAll('.chip').forEach(b => {
+    b.addEventListener('click', () => {
+      if (phase !== 'result') {
+        bet = Math.min(credits, +b.dataset.v);
+        betDispEl.textContent = bet;
+        document.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === b));
+      }
+    });
+  });
+  drawBtn.addEventListener('click', draw);
+  addEventListener('keydown', e => {
+    if (e.key >= '1' && e.key <= '5') toggleHold(+e.key - 1);
+    if (e.key === 'Enter' || e.key === 'd' || e.key === 'D') draw();
+  });
+  reset();
+})();
+</script>
+</body>
+</html>

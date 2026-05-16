@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; touch-action: manipulation; }
+  #wrap { display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 10px 8px; gap: 8px; }
+  h1 { margin: 0; font-size: clamp(14px, 3.5vw, 20px); letter-spacing: 2px; }
+  #scores-bar { display: flex; gap: 10px; font-size: clamp(10px, 2.5vw, 13px); flex-wrap: wrap; justify-content: center; opacity: 0.8; }
+  .score-chip { padding: 3px 8px; border: 1px solid var(--primary); border-radius: 12px; }
+  .score-chip.you { border-color: var(--secondary); color: var(--secondary); }
+  #table { position: relative; width: min(380px, 95vw); height: 200px; }
+  .ai-area { position: absolute; display: flex; gap: -4px; align-items: center; }
+  #ai-top    { top: 0;    left: 50%; transform: translateX(-50%); }
+  #ai-left   { left: 0;  top: 50%;  transform: translateY(-50%); }
+  #ai-right  { right: 0; top: 50%;  transform: translateY(-50%); }
+  .ai-card { width: clamp(22px, 6vw, 30px); height: clamp(32px, 9vw, 42px);
+    background: var(--primary); border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
+    margin-left: -4px; }
+  #trick-area { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 4px; width: 100px; }
+  .trick-slot { width: 44px; height: 62px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); }
+  .card {
+    width: clamp(40px, 11vw, 52px); height: clamp(56px, 16vw, 74px);
+    background: #fff; border-radius: 6px; border: 1px solid #bbb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(14px, 4vw, 18px); font-weight: 800;
+    cursor: pointer; user-select: none;
+    box-shadow: 1px 2px 5px rgba(0,0,0,0.35);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .card.red { color: #cc0000; }
+  .card.sel { transform: translateY(-10px); box-shadow: 0 6px 14px var(--secondary);
+    outline: 2px solid var(--secondary); outline-offset: 2px; }
+  .card.unplayable { opacity: 0.4; cursor: not-allowed; }
+  .card.pass-sel { transform: translateY(-10px); outline: 2px solid #44cc44; outline-offset: 2px; }
+  #player-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center;
+    width: min(500px, 98vw); }
+  #msg { font-size: clamp(12px, 3.5vw, 15px); font-weight: 600; color: var(--secondary);
+    min-height: 22px; text-align: center; }
+  #action-area { display: flex; gap: 8px; }
+  .act-btn { padding: 10px 20px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
+    border: 2px solid var(--primary); background: transparent; color: var(--primary);
+    cursor: pointer; border-radius: 6px; user-select: none; }
+  .act-btn:disabled { opacity: 0.3; cursor: default; }
+  .act-btn:active:not(:disabled) { background: var(--primary); color: var(--bg); }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(20px, 5vw, 32px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 3px 0; font-size: clamp(12px, 3vw, 14px); }
+  #overlay button { margin-top: 16px; padding: 10px 26px; font-size: clamp(13px, 3.5vw, 15px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="scores-bar">
+    <span class="score-chip you" id="s0">You: 0</span>
+    <span class="score-chip" id="s1">Left: 0</span>
+    <span class="score-chip" id="s2">Across: 0</span>
+    <span class="score-chip" id="s3">Right: 0</span>
+  </div>
+  <div id="table">
+    <div class="ai-area" id="ai-top"></div>
+    <div class="ai-area" id="ai-left"></div>
+    <div class="ai-area" id="ai-right"></div>
+    <div id="trick-area">
+      <div class="trick-slot" id="trick-2"></div>
+      <div class="trick-slot" id="trick-1"></div>
+      <div class="trick-slot" id="trick-3"></div>
+      <div class="trick-slot" id="trick-0"></div>
+    </div>
+  </div>
+  <div id="msg">Loading...</div>
+  <div id="player-hand"></div>
+  <div id="action-area">
+    <button class="act-btn" id="pass-btn" style="display:none">Pass 3 cards →</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Game Over</h2>
+  <p id="overMsg"></p>
+  <p id="overScores"></p>
+  <button id="restart">Play again</button>
+</div>
+<script>
+(() => {
+  const overlay   = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScores= document.getElementById('overScores');
+  const msgEl     = document.getElementById('msg');
+  const handEl    = document.getElementById('player-hand');
+  const passBtn   = document.getElementById('pass-btn');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = '__PLAYER_NAME__';
+  const AI_NAMES    = ['__ENEMY_NAME__ 1', '__ENEMY_NAME__ 2', '__ENEMY_NAME__ 3'];
+  // (Customize AI names — or replace with specific names like 'Bob', 'Carol', 'Dave')
+  const GAME_OVER_SCORE = 100; // first player to reach this triggers final scoring
+  const WIN_MSG  = PLAYER_NAME + ' had the lowest score. Utterly ruthless.';
+  const LOSE_MSG = PLAYER_NAME + ' collected too many hearts. Oops.';
+  // ==================================
+
+  const SUITS = ['♠','♥','♦','♣'];
+  const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  const RV = Object.fromEntries(RANKS.map((r,i)=>([r,i])));
+  const RED = new Set(['♥','♦']);
+  const isHeart = c => c.s === '♥';
+  const isQueenSpades = c => c.s === '♠' && c.r === 'Q';
+  const pointsOf = c => isHeart(c) ? 1 : isQueenSpades(c) ? 13 : 0;
+
+  function makeDeck() {
+    const d = SUITS.flatMap(s => RANKS.map(r => ({r,s,red:RED.has(s)})));
+    for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}
+    return d;
+  }
+  function sortHand(h) { return [...h].sort((a,b)=>SUITS.indexOf(a.s)-SUITS.indexOf(b.s)||RV[a.r]-RV[b.r]); }
+
+  let hands, totalScores, roundScores, trickCards, trickLeader;
+  let phase, roundNum, heartsBroken, passSelection, currentPlayer, aiDelay;
+  let hiScore = null;
+
+  const NAMES = [PLAYER_NAME, ...AI_NAMES];
+  function nameOf(i) { return NAMES[i] || 'P'+(i+1); }
+
+  function reset() {
+    totalScores = [0,0,0,0]; roundNum = 0;
+    overlay.style.display = 'none';
+    newRound();
+  }
+
+  function newRound() {
+    roundNum++;
+    const d = makeDeck();
+    hands = Array.from({length:4}, (_,i) => sortHand(d.splice(0,13)));
+    roundScores = [0,0,0,0]; trickCards = [null,null,null,null]; trickLeader = 0;
+    heartsBroken = false; passSelection = []; aiDelay = 0;
+    // find who has 2♣
+    trickLeader = hands.findIndex(h => h.some(c => c.r==='2'&&c.s==='♣'));
+    currentPlayer = trickLeader;
+    const passDir = [1,3,2,0][(roundNum-1)%4]; // left, right, across, hold
+    if (passDir === 0) { phase = 'play'; startTrick(); }
+    else { phase = 'pass'; passBtn.style.display = ''; renderAll(); }
+  }
+
+  function passTarget() { return [1,3,2,0][(roundNum-1)%4]; }
+
+  function doPass() {
+    if (passSelection.length !== 3) return;
+    const target = passTarget();
+    // AI pass: give away highest-point cards
+    for (let p = 1; p <= 3; p++) {
+      const from = p, to = (p + target - 1) % 4 + (target>0?0:0);
+      // simplified: each AI passes 3 highest-value cards
+    }
+    // Circular pass
+    const buffers = hands.map(h => [...h]);
+    const passCards = hands.map((h,p) => {
+      if (p === 0) return passSelection.map(c => hands[0].find(x=>x===c));
+      return aiChoosePass(p, h);
+    });
+    for (let p = 0; p < 4; p++) {
+      const to = (p + passTarget()) % 4;
+      for (const c of passCards[p]) {
+        const idx = hands[p].indexOf(c); if (idx>=0) hands[p].splice(idx,1);
+        hands[to].push(c);
+      }
+      hands[p] = sortHand(hands[p]);
+    }
+    passSelection = []; passBtn.style.display = 'none';
+    phase = 'play'; startTrick(); renderAll();
+  }
+
+  function aiChoosePass(p, hand) {
+    const sorted = [...hand].sort((a,b)=>pointsOf(b)-pointsOf(a)||RV[b.r]-RV[a.r]);
+    return sorted.slice(0,3);
+  }
+
+  function startTrick() {
+    trickCards = [null,null,null,null];
+    currentPlayer = trickLeader;
+    renderAll();
+    if (currentPlayer !== 0) scheduleAI();
+  }
+
+  function canPlay(card, playerIdx) {
+    const h = hands[playerIdx];
+    if (!trickCards.some(c=>c)) {
+      // leading: can't lead hearts until broken (unless only hearts left)
+      if (!heartsBroken && isHeart(card) && h.some(c=>!isHeart(c))) return false;
+      // first trick: must play 2♣
+      if (roundScores.every(s=>s===0) && trickCards.every(c=>!c)) {
+        if (!(card.r==='2' && card.s==='♣')) return false;
+      }
+      return true;
+    }
+    const ledSuit = trickCards.find(c=>c)?.s;
+    if (card.s === ledSuit) return true;
+    if (h.some(c=>c.s===ledSuit)) return false; // must follow suit
+    // can't play hearts on first trick (if have other cards)
+    if (roundScores.every(s=>s===0) && trickCards.some(c=>c) && !h.some(c=>!isHeart(c)&&!isQueenSpades(c))) {
+      // only has hearts/queen: must play
+    } else if (roundScores.every(s=>s===0) && trickCards.some(c=>c)) {
+      if (isHeart(card) || isQueenSpades(card)) {
+        if (h.some(c=>!isHeart(c)&&!isQueenSpades(c))) return false;
+      }
+    }
+    return true;
+  }
+
+  function playCard(playerIdx, card) {
+    const idx = hands[playerIdx].findIndex(c=>c===card); if (idx<0) return;
+    hands[playerIdx].splice(idx,1);
+    trickCards[playerIdx] = card;
+    if (isHeart(card) || isQueenSpades(card)) heartsBroken = true;
+    renderAll();
+    // check if trick complete
+    if (trickCards.every(c=>c)) { setTimeout(resolveTrick, 800); }
+    else {
+      currentPlayer = (playerIdx + 1) % 4;
+      if (currentPlayer !== 0) scheduleAI();
+      else renderAll();
+    }
+  }
+
+  function scheduleAI() {
+    setTimeout(() => {
+      if (currentPlayer === 0) return;
+      const card = aiChoosePlay(currentPlayer);
+      if (card) playCard(currentPlayer, card);
+    }, 700 + Math.random() * 400);
+  }
+
+  function aiChoosePlay(p) {
+    const h = hands[p];
+    const valid = h.filter(c => canPlay(c, p));
+    if (!valid.length) return h[0]; // fallback
+    const led = trickCards.find(c=>c)?.s;
+    if (!led) {
+      // leading: play lowest non-heart
+      const safe = valid.filter(c=>!isHeart(c)&&!isQueenSpades(c));
+      if (safe.length) return safe.sort((a,b)=>RV[a.r]-RV[b.r])[0];
+      return valid.sort((a,b)=>RV[a.r]-RV[b.r])[0];
+    }
+    // following: try not to win, dump points if can't follow
+    const following = valid.filter(c=>c.s===led);
+    if (following.length) {
+      const top = trickCards.filter(c=>c&&c.s===led).sort((a,b)=>RV[b.r]-RV[a.r])[0];
+      const under = following.filter(c=>RV[c.r]<RV[top.r]);
+      if (under.length) return under.sort((a,b)=>RV[b.r]-RV[a.r])[0]; // highest under
+      return following.sort((a,b)=>RV[a.r]-RV[b.r])[0]; // must win, play lowest
+    }
+    // can't follow: dump highest point card
+    const qs = valid.find(isQueenSpades);
+    if (qs) return qs;
+    const hearts = valid.filter(isHeart).sort((a,b)=>RV[b.r]-RV[a.r]);
+    if (hearts.length) return hearts[0];
+    return valid.sort((a,b)=>RV[b.r]-RV[a.r])[0];
+  }
+
+  function resolveTrick() {
+    const led = trickCards.find(c=>c)?.s;
+    let winner = 0; let highVal = -1;
+    for (let i = 0; i < 4; i++) {
+      if (trickCards[i]?.s === led && RV[trickCards[i].r] > highVal) {
+        highVal = RV[trickCards[i].r]; winner = i;
+      }
+    }
+    const pts = trickCards.reduce((s,c)=>s+(c?pointsOf(c):0),0);
+    roundScores[winner] += pts;
+    trickLeader = winner;
+    trickCards = [null,null,null,null];
+    msgEl.textContent = nameOf(winner) + ' takes the trick' + (pts>0?` (+${pts}pts)`:'') + '.';
+    if (hands[0].length === 0) {
+      finishRound();
+    } else {
+      startTrick();
+    }
+  }
+
+  function finishRound() {
+    // shoot the moon check
+    const shooter = roundScores.findIndex(s=>s===26);
+    if (shooter >= 0) {
+      for (let i = 0; i < 4; i++) roundScores[i] = shooter===i ? 0 : 26;
+    }
+    for (let i = 0; i < 4; i++) totalScores[i] += roundScores[i];
+    updateScoreChips();
+    if (totalScores.some(s=>s>=GAME_OVER_SCORE)) { endGame(); return; }
+    setTimeout(newRound, 1500);
+  }
+
+  function endGame() {
+    const min = Math.min(...totalScores);
+    const winner = totalScores.findIndex(s=>s===min);
+    const youWon = winner === 0;
+    window.parent.postMessage({ highScore: GAME_OVER_SCORE - totalScores[0] }, '*');
+    overTitle.textContent = youWon ? 'You win!' : nameOf(winner) + ' wins!';
+    overMsg.textContent = youWon ? WIN_MSG : LOSE_MSG;
+    overScores.textContent = NAMES.map((n,i)=>n+': '+totalScores[i]).join('  ·  ');
+    overlay.style.display = 'flex';
+  }
+
+  function updateScoreChips() {
+    ['you','P1','P2','P3'].forEach((_,i) => {
+      const el = document.getElementById('s'+i);
+      el.textContent = (i===0?'You':AI_NAMES[i-1]||'P'+(i+1)) + ': ' + totalScores[i];
+    });
+  }
+
+  function renderAll() {
+    updateScoreChips();
+    // AI hand indicators
+    for (const [id, idx] of [['ai-top',2],['ai-left',1],['ai-right',3]]) {
+      const el = document.getElementById(id); el.innerHTML = '';
+      const n = hands[idx]?.length || 0;
+      for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.className='ai-card'; el.appendChild(d); }
+    }
+    // trick table
+    for (let i = 0; i < 4; i++) {
+      const slot = document.getElementById('trick-'+i);
+      slot.innerHTML = '';
+      if (trickCards[i]) {
+        const c = trickCards[i];
+        const el = document.createElement('div');
+        el.className = 'card' + (c.red?' red':'');
+        el.textContent = c.r+c.s; el.style.position='relative'; el.style.width=el.style.height='100%';
+        slot.appendChild(el);
+      }
+    }
+    // player hand
+    handEl.innerHTML = '';
+    const ph = sortHand(hands[0]);
+    const isLead = !trickCards.some(c=>c);
+    ph.forEach(c => {
+      const el = document.createElement('div');
+      const playable = phase==='play' && currentPlayer===0 && canPlay(c, 0);
+      const inPassSel = passSelection.includes(c);
+      el.className = 'card' + (c.red?' red':'') + (inPassSel?' pass-sel':'') + (phase==='play'&&!playable?' unplayable':'');
+      el.textContent = c.r+c.s;
+      el.addEventListener('click', () => {
+        if (phase==='pass') {
+          if (inPassSel) passSelection.splice(passSelection.indexOf(c),1);
+          else if (passSelection.length<3) passSelection.push(c);
+          passBtn.disabled = passSelection.length!==3;
+          renderAll();
+        } else if (phase==='play' && currentPlayer===0 && canPlay(c,0)) {
+          playCard(0, c);
+        }
+      });
+      handEl.appendChild(el);
+    });
+    // message
+    if (phase==='pass') {
+      const dir = ['left →','→ right','↔ across','(no pass)'][(roundNum-1)%4];
+      msgEl.textContent = 'Select 3 cards to pass ' + dir + '.';
+      passBtn.disabled = passSelection.length !== 3;
+    } else if (phase==='play') {
+      if (currentPlayer===0) msgEl.textContent = isLead ? 'Your lead.' : 'Your turn — follow suit if you can.';
+      else msgEl.textContent = nameOf(currentPlayer) + ' is thinking...';
+    }
+  }
+
+  passBtn.addEventListener('click', doPass);
+  addEventListener('keydown', e => {
+    if (e.key==='Enter' && overlay.style.display!=='none') document.getElementById('restart').click();
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+  reset();
+})();
+</script>
+</body>
+</html>

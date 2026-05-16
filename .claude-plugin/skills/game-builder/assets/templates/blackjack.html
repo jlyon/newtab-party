@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; touch-action: manipulation; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px 12px; gap: 14px; }
+  h1 { margin: 0; font-size: clamp(16px, 4vw, 26px); letter-spacing: 3px; }
+  #chips-row { font-size: clamp(14px, 3.5vw, 18px); }
+  .zone { width: min(480px, 95vw); }
+  .zone-label { font-size: 12px; opacity: 0.55; margin-bottom: 4px; }
+  .hand { display: flex; gap: 8px; flex-wrap: wrap; min-height: 96px; align-items: flex-start; }
+  .card {
+    width: clamp(52px, 14vw, 68px); height: clamp(74px, 20vw, 96px);
+    background: #fff; border-radius: 8px; border: 1px solid #bbb;
+    display: flex; flex-direction: column; align-items: flex-start;
+    justify-content: flex-start; padding: 5px 7px;
+    font-size: clamp(16px, 4.5vw, 22px); font-weight: 800; cursor: default;
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.4); user-select: none;
+  }
+  .card.red { color: #cc0000; }
+  .card.back { background: var(--primary); }
+  .score-line { font-size: clamp(12px, 3vw, 15px); opacity: 0.75; margin-top: 4px; }
+  #msg { font-size: clamp(14px, 4vw, 20px); font-weight: 700; min-height: 28px;
+    color: var(--secondary); text-align: center; }
+  #bet-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    padding: 8px 14px; font-size: clamp(13px, 3.5vw, 16px); font-weight: 700;
+    border: 3px solid var(--secondary); background: transparent; color: var(--secondary);
+    cursor: pointer; border-radius: 50px; user-select: none;
+  }
+  .chip:active { background: var(--secondary); color: var(--bg); }
+  #action-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .act-btn {
+    padding: 10px 20px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
+    border: 2px solid var(--primary); background: transparent; color: var(--primary);
+    cursor: pointer; border-radius: 6px; user-select: none;
+  }
+  .act-btn:active { background: var(--primary); color: var(--bg); }
+  .act-btn:disabled { opacity: 0.3; cursor: default; }
+  #deal-btn {
+    padding: 10px 28px; font-size: clamp(14px, 3.5vw, 16px); font-weight: 700;
+    border: 2px solid var(--secondary); color: var(--secondary); background: transparent;
+    cursor: pointer; border-radius: 6px; user-select: none;
+  }
+  #deal-btn:active { background: var(--secondary); color: var(--bg); }
+  #deal-btn:disabled { opacity: 0.3; cursor: default; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="chips-row">__PLAYER_NAME__ · <span id="chips">$200</span> · Bet: $<span id="bet-disp">0</span></div>
+  <div class="zone">
+    <div class="zone-label">Dealer</div>
+    <div class="hand" id="dealer-hand"></div>
+    <div class="score-line" id="dealer-score"></div>
+  </div>
+  <div id="msg"></div>
+  <div class="zone">
+    <div class="zone-label">__PLAYER_NAME__</div>
+    <div class="hand" id="player-hand"></div>
+    <div class="score-line" id="player-score"></div>
+  </div>
+  <div id="bet-row">
+    <button class="chip" data-v="5">$5</button>
+    <button class="chip" data-v="10">$10</button>
+    <button class="chip" data-v="25">$25</button>
+    <button class="chip" data-v="50">$50</button>
+    <button class="chip" data-v="0">✕ Clear</button>
+    <button id="deal-btn" disabled>Deal ▶</button>
+  </div>
+  <div id="action-row" style="display:none">
+    <button class="act-btn" id="btn-hit">Hit</button>
+    <button class="act-btn" id="btn-stand">Stand</button>
+    <button class="act-btn" id="btn-double">Double</button>
+  </div>
+</div>
+<script>
+(() => {
+  const chipsEl   = document.getElementById('chips');
+  const betDisp   = document.getElementById('bet-disp');
+  const dealerH   = document.getElementById('dealer-hand');
+  const dealerS   = document.getElementById('dealer-score');
+  const playerH   = document.getElementById('player-hand');
+  const playerS   = document.getElementById('player-score');
+  const msgEl     = document.getElementById('msg');
+  const betRow    = document.getElementById('bet-row');
+  const actionRow = document.getElementById('action-row');
+  const dealBtn   = document.getElementById('deal-btn');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME  = '__PLAYER_NAME__';
+  const START_CHIPS  = 200;
+  const DECKS        = 2;               // number of decks to shuffle together
+  const DEALER_STAND = 17;              // dealer stands on this value (soft-17 treated as hit)
+  const BLACKJACK_PAY = 1.5;           // payout multiplier for natural blackjack
+  // ==================================
+
+  const SUITS = ['♠','♥','♦','♣'];
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  function makeDeck() { return SUITS.flatMap(s => RANKS.map(r => ({ r, s, red: s==='♥'||s==='♦' }))); }
+  function shuffle(d) { for (let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d; }
+  function cardVal(r) { return r==='A'?[1,11]:['J','Q','K'].includes(r)?[10]:[ +r ]; }
+  function handScore(hand) {
+    let total = 0, aces = 0;
+    for (const c of hand) { const v = cardVal(c.r); total += v[0]; if (c.r==='A') aces++; }
+    while (aces-- > 0 && total + 10 <= 21) total += 10;
+    return total;
+  }
+  function cardHTML(c, faceDown) {
+    if (faceDown) return `<div class="card back"></div>`;
+    return `<div class="card${c.red?' red':''}">${c.r}${c.s}</div>`;
+  }
+
+  let shoe, chips, bet, playerCards, dealerCards, phase;
+  let hiScore = 0;
+
+  function newShoe() { shoe = shuffle(Array.from({length:DECKS},()=>makeDeck()).flat()); }
+  function draw() { if (shoe.length < 10) newShoe(); return shoe.pop(); }
+
+  function reset() { chips = START_CHIPS; bet = 0; phase = 'bet'; newShoe(); renderBet(); }
+
+  function renderBet() {
+    betRow.style.display = 'flex'; actionRow.style.display = 'none';
+    playerH.innerHTML = ''; dealerH.innerHTML = ''; playerS.textContent = ''; dealerS.textContent = '';
+    chipsEl.textContent = '$' + chips; betDisp.textContent = bet;
+    dealBtn.disabled = bet === 0 || bet > chips;
+    msgEl.textContent = bet > 0 ? 'Good luck!' : 'Place your bet.';
+  }
+
+  function deal() {
+    if (bet === 0 || bet > chips || phase !== 'bet') return;
+    chips -= bet; chipsEl.textContent = '$' + chips;
+    playerCards = [draw(), draw()]; dealerCards = [draw(), draw()];
+    phase = 'player';
+    betRow.style.display = 'none'; actionRow.style.display = 'flex';
+    document.getElementById('btn-double').disabled = chips < bet;
+    render();
+    // check natural blackjack
+    if (handScore(playerCards) === 21) {
+      // check dealer blackjack too
+      if (handScore(dealerCards) === 21) { finish('push'); }
+      else { finish('blackjack'); }
+    }
+  }
+
+  function render(revealDealer) {
+    playerH.innerHTML = playerCards.map(c => cardHTML(c, false)).join('');
+    dealerH.innerHTML = dealerCards.map((c, i) => cardHTML(c, !revealDealer && i === 1)).join('');
+    const ps = handScore(playerCards);
+    playerS.textContent = 'Score: ' + ps + (ps > 21 ? ' — BUST' : '');
+    if (revealDealer) dealerS.textContent = 'Score: ' + handScore(dealerCards);
+    else dealerS.textContent = '';
+  }
+
+  function hit() {
+    if (phase !== 'player') return;
+    playerCards.push(draw());
+    document.getElementById('btn-double').disabled = true;
+    render();
+    if (handScore(playerCards) > 21) finish('bust');
+    else if (handScore(playerCards) === 21) stand();
+  }
+
+  function stand() {
+    if (phase !== 'player') return;
+    phase = 'dealer';
+    render(true);
+    // dealer plays
+    const playDealer = () => {
+      const ds = handScore(dealerCards);
+      if (ds < DEALER_STAND) {
+        setTimeout(() => { dealerCards.push(draw()); render(true); playDealer(); }, 500);
+      } else {
+        const ps = handScore(playerCards), d = handScore(dealerCards);
+        if (d > 21 || ps > d) finish('win');
+        else if (d > ps) finish('lose');
+        else finish('push');
+      }
+    };
+    setTimeout(playDealer, 400);
+  }
+
+  function dbl() {
+    if (phase !== 'player' || chips < bet) return;
+    chips -= bet; bet *= 2; chipsEl.textContent = '$' + chips;
+    playerCards.push(draw()); render();
+    if (handScore(playerCards) > 21) finish('bust');
+    else stand();
+  }
+
+  function finish(result) {
+    phase = 'done'; render(true);
+    const payout = {
+      blackjack: Math.floor(bet * (1 + BLACKJACK_PAY)),
+      win: bet * 2,
+      push: bet,
+      bust: 0, lose: 0,
+    }[result] || 0;
+    chips += payout;
+    const msgs = {
+      blackjack: '🃏 Blackjack! +$' + payout,
+      win: '✅ You win! +$' + (payout - (result!=='push'?0:0)),
+      push: '🤝 Push. Bet returned.',
+      bust: '💥 Bust!',
+      lose: '❌ Dealer wins.',
+    };
+    msgEl.textContent = msgs[result] || '';
+    chipsEl.textContent = '$' + chips;
+    if (chips > hiScore) { hiScore = chips; window.parent.postMessage({ highScore: hiScore }, '*'); }
+    setTimeout(() => {
+      bet = Math.min(bet, chips);
+      phase = 'bet';
+      if (chips <= 0) { chips = START_CHIPS; bet = 0; msgEl.textContent = 'Broke! Reloading wallet...'; }
+      renderBet();
+    }, 2000);
+  }
+
+  document.querySelectorAll('.chip').forEach(b => {
+    b.addEventListener('click', () => {
+      if (phase !== 'bet') return;
+      const v = +b.dataset.v;
+      if (v === 0) { bet = 0; } else { bet = Math.min(chips, bet + v); }
+      renderBet();
+    });
+  });
+  dealBtn.addEventListener('click', deal);
+  document.getElementById('btn-hit').addEventListener('click', hit);
+  document.getElementById('btn-stand').addEventListener('click', stand);
+  document.getElementById('btn-double').addEventListener('click', dbl);
+  addEventListener('keydown', e => {
+    if (e.key === 'h' || e.key === 'H') hit();
+    if (e.key === 's' || e.key === 'S') stand();
+    if (e.key === 'd' || e.key === 'D') dbl();
+    if (e.key === 'Enter' && phase === 'bet') deal();
+  });
+  reset();
+})();
+</script>
+</body>
+</html>

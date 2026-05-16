@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 6px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
+  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
+    width: min(600px, 95vw); height: auto; display: block; }
+  #controls { display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    width: min(600px, 95vw); padding: 4px 0; }
+  .ctrl-group { display: flex; gap: 8px; }
+  .btn {
+    padding: 0; width: 60px; height: 52px; font-size: 22px; border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
+    user-select: none; display: flex; align-items: center; justify-content: center;
+    -webkit-touch-callout: none;
+  }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  #btn-atk { width: 72px; border-color: var(--secondary); color: var(--secondary); font-size: 26px; }
+  #btn-atk:active, #btn-atk.held { background: var(--secondary); color: var(--bg); }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.45); font-size: 13px; line-height: 1.6; margin: 0 0 28px; font-style: italic; }
+  #start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; font-family: inherit; transition: opacity 0.15s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span>Fighter: __PLAYER_NAME__</span>
+    <span id="score">Score: 0</span>
+    <span id="lives">Lives: ♥♥♥</span>
+  </div>
+  <canvas id="game" width="600" height="340"></canvas>
+  <div id="controls">
+    <div class="ctrl-group">
+      <button class="btn" id="btn-left">◀</button>
+      <button class="btn" id="btn-right">▶</button>
+    </div>
+    <button class="btn" id="btn-atk">👊</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">← → or A/D to move · Space / Z / X to punch</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">KO!</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Fight again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const W = canvas.width, H = canvas.height;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = '__PLAYER_NAME__';
+  const ENEMY_NAME  = '__ENEMY_NAME__';         // e.g. "henchmen", "clones", "zombies"
+  const WIN_SCORE   = 300;                       // score needed to win
+  const PLAYER_SPEED = 4;
+  const PUNCH_RANGE  = 70;                       // px reach of punch
+  const PUNCH_COOLDOWN = 400;                    // ms between punches
+  const ENEMY_SPAWN_MS = 1800;                   // lower = harder
+  const WIN_MSG  = PLAYER_NAME + ' cleaned the floor with every last ' + ENEMY_NAME + '. Unstoppable.';
+  const LOSE_MSG = PLAYER_NAME + ' got jumped by the ' + ENEMY_NAME + '. Embarrassing. Again.';
+  // ==================================
+
+  const FLOOR_Y = H - 50;
+  const PW = 28, PH = 48;
+  const EW = 26, EH = 44;
+  const keys = {};
+  // touch-held buttons
+  const held = { left: false, right: false, atk: false };
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const down = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up   = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', down); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', down, { passive: false });
+    el.addEventListener('touchend', up, { passive: false });
+    el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-atk', 'atk');
+  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key===' ') e.preventDefault(); });
+  addEventListener('keyup',   e => { keys[e.key.toLowerCase()] = false; });
+
+  let player, enemies, score, hiScore = 0, lives, lastPunch, lastSpawn, running, frame;
+  let punchTimer = 0; // frames to show punch flash
+
+  function reset() {
+    player = { x: W / 2 - PW / 2, y: FLOOR_Y - PH, facing: 1, punching: false };
+    enemies = []; score = 0; lives = 3; frame = 0;
+    lastPunch = 0; lastSpawn = 0;
+    running = true; punchTimer = 0;
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = 'Score: ' + score;
+    livesEl.textContent = 'Lives: ' + '♥'.repeat(lives) + '♡'.repeat(Math.max(0, 3 - lives));
+  }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function endGame(won) {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = won ? 'You win!' : 'KO!';
+    overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
+    overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '');
+    updateHud(); overlay.style.display = 'flex';
+  }
+  function spawnEnemy() {
+    const fromLeft = Math.random() < 0.5;
+    enemies.push({ x: fromLeft ? -EW : W, y: FLOOR_Y - EH, vx: fromLeft ? 1.5 : -1.5, hp: 1, flash: 0 });
+  }
+  function rectsHit(ax, ay, aw, ah, bx, by, bw, bh) {
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  function step(now) {
+    frame++;
+    // movement
+    const mv = (keys['arrowleft'] || keys['a'] || held.left ? -1 : 0)
+             + (keys['arrowright'] || keys['d'] || held.right ? 1 : 0);
+    if (mv !== 0) player.facing = mv;
+    player.x = Math.max(0, Math.min(W - PW, player.x + mv * PLAYER_SPEED));
+
+    // punch
+    const wantPunch = keys[' '] || keys['z'] || keys['x'] || held.atk;
+    if (wantPunch && now - lastPunch > PUNCH_COOLDOWN) {
+      lastPunch = now; punchTimer = 8;
+      const px = player.facing > 0 ? player.x + PW : player.x - PUNCH_RANGE;
+      for (const e of enemies) {
+        if (rectsHit(px, player.y, PUNCH_RANGE, PH, e.x, e.y, EW, EH)) {
+          e.hp--; e.flash = 6;
+          if (e.hp <= 0) { e.dead = true; score += 10; }
+        }
+      }
+    }
+    if (punchTimer > 0) punchTimer--;
+
+    // spawn
+    if (now - lastSpawn > ENEMY_SPAWN_MS) { spawnEnemy(); lastSpawn = now; }
+
+    // update enemies
+    for (const e of enemies) {
+      if (!e.dead) {
+        const spd = 1.2 + score * 0.003;
+        e.x += (player.x > e.x ? spd : -spd);
+        if (e.flash > 0) e.flash--;
+        if (rectsHit(player.x+4, player.y+4, PW-8, PH-8, e.x, e.y, EW, EH)) {
+          e.dead = true; lives--;
+          if (lives <= 0) { endGame(false); return; }
+        }
+      }
+    }
+    enemies = enemies.filter(e => !e.dead);
+    updateHud();
+    if (score >= WIN_SCORE) { endGame(true); return; }
+  }
+
+  function drawChar(x, y, w, h, col, facing, punching) {
+    ctx.fillStyle = col;
+    // body
+    ctx.fillRect(x, y + h * 0.3, w, h * 0.45);
+    // head
+    ctx.beginPath(); ctx.arc(x + w/2, y + h * 0.18, w * 0.42, 0, Math.PI*2); ctx.fill();
+    // legs
+    ctx.fillRect(x + 2, y + h * 0.75, w*0.35, h*0.25);
+    ctx.fillRect(x + w - 2 - w*0.35, y + h * 0.75, w*0.35, h*0.25);
+    // arm
+    if (punching) {
+      const ax = facing > 0 ? x + w : x - w * 0.6;
+      ctx.fillRect(ax, y + h * 0.35, w * 0.6, h * 0.18);
+    } else {
+      ctx.fillRect(x - 3, y + h*0.32, 6, h * 0.38);
+      ctx.fillRect(x + w - 3, y + h*0.32, 6, h * 0.38);
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // floor
+    ctx.fillStyle = COL1; ctx.globalAlpha = 0.15;
+    ctx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = COL1; ctx.fillRect(0, FLOOR_Y, W, 2);
+    // score bar outline
+    ctx.strokeStyle = COL2; ctx.globalAlpha = 0.3; ctx.lineWidth = 1;
+    ctx.strokeRect(10, H - 20, W - 20, 8);
+    ctx.fillStyle = COL2; ctx.globalAlpha = 0.5;
+    ctx.fillRect(10, H - 20, Math.min(W - 20, (W - 20) * score / WIN_SCORE), 8);
+    ctx.globalAlpha = 1;
+
+    // enemies
+    for (const e of enemies) {
+      drawChar(e.x, e.y, EW, EH, e.flash > 0 ? '#fff' : COL2, player.x > e.x ? 1 : -1, false);
+    }
+    // player
+    drawChar(player.x, player.y, PW, PH, COL1, player.facing, punchTimer > 0);
+    // punch flash arc
+    if (punchTimer > 4) {
+      const ax = player.facing > 0 ? player.x + PW + 20 : player.x - 20;
+      ctx.strokeStyle = COL2; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
+      ctx.beginPath(); ctx.arc(ax, player.y + PH * 0.4, 20, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    if (running) step(now);
+    draw(); requestAnimationFrame(loop);
+  }
+  addEventListener('keydown', e => { if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click(); });
+  document.getElementById('restart').addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>

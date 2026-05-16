@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 6px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
+  #hud { display: flex; gap: 16px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
+  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
+    width: min(600px, 95vw); height: auto; display: block; cursor: pointer; }
+  #actions { display: flex; gap: 8px; width: min(600px, 95vw); padding: 4px 0; }
+  .act-btn {
+    flex: 1; padding: 8px 4px; font-size: clamp(11px, 2.5vw, 13px); font-weight: 600;
+    border: 2px solid var(--primary); background: rgba(0,0,0,0.3); color: var(--primary);
+    cursor: pointer; border-radius: 6px; text-align: center; user-select: none;
+    -webkit-touch-callout: none; transition: background 0.1s;
+  }
+  .act-btn.selected { background: var(--primary); color: var(--bg); }
+  .act-btn.empty { opacity: 0.35; pointer-events: none; }
+  #hint { font-size: clamp(10px, 2.5vw, 12px); opacity: 0.5; }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.45); font-size: 13px; line-height: 1.6; margin: 0 0 28px; font-style: italic; }
+  #start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; font-family: inherit; transition: opacity 0.15s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span>Guide: __PLAYER_NAME__</span>
+    <span id="saved">Saved: 0</span>
+    <span id="lost">Lost: 0</span>
+    <span id="rem">Left: 0</span>
+  </div>
+  <canvas id="game" width="600" height="360"></canvas>
+  <div id="actions">
+    <button class="act-btn selected" id="btn-blocker" data-action="blocker">🚧 Blocker <br/><small id="ct-blocker">5</small></button>
+    <button class="act-btn" id="btn-digger"  data-action="digger">⛏ Digger <br/><small id="ct-digger">3</small></button>
+    <button class="act-btn" id="btn-floater" data-action="floater">☂ Floater <br/><small id="ct-floater">3</small></button>
+    <button class="act-btn" id="btn-none"    data-action="none">✋ None</button>
+  </div>
+  <div id="hint">Tap a lemming to assign the selected action</div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Click a lemming to give it a skill · Save enough to win</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Level over!</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Try again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const savedEl = document.getElementById('saved');
+  const lostEl  = document.getElementById('lost');
+  const remEl   = document.getElementById('rem');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const W = canvas.width, H = canvas.height;
+  const SCALE = 8; // pixels per grid cell
+  const GW = W / SCALE, GH = H / SCALE; // grid dimensions (75 x 45)
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME  = '__PLAYER_NAME__';
+  const LEMMING_NAME = '__ENEMY_NAME__';     // what to call the lemmings, e.g. "interns", "clones"
+  const TOTAL        = 12;                   // lemmings to release
+  const MIN_SAVE     = 8;                    // lemmings needed to win
+  const SPAWN_INTERVAL = 90;                 // frames between spawns (lower = faster)
+  const WALK_SPEED   = 0.5;                  // cells per frame
+  const FALL_SPEED   = 1.0;                  // cells per frame falling
+  const FALL_DEATH   = 12;                   // cells of free-fall before splat
+  // Spawn point and exit (grid coords)
+  const SPAWN = { x: 3, y: 3 };
+  const EXIT  = { x: 68, y: 27, w: 4, h: 4 };
+  // Action supplies (how many of each the player gets)
+  const SUPPLIES = { blocker: 5, digger: 3, floater: 3 };
+  // Terrain: array of solid rectangles [x, y, w, h] in grid coords
+  const TERRAIN = [
+    [0, 44, 75, 1],   // floor
+    [0, 0, 1, 45],    // left wall
+    [74, 0, 1, 45],   // right wall
+    [0, 7, 20, 2],    // left platform
+    [18, 14, 22, 2],  // mid-left platform
+    [38, 21, 20, 2],  // center platform
+    [56, 28, 18, 2],  // right platform  — exit sits on this
+    [28, 7, 18, 2],   // upper right platform
+    [50, 14, 14, 2],  // far right upper
+  ];
+  const WIN_MSG  = 'The ' + LEMMING_NAME + ' made it! ' + PLAYER_NAME + ' is a hero.';
+  const LOSE_MSG = 'Too many ' + LEMMING_NAME + ' were lost. ' + PLAYER_NAME + ' is having a day.';
+  // ==================================
+
+  let grid, lemmings, saved, lost, spawned, spawnTimer, running, frame;
+  let selectedAction = 'blocker';
+  const supplies = {};
+
+  // build solid grid from TERRAIN rects
+  function buildGrid() {
+    grid = Array.from({ length: GH }, () => new Uint8Array(GW));
+    for (const [x, y, w, h] of TERRAIN) {
+      for (let gy = y; gy < Math.min(y + h, GH); gy++)
+        for (let gx = x; gx < Math.min(x + w, GW); gx++)
+          grid[gy][gx] = 1;
+    }
+  }
+  function isSolid(gx, gy) {
+    const ix = Math.round(gx), iy = Math.round(gy);
+    if (ix < 0 || ix >= GW || iy < 0 || iy >= GH) return iy >= GH;
+    return grid[iy]?.[ix] === 1;
+  }
+
+  function reset() {
+    buildGrid();
+    lemmings = []; saved = 0; lost = 0; spawned = 0; spawnTimer = 0; frame = 0; running = true;
+    Object.assign(supplies, SUPPLIES);
+    updateActionButtons();
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() {
+    savedEl.textContent = 'Saved: ' + saved + '/' + MIN_SAVE;
+    lostEl.textContent  = 'Lost: ' + lost;
+    remEl.textContent   = 'Left: ' + (TOTAL - spawned);
+  }
+  function updateActionButtons() {
+    for (const [action, count] of Object.entries(supplies)) {
+      const ct = document.getElementById('ct-' + action);
+      const btn = document.getElementById('btn-' + action);
+      if (ct) ct.textContent = count;
+      if (btn) btn.classList.toggle('empty', count <= 0);
+    }
+  }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function endGame() {
+    running = false;
+    const won = saved >= MIN_SAVE;
+    overTitle.textContent = won ? 'You win!' : 'Level failed';
+    overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
+    overScore.textContent = 'Saved ' + saved + ' of ' + TOTAL + ' ' + LEMMING_NAME + ' (needed ' + MIN_SAVE + ')';
+    postHi(saved);
+    overlay.style.display = 'flex';
+  }
+  function spawnLemming() {
+    lemmings.push({ x: SPAWN.x + 0.5, y: SPAWN.y, vx: WALK_SPEED, vy: 0,
+      onGround: false, action: null, fallDist: 0, dead: false, saved: false, frame: 0 });
+    spawned++;
+  }
+
+  function digBelow(lem) {
+    const gx = Math.round(lem.x), gy = Math.floor(lem.y) + 1;
+    if (gy < GH && grid[gy]?.[gx]) { grid[gy][gx] = 0; }
+  }
+
+  function step() {
+    frame++;
+    // spawn
+    if (spawned < TOTAL) {
+      spawnTimer++;
+      if (spawnTimer >= SPAWN_INTERVAL) { spawnLemming(); spawnTimer = 0; }
+    }
+
+    for (const lem of lemmings) {
+      if (lem.dead || lem.saved) continue;
+      lem.frame++;
+
+      // check exit
+      if (lem.x >= EXIT.x && lem.x <= EXIT.x + EXIT.w &&
+          lem.y >= EXIT.y && lem.y <= EXIT.y + EXIT.h) {
+        lem.saved = true; saved++; updateHud(); continue;
+      }
+
+      // blocker: stays still, turns others
+      if (lem.action === 'blocker') {
+        for (const other of lemmings) {
+          if (other === lem || other.dead || other.saved || other.action === 'blocker') continue;
+          if (Math.abs(other.x - lem.x) < 1.2 && Math.abs(other.y - lem.y) < 1.5) {
+            other.vx *= -1;
+            other.x += other.vx * 2;
+          }
+        }
+        continue;
+      }
+
+      // digger: dig down each few frames
+      if (lem.action === 'digger') {
+        if (lem.frame % 8 === 0) digBelow(lem);
+      }
+
+      // horizontal movement
+      if (lem.onGround) {
+        const nextX = lem.x + lem.vx;
+        const frontGx = Math.round(nextX + (lem.vx > 0 ? 0.5 : -0.5));
+        const bodyGy  = Math.floor(lem.y);
+        if (isSolid(frontGx, bodyGy) || nextX <= 0.5 || nextX >= GW - 0.5) {
+          lem.vx *= -1; // turn around
+        } else {
+          lem.x = nextX;
+        }
+        // step up 1 cell
+        const stepGy = Math.floor(lem.y) - 1;
+        if (!isSolid(Math.round(lem.x + (lem.vx > 0 ? 0.5 : -0.5)), stepGy)) {
+          // can walk or climb
+        }
+      }
+
+      // gravity
+      const belowY = Math.floor(lem.y) + 1;
+      const belowSolid = isSolid(Math.round(lem.x), belowY);
+      if (belowSolid) {
+        lem.vy = 0; lem.onGround = true;
+        lem.y = Math.floor(lem.y);
+        if (lem.fallDist >= FALL_DEATH && lem.action !== 'floater') {
+          lem.dead = true; lost++; updateHud();
+        }
+        lem.fallDist = 0;
+      } else {
+        lem.onGround = false;
+        const fallRate = lem.action === 'floater' ? FALL_SPEED * 0.3 : FALL_SPEED;
+        lem.y += fallRate; lem.fallDist += fallRate;
+        if (lem.y >= GH) { lem.dead = true; lost++; updateHud(); }
+      }
+    }
+
+    // check done
+    if (spawned >= TOTAL && lemmings.every(l => l.dead || l.saved)) {
+      endGame(); return;
+    }
+    updateHud();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // terrain
+    ctx.fillStyle = COL1;
+    for (let gy = 0; gy < GH; gy++) {
+      for (let gx = 0; gx < GW; gx++) {
+        if (grid[gy][gx]) ctx.fillRect(gx * SCALE, gy * SCALE, SCALE, SCALE);
+      }
+    }
+    // exit zone
+    ctx.fillStyle = COL2; ctx.globalAlpha = 0.8;
+    ctx.fillRect(EXIT.x * SCALE, EXIT.y * SCALE, EXIT.w * SCALE, EXIT.h * SCALE);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#000'; ctx.font = 'bold ' + SCALE + 'px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('EXIT', (EXIT.x + EXIT.w / 2) * SCALE, (EXIT.y + EXIT.h / 2 + 0.4) * SCALE);
+    ctx.textAlign = 'left';
+    // spawn indicator
+    ctx.fillStyle = COL2; ctx.globalAlpha = 0.5;
+    ctx.fillRect(SPAWN.x * SCALE - 4, SPAWN.y * SCALE - 6, 16, 6);
+    ctx.globalAlpha = 1;
+    // lemmings
+    for (const lem of lemmings) {
+      if (lem.dead || lem.saved) continue;
+      const sx = lem.x * SCALE, sy = lem.y * SCALE;
+      // body
+      ctx.fillStyle = lem.action === 'blocker' ? COL2 : lem.action === 'digger' ? '#e8a020' : lem.action === 'floater' ? '#20e0e0' : COL1;
+      ctx.fillRect(sx - 3, sy - SCALE + 2, 7, SCALE - 2);
+      // head
+      ctx.beginPath(); ctx.arc(sx, sy - SCALE + 1, 3.5, 0, Math.PI * 2); ctx.fill();
+      // legs walk anim
+      ctx.fillStyle = COL1;
+      const lp = Math.floor(lem.frame / 5) % 2;
+      if (lem.onGround && lem.action !== 'blocker') {
+        ctx.fillRect(sx - 3 + (lp ? 3 : 0), sy, 3, 4);
+        ctx.fillRect(sx - 3 + (lp ? 0 : 3), sy + 2, 3, 2);
+      }
+      // action label
+      if (lem.action === 'blocker') {
+        ctx.fillStyle = '#fff'; ctx.font = '7px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText('🚧', sx, sy - SCALE - 1); ctx.textAlign = 'left';
+      } else if (lem.action === 'digger') {
+        ctx.fillStyle = '#fff'; ctx.font = '7px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText('⛏', sx, sy - SCALE - 1); ctx.textAlign = 'left';
+      } else if (lem.action === 'floater') {
+        ctx.fillStyle = '#fff'; ctx.font = '7px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText('☂', sx, sy - SCALE - 1); ctx.textAlign = 'left';
+      }
+    }
+  }
+
+  // click/tap to assign action to nearest lemming
+  function handleTap(cx, cy) {
+    if (!running || selectedAction === 'none') return;
+    const gx = cx / SCALE, gy = cy / SCALE;
+    let best = null, bestDist = 4; // max 4 grid cells away
+    for (const lem of lemmings) {
+      if (lem.dead || lem.saved || lem.action) continue;
+      const d = Math.hypot(lem.x - gx, lem.y - gy);
+      if (d < bestDist) { best = lem; bestDist = d; }
+    }
+    if (best && supplies[selectedAction] > 0) {
+      best.action = selectedAction;
+      supplies[selectedAction]--;
+      if (selectedAction === 'blocker') best.vx = 0;
+      updateActionButtons();
+    }
+  }
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    handleTap((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleX);
+  });
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const t = e.touches[0];
+    handleTap((t.clientX - rect.left) * scaleX, (t.clientY - rect.top) * scaleX);
+  }, { passive: false });
+
+  // action button selection
+  document.querySelectorAll('.act-btn').forEach(btn => {
+    const select = e => {
+      e.preventDefault();
+      selectedAction = btn.dataset.action;
+      document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    btn.addEventListener('click', select);
+    btn.addEventListener('touchstart', select, { passive: false });
+  });
+
+  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  addEventListener('keydown', e => { if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click(); });
+  document.getElementById('restart').addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>

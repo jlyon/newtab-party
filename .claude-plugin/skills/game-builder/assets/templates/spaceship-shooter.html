@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__GAME_NAME__</title>
+<style>
+  :root {
+    --primary: __PRIMARY_COLOR__;
+    --secondary: __SECONDARY_COLOR__;
+    --bg: __BACKGROUND_COLOR__;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #wrap {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%;
+  }
+  h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: 2px; }
+  #hud {
+    width: 600px; max-width: 95vw;
+    display: flex; justify-content: space-between;
+    font-size: 14px; margin-bottom: 6px; opacity: 0.85;
+  }
+  canvas {
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: 80vh;
+  }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.45); font-size: 13px; line-height: 1.6; margin: 0 0 28px; font-style: italic; }
+  #start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 4px; font-family: inherit; transition: opacity 0.15s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay {
+    position: fixed; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75);
+    flex-direction: column; text-align: center;
+    padding: 20px;
+  }
+  #overlay h2 { color: var(--secondary); font-size: 36px; margin: 0 0 10px; }
+  #overlay p { color: var(--primary); margin: 4px 0; }
+  #overlay button {
+    margin-top: 18px; padding: 10px 22px; font-size: 16px;
+    background: var(--primary); color: var(--bg); border: none;
+    cursor: pointer; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud"><span>Pilot: __PLAYER_NAME__</span><span id="score">Score: 0</span><span id="lives">Lives: 3</span></div>
+  <canvas id="game" width="600" height="700"></canvas>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Arrow keys or WASD to move · Space to shoot</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Game Over</h2>
+  <p id="overMsg">__PLAYER_NAME__ has been vaporized.</p>
+  <p>Arrow keys / WASD to move &nbsp;·&nbsp; Space to shoot</p>
+  <button id="restart">Play again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const overlay = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const PRIMARY = css.getPropertyValue('--primary').trim();
+  const SECONDARY = css.getPropertyValue('--secondary').trim();
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // Customize: enemy name, enemy speed, scoring, win condition.
+  const ENEMY_NAME = '__ENEMY_NAME__';
+  const WIN_SCORE = 500;            // hit this score to win
+  const ENEMY_SPAWN_MS = 900;       // lower = harder
+  const ENEMY_SPEED_MIN = 1.2;
+  const ENEMY_SPEED_MAX = 2.6;
+  const PLAYER_SPEED = 6;
+  const BULLET_SPEED = 9;
+  const BULLET_COOLDOWN_MS = 220;
+  // ==================================
+
+  const keys = {};
+  addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if ([' ','arrowleft','arrowright','arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
+  });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  let player, bullets, enemies, score, lives, lastShot, lastSpawn, running;
+
+  function reset() {
+    player = { x: W/2, y: H - 60, w: 36, h: 28 };
+    bullets = []; enemies = [];
+    score = 0; lives = 3;
+    lastShot = 0; lastSpawn = 0;
+    running = true;
+    overlay.style.display = 'none';
+    updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = 'Score: ' + score;
+    livesEl.textContent = 'Lives: ' + lives;
+  }
+  function spawnEnemy() {
+    const w = 28 + Math.random()*18;
+    enemies.push({
+      x: Math.random()*(W - w),
+      y: -30,
+      w, h: w*0.8,
+      vy: ENEMY_SPEED_MIN + Math.random()*(ENEMY_SPEED_MAX - ENEMY_SPEED_MIN)
+    });
+  }
+  function rectsHit(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x &&
+           a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+  function endGame(won) {
+    running = false;
+    overTitle.textContent = won ? 'You win!' : 'Game over';
+    overMsg.textContent = won
+      ? '__PLAYER_NAME__ has crushed the ' + ENEMY_NAME + ' menace. Hero status: confirmed.'
+      : 'The ' + ENEMY_NAME + ' got __PLAYER_NAME__. Tragic. Avenge them.';
+    overlay.style.display = 'flex';
+  }
+
+  function step(dt, now) {
+    // input
+    let vx = 0, vy = 0;
+    if (keys['arrowleft']  || keys['a']) vx -= PLAYER_SPEED;
+    if (keys['arrowright'] || keys['d']) vx += PLAYER_SPEED;
+    if (keys['arrowup']    || keys['w']) vy -= PLAYER_SPEED;
+    if (keys['arrowdown']  || keys['s']) vy += PLAYER_SPEED;
+    player.x = Math.max(0, Math.min(W - player.w, player.x + vx));
+    player.y = Math.max(0, Math.min(H - player.h, player.y + vy));
+
+    if (keys[' '] && now - lastShot > BULLET_COOLDOWN_MS) {
+      bullets.push({ x: player.x + player.w/2 - 2, y: player.y, w: 4, h: 12 });
+      lastShot = now;
+    }
+
+    // spawn
+    if (now - lastSpawn > ENEMY_SPAWN_MS) { spawnEnemy(); lastSpawn = now; }
+
+    // update bullets
+    for (const b of bullets) b.y -= BULLET_SPEED;
+    bullets = bullets.filter(b => b.y + b.h > 0);
+
+    // update enemies
+    for (const e of enemies) e.y += e.vy;
+
+    // collisions
+    for (const e of enemies) {
+      for (const b of bullets) {
+        if (rectsHit(b, e)) {
+          e.dead = true; b.dead = true; score += 10;
+        }
+      }
+      if (rectsHit(e, player)) { e.dead = true; lives--; }
+    }
+    bullets = bullets.filter(b => !b.dead);
+    enemies = enemies.filter(e => !e.dead && e.y < H + 40);
+
+    updateHud();
+    if (lives <= 0) endGame(false);
+    if (score >= WIN_SCORE) endGame(true);
+  }
+
+  function draw() {
+    // background stars
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    for (let i = 0; i < 60; i++) {
+      const sx = (i*73 + (performance.now()/40))%W;
+      const sy = (i*131)%H;
+      ctx.fillRect(sx, sy, 2, 2);
+    }
+
+    // player ship
+    ctx.fillStyle = PRIMARY;
+    ctx.beginPath();
+    ctx.moveTo(player.x + player.w/2, player.y);
+    ctx.lineTo(player.x + player.w, player.y + player.h);
+    ctx.lineTo(player.x, player.y + player.h);
+    ctx.closePath(); ctx.fill();
+
+    // bullets
+    ctx.fillStyle = SECONDARY;
+    for (const b of bullets) ctx.fillRect(b.x, b.y, b.w, b.h);
+
+    // enemies
+    ctx.fillStyle = SECONDARY;
+    for (const e of enemies) {
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + e.w, e.y);
+      ctx.lineTo(e.x + e.w/2, e.y + e.h);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(50, now - last); last = now;
+    if (running) step(dt, now);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  addEventListener('keydown', e => { if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click(); });
+  document.getElementById('restart').addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>

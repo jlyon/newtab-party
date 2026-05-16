@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>__GAME_NAME__</title>
+<style>
+  :root {
+    --primary: __PRIMARY_COLOR__;
+    --secondary: __SECONDARY_COLOR__;
+    --bg: __BACKGROUND_COLOR__;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg); color: var(--primary);
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.55;
+  }
+  #wrap {
+    max-width: 720px; margin: 0 auto;
+    padding: 60px 24px 80px;
+  }
+  h1 {
+    color: var(--secondary);
+    font-size: 32px; letter-spacing: 1px;
+    margin: 0 0 6px;
+  }
+  .sub { opacity: 0.7; font-size: 14px; margin-bottom: 40px; }
+  #scene {
+    font-size: 18px;
+    border-left: 3px solid var(--secondary);
+    padding: 0 0 0 20px;
+    margin-bottom: 28px;
+    min-height: 120px;
+  }
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choice {
+    display: block; width: 100%;
+    text-align: left; font: inherit; font-size: 16px;
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .choice:hover { background: var(--primary); color: var(--bg); }
+  .ending .choice { border-color: var(--secondary); color: var(--secondary); }
+  .ending .choice:hover { background: var(--secondary); color: var(--bg); }
+  .meta { margin-top: 28px; font-size: 13px; opacity: 0.65; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div class="sub">A choose-your-own-adventure starring __PLAYER_NAME__.</div>
+  <div id="scene"></div>
+  <div id="choices" class="choices"></div>
+  <div class="meta" id="meta"></div>
+</div>
+<script>
+(() => {
+  const sceneEl = document.getElementById('scene');
+  const choicesEl = document.getElementById('choices');
+  const metaEl = document.getElementById('meta');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // Define the story as nodes. Each node has:
+  //   text:      the prose shown to the player
+  //   choices:   list of { label, next }  (omit or leave empty on endings)
+  //   ending:    optional "win" | "lose" | "neutral"
+  //
+  // Customize this to the user's premise. Aim for 8-15 nodes with at least
+  // one "you won" and one "you died" ending. Branches can re-converge.
+  const story = {
+    start: {
+      text: "__PLAYER_NAME__ stands at the edge of the forest. The path forks. The wind has opinions.",
+      choices: [
+        { label: "Take the left path, into the dark trees.", next: "dark" },
+        { label: "Take the right path, toward the sound of water.", next: "river" },
+        { label: "Sit down and have a snack first.", next: "snack" }
+      ]
+    },
+    dark: {
+      text: "The trees press in close. Something rustles. It is either a small bird or the end of you. You cannot tell which.",
+      choices: [
+        { label: "Investigate the rustling.", next: "bird" },
+        { label: "Sneak past it, slowly.", next: "deeper" }
+      ]
+    },
+    bird: {
+      text: "It's a small bird. It looks at you with an expression that can only be described as judgmental.",
+      choices: [
+        { label: "Apologize to the bird.", next: "deeper" },
+        { label: "Continue, your dignity intact-ish.", next: "deeper" }
+      ]
+    },
+    deeper: {
+      text: "Deeper in the forest, you find a door. Just a door. Standing on its own. It's locked, but the key is hanging from a branch above it. Of course it is.",
+      choices: [
+        { label: "Take the key and open the door.", next: "win" },
+        { label: "Leave. This is clearly a trap.", next: "lose_back" }
+      ]
+    },
+    river: {
+      text: "The river is wide, cold, and pretending to be friendly. A small boat is tied to a tree.",
+      choices: [
+        { label: "Take the boat.", next: "boat" },
+        { label: "Swim across because you are unwise.", next: "lose_river" }
+      ]
+    },
+    boat: {
+      text: "You row across without incident. On the other side, a path leads to a strange glowing door.",
+      choices: [
+        { label: "Open the door.", next: "win" },
+        { label: "Eh, you've done enough today.", next: "lose_back" }
+      ]
+    },
+    snack: {
+      text: "You eat a sandwich. It is the best sandwich of your life. You consider this an ending.",
+      choices: [
+        { label: "Go home, fulfilled.", next: "neutral_snack" },
+        { label: "Fine. Go to the forest.", next: "start" }
+      ]
+    },
+    win: {
+      text: "Beyond the door is a quiet room with a single chair, a small dog, and a printed certificate that reads: YOU WIN. __PLAYER_NAME__, against all odds.",
+      ending: "win"
+    },
+    lose_back: {
+      text: "You turn back. You never speak of this again. Years later, you still wonder what was behind the door. The end.",
+      ending: "lose"
+    },
+    lose_river: {
+      text: "The river was, in fact, not friendly. __PLAYER_NAME__ has been carried gently but firmly downstream. The end.",
+      ending: "lose"
+    },
+    neutral_snack: {
+      text: "You become a famous sandwich enthusiast. Is that an ending? Sure. Why not.",
+      ending: "neutral"
+    }
+  };
+  // ==================================
+
+  let visited = 0;
+  function go(id) {
+    const node = story[id];
+    if (!node) { sceneEl.textContent = "(missing scene: " + id + ")"; return; }
+    visited++;
+    sceneEl.textContent = node.text;
+    choicesEl.innerHTML = '';
+    choicesEl.classList.toggle('ending', !!node.ending);
+    if (node.ending) {
+      const b = document.createElement('button');
+      b.className = 'choice';
+      b.textContent = '↻ Start over';
+      b.onclick = () => { visited = 0; go('start'); };
+      choicesEl.appendChild(b);
+      metaEl.textContent = node.ending === 'win'
+        ? '✦ Ending: victory ✦'
+        : node.ending === 'lose'
+          ? '✦ Ending: not great ✦'
+          : '✦ Ending: ambiguous ✦';
+      return;
+    }
+    metaEl.textContent = 'Scenes visited: ' + visited;
+    for (const c of node.choices || []) {
+      const b = document.createElement('button');
+      b.className = 'choice';
+      b.textContent = '› ' + c.label;
+      b.onclick = () => go(c.next);
+      choicesEl.appendChild(b);
+    }
+  }
+  addEventListener('keydown', e => { if (e.key === 'Enter') { const first = document.querySelector('.choice'); if (first) first.click(); } });
+  go('start');
+})();
+</script>
+</body>
+</html>
