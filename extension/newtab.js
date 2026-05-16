@@ -23,20 +23,6 @@ function todayLabel() {
   });
 }
 
-function fmtTime(iso) {
-  try {
-    return (
-      new Date(iso + "Z").toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: "UTC",
-        hour12: true,
-      }) + " UTC"
-    );
-  } catch {
-    return "";
-  }
-}
 
 function fmtCountdown(ms) {
   const h = Math.floor(ms / 3600000),
@@ -50,6 +36,18 @@ let games = [],
 let sessionPlayId = null,
   sessionNameDone = false;
 
+function fmtDate(s) {
+  try {
+    return new Date(s + "T00:00:00Z").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return s;
+  }
+}
+
 async function init() {
   try {
     const data = await fetch(`${SERVER_URL}/games.json`).then((r) => {
@@ -57,25 +55,12 @@ async function init() {
       return r.json();
     });
     games = data.games || [];
-
-    const listEl = document.getElementById("about-game-list");
-    for (const g of games) {
-      const card = document.createElement("div");
-      card.className = "about-game-card";
-      card.innerHTML =
-        `<div class="about-game-name">${esc(g.name)}</div>` +
-        `<div class="about-game-type">${esc(g.type || "")}</div>` +
-        `<div class="about-game-desc">${esc(g.description || "")}</div>` +
-        (g.controls
-          ? `<div class="about-game-controls">${esc(g.controls)}</div>`
-          : "");
-      listEl.appendChild(card);
-    }
-
     loadGame(getDailyGame(games));
   } catch {
     showServerError();
   }
+
+  loadRecentGames();
 
   window.addEventListener("message", handleMessage);
   document.addEventListener("keydown", (e) => {
@@ -123,6 +108,42 @@ async function init() {
     if (e.key === "Enter") submitName();
     if (e.key === "Escape") closeNamePrompt();
   });
+
+  // Start screen
+  document.getElementById("start-btn").addEventListener("click", startGame);
+}
+
+async function loadRecentGames() {
+  try {
+    const recentDays = await fetch(`${SERVER_URL}/api/recent-days`).then((r) =>
+      r.json()
+    );
+    const listEl = document.getElementById("about-game-list");
+    listEl.innerHTML = "";
+    const todayStr = new Date().toISOString().slice(0, 10);
+    for (const { date, game: g } of recentDays) {
+      const isToday = date === todayStr;
+      const href = isToday
+        ? `${SERVER_URL}/leaderboard`
+        : `${SERVER_URL}/play/${date}`;
+      const dateLabel = isToday ? "Today" : fmtDate(date);
+      const link = document.createElement("a");
+      link.className = "recent-game-link";
+      link.href = href;
+      link.target = "_blank";
+      link.innerHTML =
+        `<div class="about-game-card">` +
+        `<div class="about-game-date">${esc(dateLabel)}</div>` +
+        `<div class="about-game-name">${esc(g.name)}</div>` +
+        `<div class="about-game-type">${esc(g.type || "")}</div>` +
+        `<div class="about-game-desc">${esc(g.description || "")}</div>` +
+        (g.controls
+          ? `<div class="about-game-controls">${esc(g.controls)}</div>`
+          : "") +
+        `</div>`;
+      listEl.appendChild(link);
+    }
+  } catch {}
 }
 
 function showServerError() {
@@ -152,14 +173,37 @@ function loadGame(game) {
   document.getElementById("high-score").textContent = "";
   document.getElementById("high-score").classList.remove("new-best");
 
-  const loading = document.getElementById("loading");
-  const frame = document.getElementById("game-frame");
-  loading.classList.remove("hidden");
-  loading.textContent = "Loading…";
+  const wrap = document.getElementById("game-title-wrap");
+  if (game.description || game.controls) {
+    document.getElementById("game-tooltip-desc").textContent =
+      game.description || "";
+    document.getElementById("game-tooltip-controls").textContent =
+      game.controls || "";
+    wrap.classList.add("has-tip");
+  } else {
+    wrap.classList.remove("has-tip");
+  }
 
-  frame.onload = () => loading.classList.add("hidden");
-  // Games are served from the server — no extension release needed to add new ones
-  frame.src = `${SERVER_URL}/${game.file}`;
+  const frame = document.getElementById("game-frame");
+  const loading = document.getElementById("loading");
+  if (game.controls) {
+    document.getElementById("start-name").textContent = game.name;
+    document.getElementById("start-desc").textContent = game.description || "";
+    document.getElementById("start-controls").textContent = game.controls;
+    document.getElementById("start-overlay").classList.remove("hidden");
+    loading.classList.add("hidden");
+    frame.src = `${SERVER_URL}/${game.file}`;
+  } else {
+    document.getElementById("start-overlay").classList.add("hidden");
+    loading.classList.remove("hidden");
+    loading.textContent = "Loading…";
+    frame.onload = () => loading.classList.add("hidden");
+    frame.src = `${SERVER_URL}/${game.file}`;
+  }
+}
+
+function startGame() {
+  document.getElementById("start-overlay").classList.add("hidden");
 }
 
 function handleMessage(event) {
@@ -189,17 +233,7 @@ async function reportScore(gameId, gameName, score) {
     if (!r.ok) return;
     const { id, rank } = await r.json();
     sessionPlayId = id;
-
-    const savedName = localStorage.getItem("playerName");
-    if (savedName) {
-      fetch(`${SERVER_URL}/api/plays/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName: savedName }),
-      }).catch(() => {});
-    } else if (!sessionNameDone && rank <= 10) {
-      showNamePrompt(rank);
-    }
+    if (!sessionNameDone && rank <= 10) showNamePrompt(rank);
   } catch {
     // Server not reachable — score silently dropped
   }
@@ -233,13 +267,12 @@ async function openLeaderboard() {
         tr.innerHTML =
           `<td class="lb-rank">${i + 1}</td>` +
           `<td class="lb-player">${s.player_name ? esc(s.player_name) : '<span class="lb-anon">—</span>'}</td>` +
-          `<td class="lb-score">${s.score.toLocaleString()}</td>` +
-          `<td class="lb-time">${fmtTime(s.played_at)}</td>`;
+          `<td class="lb-score">${s.score.toLocaleString()}</td>`;
         tbody.appendChild(tr);
       });
     } else {
       tbody.innerHTML =
-        '<tr><td colspan="4" class="lb-empty">No scores yet today — be the first</td></tr>';
+        '<tr><td colspan="3" class="lb-empty">No scores yet today — be the first</td></tr>';
     }
 
     const msLeft = new Date(data.nextAt).getTime() - Date.now();
@@ -272,8 +305,12 @@ function closeAbout() {
 
 function showNamePrompt(rank) {
   document.getElementById("name-rank-val").textContent = rank;
+  const saved = localStorage.getItem("playerName");
+  const input = document.getElementById("name-input");
+  input.value = saved || "";
   document.getElementById("name-overlay").classList.add("open");
-  document.getElementById("name-input").focus();
+  input.focus();
+  if (saved) input.select();
 }
 
 function closeNamePrompt() {
