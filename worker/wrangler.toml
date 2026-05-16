@@ -1,0 +1,24 @@
+name = "newtab-party"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "newtab-party"
+database_id = "7acd47ef-1d34-47ea-b923-ba844e633c7d"
+
+[[routes]]
+pattern = "newtab.party"
+custom_domain = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
