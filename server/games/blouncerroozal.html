@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <title>BLOUNCERROOZAL</title>
 <style>
   :root { --primary: #FFD700; --secondary: #C0C0C0; --bg: #000000; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden;
+    overflow: hidden; touch-action: none;
   }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-  h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: 4px; text-shadow: 0 0 12px var(--primary), 0 0 24px var(--primary); }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
+  h1 { margin: 0; font-size: clamp(16px, 5vw, 26px); letter-spacing: 4px; text-shadow: 0 0 12px var(--primary), 0 0 24px var(--primary); }
   #hud {
-    width: 560px; max-width: 95vw;
+    width: min(560px, 95vw);
     display: flex; justify-content: space-between;
-    font-size: 14px; margin-bottom: 6px; opacity: 0.9; letter-spacing: 1px;
+    font-size: clamp(11px, 3vw, 14px); opacity: 0.9; letter-spacing: 1px;
   }
   #hud span { color: var(--primary); }
   canvas {
@@ -27,7 +27,7 @@
       repeating-linear-gradient(45deg, rgba(255,215,0,0.04) 0 8px, transparent 8px 16px);
     border: 2px solid var(--primary);
     box-shadow: 0 0 30px var(--primary), inset 0 0 40px rgba(0,0,0,0.7);
-    max-width: 95vw;
+    width: min(560px, 95vw); height: auto; display: block; touch-action: none;
   }
   #overlay {
     position: fixed; inset: 0; display: none;
@@ -35,11 +35,11 @@
     background: rgba(0,0,0,0.88);
     flex-direction: column; text-align: center; padding: 20px;
   }
-  #overlay h2 { color: var(--secondary); font-size: 40px; margin: 0 0 10px; letter-spacing: 3px; text-shadow: 0 0 10px var(--secondary); }
-  #overlay p { color: var(--primary); margin: 6px 0; max-width: 520px; }
-  #overlay .sub { color: var(--secondary); font-size: 13px; opacity: 0.85; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 40px); margin: 0 0 10px; letter-spacing: 3px; text-shadow: 0 0 10px var(--secondary); }
+  #overlay p { color: var(--primary); margin: 6px 0; max-width: 520px; font-size: clamp(12px, 3.5vw, 15px); }
+  #overlay .sub { color: var(--secondary); font-size: clamp(11px, 3vw, 13px); opacity: 0.85; }
   #overlay button {
-    margin-top: 18px; padding: 12px 26px; font-size: 16px;
+    margin-top: 18px; padding: 12px 26px; font-size: clamp(14px, 4vw, 16px);
     background: var(--primary); color: var(--bg); border: none;
     cursor: pointer; letter-spacing: 2px; font-weight: bold;
     box-shadow: 0 0 16px var(--primary);
@@ -61,7 +61,7 @@
 <div id="overlay">
   <h2 id="overTitle">House wins</h2>
   <p id="overMsg">Ball escaped. Tragic.</p>
-  <p class="sub">Mouse or ← / → to move · Click / Space to launch · Catch falling chips for multiball</p>
+  <p class="sub">Drag or mouse to move · Tap/click or Space to launch · Catch falling chips for multiball</p>
   <button id="restart">Double or nothing</button>
 </div>
 <script>
@@ -170,6 +170,19 @@
     const x = (e.clientX - rect.left) * (W / rect.width);
     paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w/2));
   });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches[0].clientX - rect.left) * (W / rect.width);
+    paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w/2));
+  }, { passive: false });
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches[0].clientX - rect.left) * (W / rect.width);
+    paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w/2));
+    launch();
+  }, { passive: false });
   addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft')  paddle.x = Math.max(0, paddle.x - 32);
     if (e.key === 'ArrowRight') paddle.x = Math.min(W - paddle.w, paddle.x + 32);

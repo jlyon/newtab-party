@@ -2,31 +2,42 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <title>shootin n crackin</title>
 <style>
   :root { --primary: #3b82f6; --secondary: #ff3d8b; --bg: #000; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden;
+    overflow: hidden; touch-action: none;
   }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-  h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; color: var(--secondary); text-shadow: 0 0 12px var(--secondary); text-transform: lowercase; }
-  #hud { width: 600px; max-width: 95vw; display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; opacity: 0.9; gap: 10px; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 4px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 26px); letter-spacing: 2px; color: var(--secondary); text-transform: lowercase; }
+  #hud { width: min(min(600px, 95vw), calc((100dvh - 230px) * 0.857)); display: flex; justify-content: space-between; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; gap: 10px; }
   #hud span { white-space: nowrap; }
-  canvas { background: #000; border: 2px solid var(--primary); box-shadow: 0 0 30px var(--primary), 0 0 60px var(--secondary); max-width: 95vw; max-height: 80vh; }
+  canvas { background: #000; border: 1px solid rgba(59,130,246,0.25); box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-width: min(600px, 95vw); max-height: calc(100dvh - 230px); width: auto; height: auto; display: block; }
+  #controls { display: flex; align-items: center; justify-content: space-between; width: min(min(600px, 95vw), calc((100dvh - 230px) * 0.857)); padding: 2px 0; }
+  .dpad { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .dpad-row { display: flex; gap: 3px; align-items: center; }
+  .btn { width: 52px; height: 52px; font-size: 20px; border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.4); color: var(--primary); cursor: pointer; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-touch-callout: none; }
+  .btn:active, .btn.held { background: var(--primary); color: #000; }
+  .dpad-gap { width: 52px; }
+  .btn-fire { width: 80px; height: 80px; font-size: 28px; border-color: var(--secondary); color: var(--secondary); border-radius: 50%; }
+  .btn-fire:active, .btn-fire.held { background: var(--secondary); color: #000; }
   #overlay {
     position: fixed; inset: 0; display: none;
     align-items: center; justify-content: center;
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px;
   }
-  #overlay h2 { color: var(--secondary); font-size: 38px; margin: 0 0 10px; text-shadow: 0 0 14px var(--secondary); letter-spacing: 2px; }
-  #overlay p { color: var(--primary); margin: 4px 0; }
-  #overlay .small { opacity: 0.7; font-size: 12px; }
-  #overlay button { margin-top: 18px; padding: 10px 22px; font-size: 16px; background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 38px); margin: 0 0 10px; letter-spacing: 2px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay .small { opacity: 0.7; font-size: clamp(11px, 2.5vw, 12px); }
+  #overlay button { margin-top: 18px; padding: 10px 22px; font-size: clamp(14px, 4vw, 16px); background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold; }
   #overlay button:hover { background: var(--secondary); }
 </style>
 </head>
@@ -40,6 +51,18 @@
     <span id="lives">Lives: 3</span>
   </div>
   <canvas id="game" width="600" height="700"></canvas>
+  <div id="controls">
+    <div class="dpad">
+      <div class="dpad-row"><button class="btn" id="btn-up">↑</button></div>
+      <div class="dpad-row">
+        <button class="btn" id="btn-left">←</button>
+        <div class="dpad-gap"></div>
+        <button class="btn" id="btn-right">→</button>
+      </div>
+      <div class="dpad-row"><button class="btn" id="btn-down">↓</button></div>
+    </div>
+    <button class="btn btn-fire" id="btn-fire">⚡</button>
+  </div>
 </div>
 <div id="overlay">
   <h2 id="overTitle">audited</h2>
@@ -84,11 +107,24 @@
   const BULLET_BOUNCES = 3;
 
   const keys = {};
+  const held = { left: false, right: false, up: false, down: false, fire: false };
   addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
     if ([' ','arrowleft','arrowright','arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
   });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
+  holdBtn('btn-up', 'up'); holdBtn('btn-down', 'down');
+  holdBtn('btn-fire', 'fire');
 
   let player, bullets, enemies, bosses, glitter;
   let score, lives, wave;
@@ -143,14 +179,14 @@
 
   function step(now) {
     let vx = 0, vy = 0;
-    if (keys['arrowleft']  || keys['a']) vx -= PLAYER_SPEED;
-    if (keys['arrowright'] || keys['d']) vx += PLAYER_SPEED;
-    if (keys['arrowup']    || keys['w']) vy -= PLAYER_SPEED;
-    if (keys['arrowdown']  || keys['s']) vy += PLAYER_SPEED;
+    if (keys['arrowleft']  || keys['a'] || held.left)  vx -= PLAYER_SPEED;
+    if (keys['arrowright'] || keys['d'] || held.right) vx += PLAYER_SPEED;
+    if (keys['arrowup']    || keys['w'] || held.up)    vy -= PLAYER_SPEED;
+    if (keys['arrowdown']  || keys['s'] || held.down)  vy += PLAYER_SPEED;
     player.x = Math.max(0, Math.min(W - player.w, player.x + vx));
     player.y = Math.max(0, Math.min(H - player.h, player.y + vy));
 
-    if (keys[' '] && now - lastShot > BULLET_COOLDOWN_MS) {
+    if ((keys[' '] || held.fire) && now - lastShot > BULLET_COOLDOWN_MS) {
       bullets.push({ x: player.x + player.w/2 - 3, y: player.y, w: 6, h: 12, vx: (Math.random() - 0.5) * 3.2, vy: -BULLET_SPEED, bounces: BULLET_BOUNCES });
       lastShot = now;
     }
