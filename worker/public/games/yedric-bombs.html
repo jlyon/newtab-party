@@ -12,13 +12,8 @@
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; color: var(--secondary); }
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; color: var(--secondary); }
-  canvas { border: 3px solid var(--primary); box-shadow: 0 0 18px var(--primary);
-    width: min(360px, 88vw); height: auto; display: block; background: #e8eef4; }
-  #controls { display: flex; gap: 10px; width: min(360px, 88vw); }
-  .btn { flex: 1; height: 56px; font-size: 26px; border: 2px solid var(--primary);
-    background: rgba(255,255,255,0.5); color: var(--secondary); cursor: pointer; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-touch-callout: none; }
-  .btn:active, .btn.held { background: var(--primary); color: #fff; }
+  canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; background: #e8eef4; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.78); flex-direction: column; text-align: center; padding: 20px; }
   #overlay h2 { color: var(--primary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
@@ -36,10 +31,6 @@
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="360" height="540"></canvas>
-  <div id="controls">
-    <button class="btn" id="btn-left">←</button>
-    <button class="btn" id="btn-right">→</button>
-  </div>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Wipeout!</h2>
@@ -99,7 +90,6 @@
     el.addEventListener('touchstart', dn, { passive: false });
     el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
   }
-  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
   addEventListener('keydown', e => {
     keys[e.key] = true;
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
@@ -436,9 +426,9 @@
     if (!started) {
       ctx.fillStyle = '#1f2937'; ctx.globalAlpha = 0.85;
       ctx.font = 'bold ' + Math.round(W * 0.045) + 'px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('Press ← / → or buttons to ski', W/2, H/2);
+      ctx.fillText('Tilt, swipe, or ← / → to steer', W/2, H/2);
       ctx.font = Math.round(W * 0.035) + 'px system-ui'; ctx.globalAlpha = 0.7;
-      ctx.fillText('Swipe or tilt to steer · dodge trees & robots!', W/2, H/2 + 22);
+      ctx.fillText('Dodge trees, boulders & robot impostors!', W/2, H/2 + 22);
       ctx.globalAlpha = 1; ctx.textAlign = 'left';
     }
     ctx.fillStyle = COL2; ctx.globalAlpha = 0.6;
@@ -460,7 +450,7 @@
   }
 
   function loop() {
-    if (!started && (keys['ArrowLeft'] || keys['ArrowRight'] || keys['a'] || keys['d'] || held.left || held.right)) started = true;
+    if (!started && (keys['ArrowLeft'] || keys['ArrowRight'] || keys['a'] || keys['d'] || tiltX !== 0)) started = true;
     if (running) step(); draw(); requestAnimationFrame(loop);
   }
   document.getElementById('restart').addEventListener('click', reset);

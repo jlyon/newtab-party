@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Yeti Run</title>
+<style>
+  :root { --primary: #4FC3F7; --secondary: #FF6FB5; --bg: #0a1428; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+  h1 { margin: 0; font-size: clamp(15px, 4vw, 22px); letter-spacing: 2px; }
+  #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
+  canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; cursor: pointer; }
+  #hint { font-size: clamp(10px, 2.5vw, 13px); opacity: 0.5; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>YETI RUN</h1>
+  <div id="hud">
+    <span>Runner: Yedric</span>
+    <span id="score">Score: 0</span>
+    <span id="hi">Best: 0</span>
+  </div>
+  <canvas id="game" width="640" height="210"></canvas>
+  <div id="hint">Space · ↑ to jump &nbsp;|&nbsp; Double-jump allowed</div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Splat.</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Run again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl  = document.getElementById('score');
+  const hiEl     = document.getElementById('hi');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const W = canvas.width, H = canvas.height;
+  const GROUND_Y = H - 30;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME  = 'Yedric';
+  const WIN_SCORE = 0;                        // 0 = endless leaderboard mode
+  const GRAVITY      = 0.65;
+  const JUMP_FORCE   = -13;
+  const BASE_SPEED   = 4.5;
+  const SPEED_INC    = 0.0007;
+  const OBSTACLE_TYPES = ['rogue snowman', 'wayward skier', 'avalanche boulder'];
+  const DIE_MSGS = [
+    () => 'Yedric ate a snowman head-first. The snowman is, somehow, fine.',
+    () => 'A skier Yedric yeeted last week came back for revenge. Karmic.',
+    () => 'Avalanche boulder. Yedric is now slightly more rectangular.',
+    () => 'Yedric tripped on his own fur. This is a documented yeti hazard.',
+    () => 'The mountain won this round. Yedric blames the algorithm.'
+  ];
+  const WIN_MSG = 'Yedric outran the entire mountain. Cryptid of the year.';
+  // ==================================
+
+  const PX = 90, PW = 36, PH = 44;
+  const FUR = '#FAFCFE';
+  const FUR_SHADE = '#D6EAF6';
+  const EYE = '#2A1F4A';
+  let py, pvy, jumpsLeft, obsts, frame, spd, score, hiScore = 0, running, started;
+  let snowflakes = [];
+
+  function reset() {
+    py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2;
+    obsts = []; frame = 0; spd = BASE_SPEED; score = 0;
+    running = true; started = false;
+    snowflakes = [];
+    for (let i = 0; i < 40; i++) {
+      snowflakes.push({ x: Math.random() * W, y: Math.random() * (GROUND_Y - 4), r: 1 + Math.random() * 2, vy: 0.3 + Math.random() * 0.8 });
+    }
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = 'Score: ' + score;
+    hiEl.textContent = 'Best: ' + hiScore;
+  }
+  function jump() {
+    if (!running) return;
+    started = true;
+    if (jumpsLeft > 0) { pvy = JUMP_FORCE; jumpsLeft--; }
+  }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function endGame(won, killerType) {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = won ? 'You win!' : 'Yedric down.';
+    if (won) {
+      overMsg.textContent = WIN_MSG;
+    } else {
+      let msg;
+      if (killerType === 0) msg = DIE_MSGS[0]();
+      else if (killerType === 1) msg = DIE_MSGS[1]();
+      else if (killerType === 2) msg = DIE_MSGS[2]();
+      else msg = DIE_MSGS[3 + Math.floor(Math.random() * 2)]();
+      overMsg.textContent = msg;
+    }
+    overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' · new best!' : '  ·  Best: ' + hiScore);
+    updateHud();
+    overlay.style.display = 'flex';
+  }
+
+  function step() {
+    frame++;
+    if (!started) return;
+    spd += SPEED_INC;
+    pvy += GRAVITY; py += pvy;
+    if (py >= GROUND_Y - PH) { py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2; }
+    const minGap = Math.max(200, 420 - frame * 0.12);
+    if (!obsts.length || W - obsts[obsts.length - 1].x > minGap + Math.random() * 200) {
+      const type = Math.floor(Math.random() * 3);
+      let w, h;
+      if (type === 0) { w = 22; h = 32; }
+      else if (type === 1) { w = 26; h = 30; }
+      else { w = 20 + Math.random() * 10; h = 18 + Math.random() * 12; }
+      obsts.push({ x: W + 10, w, h, y: GROUND_Y - h, type });
+    }
+    for (const o of obsts) o.x -= spd;
+    obsts = obsts.filter(o => o.x + o.w > -10);
+    for (const s of snowflakes) {
+      s.y += s.vy; s.x -= spd * 0.3;
+      if (s.y > GROUND_Y - 4) { s.y = -2; s.x = Math.random() * W; }
+      if (s.x < 0) s.x += W;
+    }
+    score = Math.floor(frame * spd * 0.04);
+    if (WIN_SCORE > 0 && score >= WIN_SCORE) { endGame(true, -1); return; }
+    for (const o of obsts) {
+      if (PX + 6 + PW - 12 > o.x + 3 && PX + 6 < o.x + o.w - 3 && py + 5 + PH - 8 > o.y + 3) {
+        endGame(false, o.type); return;
+      }
+    }
+    updateHud();
+  }
+
+  function drawSnowman(x, y, w, h) {
+    ctx.fillStyle = COL2;
+    ctx.beginPath(); ctx.arc(x + w/2, y + h - 8, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w/2, y + 6, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x + w/2 - 2, y + 4, 1.5, 1.5);
+    ctx.fillRect(x + w/2 + 1, y + 4, 1.5, 1.5);
+    ctx.fillRect(x + w/2 - 1, y + h - 14, 1.5, 1.5);
+    ctx.fillRect(x + w/2 - 1, y + h - 9, 1.5, 1.5);
+  }
+  function drawSkier(x, y, w, h) {
+    ctx.fillStyle = COL2;
+    ctx.fillRect(x + 8, y + 6, 10, 14);
+    ctx.fillRect(x + 9, y, 8, 7);
+    ctx.fillRect(x, y + h - 4, w, 3);
+    ctx.fillRect(x + 18, y + 4, 2, 18);
+  }
+  function drawBoulder(x, y, w, h) {
+    ctx.fillStyle = COL2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + h);
+    ctx.lineTo(x + 3, y + h * 0.3);
+    ctx.lineTo(x + w * 0.4, y);
+    ctx.lineTo(x + w * 0.8, y + h * 0.2);
+    ctx.lineTo(x + w, y + h * 0.6);
+    ctx.lineTo(x + w - 2, y + h);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x + 3, y + h * 0.5, w - 6, 2);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = COL1; ctx.globalAlpha = 0.15;
+    const mOff = (frame * (spd || BASE_SPEED) * 0.15) % 160;
+    for (let i = -1; i < 6; i++) {
+      const mx = i * 160 - mOff;
+      ctx.beginPath();
+      ctx.moveTo(mx, GROUND_Y);
+      ctx.lineTo(mx + 80, GROUND_Y - 70);
+      ctx.lineTo(mx + 160, GROUND_Y);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.7;
+    for (const s of snowflakes) {
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = COL1; ctx.fillRect(0, GROUND_Y, W, 2);
+    ctx.fillStyle = COL1; ctx.globalAlpha = 0.2;
+    const dashOff = (frame * (spd || BASE_SPEED)) % 80;
+    for (let x = -dashOff; x < W; x += 80) ctx.fillRect(x, GROUND_Y - 2, 40, 1);
+    ctx.globalAlpha = 1;
+    for (const o of obsts) {
+      if (o.type === 0) drawSnowman(o.x, o.y, o.w, o.h);
+      else if (o.type === 1) drawSkier(o.x, o.y, o.w, o.h);
+      else drawBoulder(o.x, o.y, o.w, o.h);
+    }
+
+    // ===== YEDRIC =====
+    const cx = PX + PW / 2;
+    const bodyTop = py + 8;
+    const onGround = py >= GROUND_Y - PH - 1;
+
+    ctx.fillStyle = FUR;
+    if (onGround) {
+      const lp = Math.floor(frame / 7) % 2;
+      ctx.beginPath(); ctx.ellipse(PX + 9, py + PH + (lp ? 4 : 1), 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(PX + PW - 9, py + PH + (lp ? 1 : 4), 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.ellipse(PX + 9, py + PH + 2, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(PX + PW - 9, py + PH + 2, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = FUR;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, bodyTop + 6);
+    ctx.quadraticCurveTo(cx - 22, bodyTop + 20, cx - 18, py + PH - 2);
+    ctx.quadraticCurveTo(cx, py + PH + 5, cx + 18, py + PH - 2);
+    ctx.quadraticCurveTo(cx + 22, bodyTop + 20, cx + 14, bodyTop + 6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = FUR_SHADE;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, bodyTop + 6);
+    ctx.quadraticCurveTo(cx - 22, bodyTop + 20, cx - 18, py + PH - 2);
+    ctx.quadraticCurveTo(cx - 16, bodyTop + 18, cx - 12, bodyTop + 6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = FUR_SHADE;
+    ctx.beginPath();
+    ctx.moveTo(cx - 1, bodyTop + 18);
+    ctx.lineTo(cx + 5, bodyTop + 24);
+    ctx.lineTo(cx + 2, bodyTop + 26);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = COL1;
+    ctx.beginPath(); ctx.ellipse(cx - 13, py + 1, 3.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 13, py + 1, 3.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = FUR;
+    ctx.beginPath(); ctx.ellipse(cx, py + 2, 13, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = FUR;
+    ctx.beginPath();
+    ctx.moveTo(cx - 1, py - 8);
+    ctx.quadraticCurveTo(cx + 2, py - 15, cx + 7, py - 11);
+    ctx.quadraticCurveTo(cx + 5, py - 7, cx + 2, py - 6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = FUR_SHADE;
+    ctx.beginPath();
+    ctx.moveTo(cx + 2, py - 6);
+    ctx.quadraticCurveTo(cx + 5, py - 8, cx + 6, py - 10);
+    ctx.quadraticCurveTo(cx + 4, py - 6, cx + 2, py - 6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = COL1;
+    ctx.beginPath();
+    const fx = cx - 9, fy = py - 1, fw = 18, fh = 10, r = 4;
+    ctx.moveTo(fx + r, fy);
+    ctx.lineTo(fx + fw - r, fy);
+    ctx.quadraticCurveTo(fx + fw, fy, fx + fw, fy + r);
+    ctx.lineTo(fx + fw, fy + fh - r);
+    ctx.quadraticCurveTo(fx + fw, fy + fh, fx + fw - r, fy + fh);
+    ctx.lineTo(fx + r, fy + fh);
+    ctx.quadraticCurveTo(fx, fy + fh, fx, fy + fh - r);
+    ctx.lineTo(fx, fy + r);
+    ctx.quadraticCurveTo(fx, fy, fx + r, fy);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = EYE;
+    ctx.beginPath(); ctx.arc(cx - 4, py + 2, 1.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 4, py + 2, 1.7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = EYE; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, py + 6, 2.5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+    ctx.fillStyle = FUR;
+    ctx.beginPath();
+    ctx.moveTo(cx + 1.5, py + 7.5);
+    ctx.lineTo(cx + 3, py + 7.5);
+    ctx.lineTo(cx + 2.2, py + 9.3);
+    ctx.closePath(); ctx.fill();
+    // ===== end Yedric =====
+
+    if (!started) {
+      ctx.fillStyle = COL1; ctx.globalAlpha = 0.6;
+      ctx.font = Math.round(W * 0.028) + 'px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Tap or press Space to start', W / 2, H / 2 - 14);
+      ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    }
+  }
+
+  addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); }
+    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+  });
+  canvas.addEventListener('click', jump);
+  document.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+  document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+
+  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

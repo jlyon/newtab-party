@@ -13,10 +13,12 @@
     height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
-  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
-    width: min(600px, 95vw); height: auto; display: block; }
+  canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; }
   #controls { display: flex; gap: 10px; align-items: center; justify-content: space-between;
-    width: min(600px, 95vw); padding: 4px 0; }
+    max-width: 95vw; padding: 4px 0; }
+  @media (pointer: fine) { #controls { display: none; } }
+  @media (pointer: coarse) { canvas { max-height: calc(100dvh - 150px); } }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
     padding: 0; width: 60px; height: 52px; font-size: 22px; border: 2px solid var(--primary);

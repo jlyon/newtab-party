@@ -12,13 +12,8 @@
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
-  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
-    width: min(360px, 88vw); height: auto; display: block; }
-  #controls { display: flex; gap: 10px; width: min(360px, 88vw); }
-  .btn { flex: 1; height: 56px; font-size: 26px; border: 2px solid var(--primary);
-    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-touch-callout: none; }
-  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; }
   #start-overlay {
     position: fixed; inset: 0; display: flex;
     align-items: center; justify-content: center;
@@ -51,10 +46,6 @@
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="360" height="540"></canvas>
-  <div id="controls">
-    <button class="btn" id="btn-left">◀</button>
-    <button class="btn" id="btn-right">▶</button>
-  </div>
 </div>
 <div id="start-overlay">
   <div id="start-card">
@@ -117,7 +108,6 @@
     el.addEventListener('touchstart', dn, { passive: false });
     el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
   }
-  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
   addEventListener('keydown', e => {
     keys[e.key] = true;
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();

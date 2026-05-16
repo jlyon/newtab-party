@@ -86,9 +86,7 @@ ${FAVICON}
   #about-modal::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
   #about-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 22px; padding: 4px 8px; border-radius: 4px; transition: color 0.12s; line-height: 1; font-family: inherit; }
   #about-close:hover { color: rgba(255,255,255,0.7); }
-  #about-modal h2 { font-size: 30px; font-weight: 700; margin-bottom: 6px; }
-  #about-modal .tagline { color: rgba(255,255,255,0.4); font-size: 14px; margin-bottom: 32px; }
-  #about-modal h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.3); margin: 28px 0 10px; }
+  #about-modal .modal-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.3); margin: 28px 0 10px; }
   #about-modal p, #about-modal li { color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.65; margin-bottom: 6px; }
   #about-modal ol { padding-left: 18px; }
   #about-modal code { background: rgba(255,255,255,0.09); padding: 2px 7px; border-radius: 4px; font-family: 'SF Mono','Monaco',monospace; font-size: 12px; color: #e2e8f0; }
@@ -102,8 +100,8 @@ ${FAVICON}
   .about-game-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.45; }
   .about-game-controls { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 6px; font-style: italic; }
   .modal-links { margin-top: 32px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .modal-links a { color: #e5e7eb; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 9px 16px; text-decoration: none; font-size: 13px; font-weight: 500; transition: background 0.12s; }
-  .modal-links a:hover { background: rgba(255,255,255,0.16); }
+  .modal-links a, .modal-links button { color: #e5e7eb; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 9px 16px; text-decoration: none; font-size: 13px; font-weight: 500; transition: background 0.12s; cursor: pointer; font-family: inherit; }
+  .modal-links a:hover, .modal-links button:hover { background: rgba(255,255,255,0.16); }
   #name-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; align-items: flex-end; justify-content: center; padding-bottom: 32px; }
   #name-overlay.open { display: flex; }
   #name-modal { background: #111118; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 24px 28px; width: 340px; }
@@ -164,22 +162,23 @@ ${FAVICON}
 <div id="about-overlay">
   <div id="about-modal">
     <button id="about-close" onclick="closeAbout()">×</button>
-    <h2>🥳 newtab.party</h2>
-    <p class="tagline">A new arcade game every day. Built by AI. Played by humans. Judged by the leaderboard.</p>
-    <h3>What is this?</h3>
-    <p>Every day at midnight UTC, a brand-new arcade game drops — same one for everyone, 24 hours to post your best score. After that the leaderboard locks and you're just playing for your own ego. Install the Chrome extension and every new tab becomes a perfectly justifiable distraction.</p>
-    <h3>Recent games</h3>
+    <div class="modal-title">newtab.party</div>
+    <p class="modal-subtitle" style="text-transform:none;letter-spacing:0;font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:32px;">A new arcade game every day. Built by AI. Played by humans. Judged by the leaderboard.</p>
+    <div class="modal-section">What is this?</div>
+    <p>Every day at midnight UTC, a brand-new arcade game drops — same one for everyone, 24 hours to post your best score. After that the leaderboard locks and you're just playing for your own ego. You're already here, so you're already winning.</p>
+    <div class="modal-section">Recent games</div>
     <div id="about-game-list"></div>
-    <h3>Build and share!</h3>
+    <div class="modal-section">Add your own game</div>
     <ol>
       <li>Clone the repo and install the <code>game-builder</code> Claude Code skill (link below)</li>
-      <li>Run <code>/game-builder</code> in a Claude Code session</li>
-      <li>Drop the generated <code>.html</code> into <code>worker/public/games/</code> and add an entry to <code>worker/games.json</code></li>
-      <li>Submit a pull request to share it with everyone</li>
+      <li>Open Claude Code in any project and run <code>/game-builder</code> — it'll walk you through designing your game</li>
+      <li>Drop the generated <code>.html</code> file into <code>worker/public/games/</code> and add an entry to <code>worker/games.json</code></li>
+      <li>Run <code>npm run deploy</code> from <code>worker/</code> — live immediately, no extension update needed</li>
+      <li>Submit a pull request — we'd love to grow the library</li>
     </ol>
     <div class="modal-links">
-      <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub →</a>
-      <a href="/leaderboard">Leaderboard →</a>
+      <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub repo →</a>
+      <button id="about-open-lb">Leaderboard →</button>
     </div>
   </div>
 </div>
@@ -320,6 +319,7 @@ function submitName() {
 
 function openAbout() { document.getElementById('about-overlay').classList.add('open'); }
 function closeAbout() { document.getElementById('about-overlay').classList.remove('open'); }
+document.getElementById('about-open-lb').addEventListener('click', () => { closeAbout(); window.location.href = '/leaderboard'; });
 function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 init();

@@ -11,9 +11,11 @@
     font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
-  canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
-    width: min(600px, 98vw); height: auto; display: block; }
-  #controls { display: flex; gap: 6px; align-items: center; width: min(600px, 98vw); flex-wrap: wrap; }
+  canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    max-width: 95vw; max-height: calc(100dvh - 80px); width: auto; height: auto; display: block; }
+  #controls { display: flex; gap: 6px; align-items: center; max-width: 95vw; flex-wrap: wrap; }
+  @media (pointer: fine) { #controls { display: none; } }
+  @media (pointer: coarse) { canvas { max-height: calc(100dvh - 170px); } }
   .ctrl-group { display: flex; gap: 5px; }
   .btn { padding: 8px 12px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 6px;
@@ -399,7 +401,7 @@
     // aim HUD (player turn only)
     if (phase === 'aim') {
       ctx.fillStyle = COL1; ctx.font = 'bold 12px system-ui';
-      ctx.fillText('Angle: ' + Math.round(angle) + '°  |  ' + WEAPONS[wpnIdx].name + '  |  keys 1-4 to switch', 8, 16);
+      ctx.fillText('Angle: ' + Math.round(angle) + '°  ·  ' + WEAPONS[wpnIdx].name + '  ·  1–4 switch  ·  Power: ' + Math.round(power) + '%', 8, 16);
     } else if (phase === 'ai-think' || (phase === 'fire' && proj?.owner === ai)) {
       ctx.fillStyle = COL2; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(AI_NAME + " is thinking...", W/2, 30);

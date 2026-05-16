@@ -54,8 +54,24 @@
       "name": "Yedric Bombs",
       "file": "games/yedric-bombs.html",
       "description": "Yedric the yeti shreds the mountain — dodging pines, boulders, and robot impostors on the way to the finish. Hit ramps for big air, thread gates for bonus points.",
-      "controls": "← → or A/D to steer · Swipe or tilt phone · Hit jumps to clear trees and rocks",
+      "controls": "← → or A/D to steer · Tilt phone to steer · Hit jumps to clear trees and rocks",
       "type": "ski"
+    },
+    {
+      "id": "yeti-run",
+      "name": "Yeti Run",
+      "file": "games/yeti-run.html",
+      "description": "Help Yedric escape the mountain. Jump over snowmen, dodge wayward skiers, and outrun avalanche boulders. Double-jump allowed. The mountain always wins. Eventually.",
+      "controls": "Space or ↑ to jump · Double-jump for extra height · Tap anywhere on mobile",
+      "type": "runner"
+    },
+    {
+      "id": "hognose",
+      "name": "Hognose",
+      "file": "games/hognose.html",
+      "description": "Dr. Hognose PhD needs 25 graduation caps. Slither the dramatic hognose snake through the grid, collect caps, and don't eat your own tail. She will huff at you if you fail.",
+      "controls": "Arrow keys or WASD to slither · Swipe or D-pad on mobile · Don't eat your tail",
+      "type": "snake"
     }
   ]
 }
