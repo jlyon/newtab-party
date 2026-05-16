@@ -2,22 +2,26 @@
 
 ## What this project is
 
-A Chrome extension (MV3) + local Express/TypeScript server. The extension replaces the new tab page with an arcade game that rotates daily (same game for everyone, like Wordle). Games are served over HTTP from the local server — no extension release needed to add new ones. Scores are stored in SQLite and shown on a per-game, per-day leaderboard.
+A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab page with an arcade game that rotates daily (same game for everyone, like Wordle). Games are static assets served from Cloudflare's edge. Scores are stored in Cloudflare D1 (SQLite) and shown on a per-game, per-day leaderboard that locks at midnight UTC.
 
 ## Key files
 
 | File | Purpose |
 |---|---|
-| `extension/manifest.json` | MV3 manifest. `frame-src http://localhost:3742` lets the newtab page iframe games from the server. No sandbox needed — games run as regular HTTP pages. |
-| `extension/newtab.js` | Fetches `games.json` from server, computes today's game, loads it in an iframe, listens for `postMessage({highScore})`. |
-| `server/games.json` | Source of truth for the game library. Server reads this; extension fetches it over HTTP. |
-| `server/games/*.html` | Self-contained game files. Served statically by the server at `/games/*`. |
-| `server/src/index.ts` | Express routes + inline HTML renderers for the arcade player and leaderboard. Also exports `GET /api/daily`. |
-| `server/src/db.ts` | All SQLite logic via `better-sqlite3`. DB is at `server/data/arcade.db` (auto-created). |
+| `extension/manifest.json` | MV3 manifest. `frame-src` allows iframing games from the worker URL. |
+| `extension/newtab.js` | `SERVER_URL` const at top. Fetches `games.json`, computes today's game, loads it in an iframe, listens for `postMessage({highScore})`. |
+| `worker/games.json` | Source of truth for the game library. Bundled into the worker at deploy time; also served at `GET /games.json`. |
+| `worker/public/games/*.html` | Self-contained game files. Served as Cloudflare edge assets at `/games/*`. |
+| `worker/src/index.ts` | Fetch handler + all routes. Intercepts `/games/*` to strip `X-Frame-Options`. |
+| `worker/src/db.ts` | All D1 query logic (async). |
+| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()` — server-rendered HTML. Start screen overlay, topbar tooltip, name prompt, recent-games about section. |
+| `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
+| `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
+| `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 
 ## Daily game algorithm
 
-Both the extension (`newtab.js`) and server (`index.ts`) use the exact same algorithm — they must stay in sync:
+Both the extension (`newtab.js`) and worker (`index.ts`) use the exact same algorithm — they must stay in sync:
 
 ```
 DAY_EPOCH = Date.UTC(2026, 4, 1)   // May 1 2026 UTC
@@ -25,15 +29,16 @@ day       = floor((Date.now() - DAY_EPOCH) / 86_400_000)
 index     = ((day % games.length) + games.length) % games.length
 ```
 
-The double-modulo handles negative days (before epoch) safely. Scores are date-scoped using SQLite's `date(played_at)` in UTC, which matches.
+The double-modulo handles negative days (before epoch) safely. Scores are date-scoped using D1's `date(played_at)` in UTC.
 
 ## Adding a game
 
 1. Build with the `game-builder` Claude Code skill (`/game-builder`)
-2. Copy `.html` to `server/games/`
-3. Add entry to `server/games.json` — required fields: `id`, `name`, `file`, `description`, `controls`, `type`
-4. Restart the server — the game is live in both web player and extension immediately
-5. No changes to `manifest.json` or the extension needed
+2. Copy `.html` to `worker/public/games/`
+3. Add entry to `worker/games.json` — required fields: `id`, `name`, `file`, `description`, `controls`, `type`
+4. `npm run deploy` from `worker/` — live immediately, no extension update needed
+
+Games with `controls` automatically get a pre-game start screen overlay in both the web player and extension.
 
 ### postHi() protocol
 
@@ -47,58 +52,78 @@ function postHi(n) {
 }
 ```
 
-Call `postHi(score)` whenever the player reaches a new personal best (on game-over, on score increase, etc.). The newtab wrapper listens for this message and forwards it to `POST /api/plays`.
+Call `postHi(score)` whenever the player reaches a new personal best. The newtab wrapper listens and forwards it to `POST /api/plays`.
 
 ## Database
 
-SQLite via `better-sqlite3` (synchronous, no async needed). Schema:
+Cloudflare D1 (SQLite-compatible, async API). Schema in `worker/schema.sql`:
 
 ```sql
 CREATE TABLE plays (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  game_id   TEXT    NOT NULL,
-  game_name TEXT    NOT NULL,
-  score     INTEGER NOT NULL,
-  played_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- UTC
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id     TEXT    NOT NULL,
+  game_name   TEXT    NOT NULL,
+  score       INTEGER NOT NULL,
+  player_name TEXT,
+  played_at   DATETIME DEFAULT CURRENT_TIMESTAMP  -- UTC
 );
 ```
 
-Key queries live in `db.ts`:
-- `recordPlay(gameId, gameName, score)` → returns `{ id, rank }` where rank is position among today's scores for that game
-- `getDailyScores(gameId, date)` → all scores for a game on a YYYY-MM-DD date
-- `getDailyCount(gameId, date)` → play count
-- `getPreviousDays(limit)` → one row per past UTC date with top score + play count
+All queries are in `worker/src/db.ts`. D1 uses `db.prepare(sql).bind(...).run/first/all()` — everything is async. Key functions:
+- `recordPlay(db, gameId, gameName, score)` → `{ id, rank }`
+- `getDailyScores(db, gameId, date)` → `Play[]`
+- `getDailyCount(db, gameId, date)` → `number`
+- `getPreviousDays(db, limit)` → `DailyEntry[]`
+- `setPlayerName(db, id, name)` → `boolean` (false if play is from a past day)
 
-## Server ports / URLs
+## URLs
 
-- Server: `http://localhost:3742`
-- Extension frames games from: `http://localhost:3742/games/*.html`
-- Extension fetches library from: `http://localhost:3742/games.json`
+- Production: `https://newtab.party`
+- GitHub: `https://github.com/jlyon/newtab-party`
+- Local dev: `http://localhost:8787` (wrangler dev default)
+- Extension `SERVER_URL` const: top of `extension/newtab.js`
+- Extension `frame-src`: `extension/manifest.json` → `content_security_policy`
 
-If the server is not running, the extension shows a friendly error with instructions to start it (`cd server && npm start`).
-
-## Running the server
+## Running locally
 
 ```bash
-cd server && npm install && npm start   # tsx src/index.ts
-cd server && npm run dev                # tsx watch (auto-reload)
+cd worker
+npm install
+npm run db:init:local          # create local D1 SQLite (first time only)
+npm run dev                    # wrangler dev → http://localhost:8787
 ```
 
-TypeScript is compiled on-the-fly via `tsx`. No build step needed for development.
+For extension dev, set `SERVER_URL = 'http://localhost:8787'` in `newtab.js` and reload the extension in `chrome://extensions`.
+
+## Deploying
+
+```bash
+cd worker
+npx wrangler d1 create newtab-party   # first time only — paste database_id into wrangler.toml
+npm run db:init:remote                 # first time only — runs schema.sql against prod D1
+npm run deploy                         # wrangler deploy
+```
 
 ## Common tasks
 
 **Check today's game and scores:**
 ```bash
-curl http://localhost:3742/api/daily | jq .
+curl https://newtab.party/api/daily | jq .
 ```
 
-**Inspect the database:**
+**Inspect the D1 database (local):**
 ```bash
-sqlite3 server/data/arcade.db "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10;"
+cd worker && npx wrangler d1 execute newtab-party --local \
+  --command "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10"
 ```
 
-**Type-check the server:**
+**Inspect the D1 database (production):**
 ```bash
-npx tsc --project server/tsconfig.json --noEmit
+cd worker && npx wrangler d1 execute newtab-party \
+  --command "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10"
+```
+
+**Type-check the worker:**
+```bash
+cd worker && npx tsc --noEmit
 ```

@@ -236,7 +236,7 @@ function renderArcade(): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arcade</title>
+<title>newtab.party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -294,6 +294,7 @@ function renderArcade(): string {
 <body>
 <div id="app">
   <div id="topbar">
+    <span>🥳 </span>
     <span id="game-title">Loading…</span>
     <span id="game-date"></span>
     <span id="high-score"></span>
@@ -679,6 +680,7 @@ function renderReplay(
 <body>
 <div id="app">
   <div id="topbar">
+    <span>🥳 </span>
     <span id="game-title">${esc(game.name)}</span>
     <span id="game-date">${esc(dateLabel)}</span>
     <span id="high-score"></span>
