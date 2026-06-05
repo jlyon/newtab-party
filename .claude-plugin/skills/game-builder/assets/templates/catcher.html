@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root{
+    --primary:__PRIMARY_COLOR__;
+    --accent:__SECONDARY_COLOR__;
+    --bg:__BACKGROUND_COLOR__;
+    --ink:#2a3b49;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{touch-action:none;margin:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Segoe UI',system-ui,Arial,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100%;user-select:none;-webkit-user-select:none;
+  }
+  #wrap{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px;width:100%;}
+  h1{
+    margin:0;font-size:clamp(20px,6vw,34px);letter-spacing:1px;
+    color:var(--primary);text-shadow:0 2px 0 rgba(0,0,0,.15);
+  }
+  #hud{
+    display:flex;gap:18px;font-size:clamp(13px,3.6vw,17px);font-weight:600;
+    align-items:center;flex-wrap:wrap;justify-content:center;
+  }
+  #hud .lives{color:var(--accent);}
+  #stage{position:relative;}
+  canvas{
+    width:min(420px,95vw);height:auto;display:block;
+    border-radius:18px;border:3px solid rgba(255,255,255,.5);
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;gap:14px;
+    background:rgba(0,0,0,.72);border-radius:16px;padding:20px;color:#fff;
+  }
+  .overlay h2{margin:0;font-size:clamp(20px,5.5vw,30px);color:var(--primary);}
+  .overlay p{margin:0;font-size:clamp(13px,3.6vw,16px);max-width:300px;line-height:1.5;color:rgba(255,255,255,.85);}
+  button.play{
+    border:none;background:var(--primary);color:#fff;font-weight:700;
+    font-size:clamp(15px,4vw,19px);padding:12px 28px;border-radius:40px;
+    cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.25);
+  }
+  button.play:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.25);}
+  #controls{display:flex;gap:14px;margin-top:4px;}
+  .btn{
+    height:62px;min-width:84px;border:none;border-radius:16px;
+    background:rgba(255,255,255,.9);color:var(--ink);font-size:30px;font-weight:700;
+    box-shadow:0 4px 0 rgba(0,0,0,.2);cursor:pointer;user-select:none;
+    -webkit-touch-callout:none;display:flex;align-items:center;justify-content:center;
+  }
+  .btn:active,.btn.held{background:var(--primary);color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.2);transform:translateY(2px);}
+  .hidden{display:none!important;}
+  #tip{font-size:12px;color:rgba(0,0,0,.45);text-align:center;}
+@media (pointer: fine) {
+  #controls { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span>Score: <span id="score">0</span></span>
+    <span class="lives">Lives: <span id="lives">3</span></span>
+    <span>Best: <span id="best">0</span></span>
+  </div>
+  <div id="stage">
+    <canvas id="c" width="420" height="560"></canvas>
+    <div id="startScreen" class="overlay">
+      <h2>__GAME_NAME__</h2>
+      <!-- ── GAME-SPECIFIC SECTION — customize for user's theme ── -->
+      <p>Catch the good stuff, dodge the bad. Move left and right to guide __PLAYER_NAME__.</p>
+      <p style="font-size:12px;color:rgba(255,255,255,.6);">Move: ← → arrows, swipe, tilt, or the buttons below.</p>
+      <!-- ── END GAME-SPECIFIC SECTION ── -->
+      <button class="play" id="startBtn">Play</button>
+    </div>
+    <div id="overScreen" class="overlay hidden">
+      <h2 id="overTitle">Game Over!</h2>
+      <p id="overMsg"></p>
+      <button class="play" id="againBtn">Play again</button>
+    </div>
+  </div>
+  <div id="controls">
+    <button class="btn" id="left">&#8592;</button>
+    <button class="btn" id="right">&#8594;</button>
+  </div>
+  <!-- ── GAME-SPECIFIC SECTION — customize tip text ── -->
+  <div id="tip">Catch __PLAYER_NAME__ items — avoid __ENEMY_NAME__!</div>
+  <!-- ── END GAME-SPECIFIC SECTION ── -->
+</div>
+<script>
+(function(){
+  const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives'),bestEl=document.getElementById('best');
+  const startScreen=document.getElementById('startScreen'),overScreen=document.getElementById('overScreen');
+  const overTitle=document.getElementById('overTitle'),overMsg=document.getElementById('overMsg');
+
+  /* ── GAME-SPECIFIC SECTION — customize for user's theme ── */
+  // Good items to catch — replace with thematically appropriate emoji
+  const GOOD_ITEMS = ['⭐','💎','🍎','🌟','✨'];
+  // Bad items to dodge — replace with thematic hazards
+  const HAZARDS = ['💀','🔥','💣','🪨','⚡'];
+  // Score messages — index 0 = 1 point, escalating
+  const WIN_MSGS = [
+    'Nice catch! Keep going.',
+    'You\'re on a roll!',
+    'Unstoppable __PLAYER_NAME__!',
+    'Legendary catching skills.'
+  ];
+  // Catcher emoji / icon drawn at the bottom
+  const CATCHER_ICON = '🤲';
+  // Items needed per "round" before speed increase (set to 1 for single-item scoring)
+  const ITEMS_PER_ROUND = 1;
+  // Points display label (e.g. 'Score', 'Caught', 'Stars')
+  const SCORE_LABEL = 'Score';
+  /* ── END GAME-SPECIFIC SECTION ── */
+
+  // Update HUD label
+  document.querySelector('#hud span').textContent = SCORE_LABEL + ': ';
+  document.querySelector('#hud span').innerHTML = SCORE_LABEL + ': <span id="score">0</span>';
+
+  let best=0;
+  let catX,score,lives,fall,timer,speed,running=false,raf=0;
+  const held={left:false,right:false};
+  const keys={};
+
+  function reset(){
+    catX=W/2;score=0;lives=3;fall=[];timer=0;speed=1;
+    scoreEl.textContent=0;livesEl.textContent=3;bestEl.textContent=best;
+  }
+
+  function spawn(){
+    const isGood=Math.random()<0.55;
+    const x=30+Math.random()*(W-60);
+    const icon=isGood
+      ? GOOD_ITEMS[Math.floor(Math.random()*GOOD_ITEMS.length)]
+      : HAZARDS[Math.floor(Math.random()*HAZARDS.length)];
+    fall.push({x,y:-30,vy:(2.0+Math.random()*1.6)*speed,vx:(Math.random()-0.5)*1.4,icon,good:isGood,r:18});
+  }
+
+  function drawCatcher(){
+    const y=H-46;
+    ctx.font='40px serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(CATCHER_ICON,catX,y);
+  }
+
+  let flash=null,flashT=0;
+
+  function loseLife(){
+    lives--;livesEl.textContent=lives;
+    flash='#ff5e6c';
+    if(lives<=0) end(false);
+  }
+
+  function gain(){
+    score++;scoreEl.textContent=score;
+    speed+=0.12;
+    flash='#5fb3e6';
+  }
+
+  function step(){
+    if(!running)return;
+    raf=requestAnimationFrame(step);
+    timer++;
+    const ml=held.left||keys['ArrowLeft']||keys['a'];
+    const mr=held.right||keys['ArrowRight']||keys['d'];
+    if(ml)catX-=6.5;
+    if(mr)catX+=6.5;
+    catX=Math.max(26,Math.min(W-26,catX));
+    const cadence=Math.max(26,60-Math.floor(speed*6));
+    if(timer%cadence===0)spawn();
+
+    ctx.clearRect(0,0,W,H);
+
+    const catY=H-46;
+    for(let i=fall.length-1;i>=0;i--){
+      const o=fall[i];
+      o.y+=o.vy;o.x+=o.vx;
+      if(o.x<20||o.x>W-20)o.vx*=-1;
+      ctx.font='34px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(o.icon,o.x,o.y);
+      if(o.y>catY-26&&o.y<catY+26&&Math.abs(o.x-catX)<34){
+        if(o.good)gain();else loseLife();
+        fall.splice(i,1);continue;
+      }
+      if(o.y>H+30){
+        fall.splice(i,1);
+      }
+    }
+    drawCatcher();
+    if(flash){
+      ctx.fillStyle=flash;ctx.globalAlpha=Math.min(0.25,flashT/8+0.05);
+      ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+      flashT++;if(flashT>6){flash=null;flashT=0;}
+    }
+  }
+
+  function start(){
+    reset();
+    startScreen.classList.add('hidden');
+    overScreen.classList.add('hidden');
+    running=true;cancelAnimationFrame(raf);raf=requestAnimationFrame(step);
+  }
+
+  function end(){
+    running=false;cancelAnimationFrame(raf);
+    if(score>best){best=score;postHi(best);}
+    bestEl.textContent=best;
+    overTitle.textContent=score>0?'Nice work!':'Oops!';
+    const msg=score<=0
+      ? 'Zero caught. Shake it off and try again!'
+      : WIN_MSGS[Math.min(score-1,WIN_MSGS.length-1)]+' You scored '+score+' point'+(score===1?'':'s')+'.';
+    overMsg.textContent=msg;
+    overScreen.classList.remove('hidden');
+  }
+
+  let _hi=0;
+  function postHi(n){
+    n=Math.floor(n)||0;
+    if(n>_hi){_hi=n;window.parent.postMessage({highScore:n},'*');}
+  }
+
+  function holdBtn(id,key){
+    const el=document.getElementById(id);
+    const dn=e=>{e.preventDefault();held[key]=true;el.classList.add('held');};
+    const up=e=>{e.preventDefault();held[key]=false;el.classList.remove('held');};
+    el.addEventListener('mousedown',dn);el.addEventListener('mouseup',up);el.addEventListener('mouseleave',up);
+    el.addEventListener('touchstart',dn,{passive:false});
+    el.addEventListener('touchend',up,{passive:false});el.addEventListener('touchcancel',up,{passive:false});
+  }
+  holdBtn('left','left');holdBtn('right','right');
+
+  document.addEventListener('keydown',e=>{
+    keys[e.key]=true;
+    if(e.key==='Enter'||e.key===' '){
+      if(!running&&!startScreen.classList.contains('hidden'))start();
+      else if(!running&&!overScreen.classList.contains('hidden'))start();
+    }
+  });
+  document.addEventListener('keyup',e=>{keys[e.key]=false;});
+
+  function canvasX(clientX){const r=cv.getBoundingClientRect();return(clientX-r.left)*(W/r.width);}
+  let dragging=false;
+  cv.addEventListener('touchstart',e=>{if(running){dragging=true;catX=canvasX(e.touches[0].clientX);}},{passive:true});
+  cv.addEventListener('touchmove',e=>{if(running&&dragging){catX=Math.max(26,Math.min(W-26,canvasX(e.touches[0].clientX)));}},{passive:true});
+  cv.addEventListener('touchend',()=>{dragging=false;});
+  cv.addEventListener('mousemove',e=>{if(running&&(e.buttons&1)){catX=Math.max(26,Math.min(W-26,canvasX(e.clientX)));}});
+
+  function enableTilt(){
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      DeviceOrientationEvent.requestPermission().then(s=>{if(s==='granted')setupTilt();}).catch(()=>{});
+    }else{setupTilt();}
+  }
+  function setupTilt(){
+    window.addEventListener('deviceorientation',e=>{
+      if(!running)return;const g=e.gamma||0;
+      held.left=g<-12;held.right=g>12;
+    });
+  }
+  document.addEventListener('touchstart',enableTilt,{once:true});
+
+  document.getElementById('startBtn').addEventListener('click',start);
+  document.getElementById('againBtn').addEventListener('click',start);
+
+  ctx.clearRect(0,0,W,H);
+})();
+</script>
+</body>
+</html>

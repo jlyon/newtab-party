@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Rack Attack</title>
+<style>
+  :root { --primary: #e23b3b; --secondary: #ffd400; --bg: #16110d; --ball: #f5f5f5; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 3px; text-transform: uppercase; }
+  canvas { border: 1px solid rgba(226,59,59,0.4); box-shadow: 0 6px 28px rgba(0,0,0,0.7);
+    width: min(420px, 94vw, calc((100dvh - 150px) * 0.656)); height: auto; display: block; border-radius: 6px; }
+  #controls { display: flex; gap: 8px; align-items: center; justify-content: center; max-width: 95vw; }
+  .btn { height: 54px; min-width: 60px; padding: 0 16px; font-size: clamp(13px, 3.5vw, 16px);
+    border: 2px solid var(--primary); background: rgba(0,0,0,0.35); color: var(--primary); cursor: pointer;
+    border-radius: 8px; user-select: none; -webkit-touch-callout: none; white-space: nowrap; font-weight: 500; }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  #btn-throw { border-color: var(--secondary); color: var(--secondary); min-width: 130px; font-weight: 500; }
+  #btn-throw:active, #btn-throw.held { background: var(--secondary); color: var(--bg); }
+  #start-overlay, #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.9); flex-direction: column; text-align: center; padding: 20px; z-index: 10;
+  }
+  #overlay { display: none; background: rgba(0,0,0,0.85); }
+  .card { max-width: 420px; }
+  .card h2 { color: var(--primary); font-size: clamp(24px,7vw,40px); margin: 0 0 16px; letter-spacing: 2px; text-transform: uppercase; }
+  #overTitle { color: var(--secondary); }
+  .card p { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.7; margin: 0 0 24px; }
+  .card button {
+    padding: 13px 38px; font-size: 16px; font-weight: 500; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 8px; font-family: inherit; text-transform: uppercase;
+  }
+  .card button:hover { opacity: 0.88; }
+@media (pointer: fine) {
+  #controls { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Rack Attack</h1>
+  <canvas id="game" width="420" height="640"></canvas>
+  <div id="controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-throw">Hold to throw</button>
+    <button class="btn" id="btn-right">▶</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div class="card">
+    <h2>Rack Attack</h2>
+    <p>Frat basement. Ten red cups a side. You vs. Chad.<br><br>
+       ◀ ▶ to aim left/right · hold <b>Throw</b> to charge — the reticle creeps up the table — release to let it fly.<br>
+       Sink all 10 of Chad's cups before he sinks yours.</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
+<div id="overlay">
+  <div class="card">
+    <h2 id="overTitle">Winner</h2>
+    <p id="overMsg"></p>
+    <button id="restart">Play again</button>
+  </div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+  const startOverlay = document.getElementById('start-overlay');
+
+  const css = getComputedStyle(document.documentElement);
+  const RED  = css.getPropertyValue('--primary').trim();
+  const YEL  = css.getPropertyValue('--secondary').trim();
+  const BALLC = css.getPropertyValue('--ball').trim();
+
+  const SCALE = 2;
+  const W = 420, H = 640;
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  ctx.scale(SCALE, SCALE);
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = 'You';
+  const AI_NAME = 'Chad';
+  const AI_ACCURACY = 0.4;          // 0 = wild, 1 = laser. Chad throws back, chaotically.
+  const AI_MISS_CHANCE = 0.38;      // chance Chad straight-up rims out
+  const CUP_R = 15;                 // cup mouth radius
+  const SCATTER_X = 6, SCATTER_Y = 5; // your throw wobble
+  const CHARGE_SPEED = 0.9;         // how fast power builds
+  const WIN_MSG = 'You cleared Chad’s rack. He’s reracking his dignity. Legend.';
+  const LOSE_MSG = 'Chad sank your last cup. He’s already telling everyone. Run it back.';
+  // ==================================
+
+  const TOP_START = { x: W/2, y: 52 };      // AI throws from here
+  const BOT_START = { x: W/2, y: H - 46 };  // you throw from here
+  const FAR_Y = 82;                          // deepest a throw can land
+  const NEAR_Y = H - 64;                     // shallowest (just past thrower)
+
+  let _hiSunk = 0;
+  let cups, aimX, power, charging, phase, ball, timer, thrower, splashes, lights;
+
+  function buildRack(apexY, dir, owner) {
+    // dir = +1 means rows go further from this owner as y moves toward center
+    const sp = 33, list = [];
+    const rows = [
+      { n: 1, off: 0 }, { n: 2, off: 1 }, { n: 3, off: 2 }, { n: 4, off: 3 },
+    ];
+    for (const r of rows) {
+      const y = apexY + dir * r.off * 29 * -1; // back row furthest from center
+      for (let i = 0; i < r.n; i++) {
+        const x = W/2 + (i - (r.n - 1) / 2) * sp;
+        list.push({ x, y, r: CUP_R, alive: true, owner });
+      }
+    }
+    return list;
+  }
+
+  function reset() {
+    // AI rack near top: back row (4) at y=100, apex (1) at y=187
+    const aiCups = buildRack(187, 1, 'ai');
+    // Player rack near bottom: apex (1) at y=H-187, back row (4) at y=H-100
+    const plCups = buildRack(H - 187, -1, 'player');
+    cups = aiCups.concat(plCups);
+    aimX = W/2; power = 0; charging = false;
+    phase = 'aim'; ball = null; timer = 0; thrower = 'player';
+    splashes = [];
+    lights = [];
+    for (let i = 0; i < 11; i++) lights.push({ x: 18 + i * (W - 36) / 10, hue: i % 3 });
+    overlay.style.display = 'none';
+  }
+
+  const alive = (owner) => cups.filter(c => c.owner === owner && c.alive);
+
+  function landYFromPower(p) { return BOT_START.y - (p / 100) * (BOT_START.y - FAR_Y); }
+
+  // ----- input -----
+  const held = { left: false, right: false, fire: false };
+  const keys = {};
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); if (key === 'fire') releaseThrow(); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-throw', 'fire');
+
+  addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === ' ') e.preventDefault();
+    if (e.key === 'Enter' && overlay.style.display === 'flex') { document.getElementById('restart').click(); }
+  });
+  addEventListener('keyup', e => {
+    if (keys[e.key] && e.key === ' ') releaseThrow();
+    keys[e.key] = false;
+  });
+
+  function releaseThrow() {
+    if (phase === 'aim' && charging && power > 3) throwBall();
+    charging = false;
+  }
+
+  function throwBall() {
+    const lx = aimX + (Math.random() * 2 - 1) * SCATTER_X;
+    const ly = landYFromPower(power) + (Math.random() * 2 - 1) * SCATTER_Y;
+    ball = { sx: BOT_START.x, sy: BOT_START.y, tx: lx, ty: ly, t: 0, dur: 34, owner: 'player', arc: 120 };
+    phase = 'throw'; power = 0; charging = false;
+  }
+
+  function aiThrow() {
+    const targets = alive('player');
+    if (!targets.length) return;
+    // Chad favors the front of the rack but is sloppy
+    targets.sort((a, b) => b.y - a.y);
+    const tgt = targets[Math.floor(Math.random() * Math.min(3, targets.length))];
+    let jit = (1 - AI_ACCURACY) * 26;
+    if (Math.random() < AI_MISS_CHANCE) jit += 30; // Chad chokes and sails it
+    const lx = tgt.x + (Math.random() * 2 - 1) * jit;
+    const ly = tgt.y + (Math.random() * 2 - 1) * jit * 0.6;
+    ball = { sx: TOP_START.x, sy: TOP_START.y, tx: lx, ty: ly, t: 0, dur: 34, owner: 'ai', arc: 120 };
+    phase = 'throw'; thrower = 'ai';
+  }
+
+  function resolveLanding() {
+    const targetOwner = ball.owner === 'player' ? 'ai' : 'player';
+    // You get a generous "rattle it in" radius; Chad has to be more precise.
+    const tol = ball.owner === 'player' ? 1.7 : 0.95;
+    let best = null, bestD = 1e9;
+    for (const c of cups) {
+      if (!c.alive || c.owner !== targetOwner) continue;
+      const d = Math.hypot(c.x - ball.tx, c.y - ball.ty);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    if (best && bestD < best.r * tol) {
+      best.alive = false;
+      splash(best.x, best.y, YEL, 22);
+    } else {
+      splash(ball.tx, ball.ty, '#ffffff', 7);
+    }
+  }
+
+  function splash(x, y, col, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * 2.6;
+      splashes.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, life: 22 + Math.random() * 16, col });
+    }
+  }
+
+  function endGame(won) {
+    phase = 'over';
+    const sunk = 10 - alive('ai').length;
+    overTitle.textContent = won ? 'You win!' : 'Chad wins';
+    overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
+    if (sunk > _hiSunk) { _hiSunk = sunk; window.parent.postMessage({ highScore: sunk }, '*'); }
+    overlay.style.display = 'flex';
+  }
+
+  // ----- update -----
+  function step() {
+    if (phase === 'aim') {
+      if (keys['ArrowLeft'] || keys['a'] || held.left)  aimX = Math.max(W/2 - 150, aimX - 3);
+      if (keys['ArrowRight'] || keys['d'] || held.right) aimX = Math.min(W/2 + 150, aimX + 3);
+      if (keys[' '] || held.fire) { charging = true; power = Math.min(100, power + CHARGE_SPEED); }
+    }
+
+    if (phase === 'throw' && ball) {
+      ball.t += 1 / ball.dur;
+      if (ball.t >= 1) {
+        ball.t = 1;
+        resolveLanding();
+        phase = 'resolve'; timer = 28; ball = null;
+      }
+    }
+
+    if (phase === 'resolve') {
+      if (--timer <= 0) {
+        if (!alive('ai').length) { endGame(true); }
+        else if (!alive('player').length) { endGame(false); }
+        else if (thrower === 'player') { phase = 'ai-wait'; timer = 55; }
+        else { phase = 'aim'; thrower = 'player'; power = 0; }
+      }
+    }
+
+    if (phase === 'ai-wait') { if (--timer <= 0) aiThrow(); }
+
+    for (const s of splashes) { s.x += s.vx; s.y += s.vy; s.vy += 0.14; s.life--; }
+    splashes = splashes.filter(s => s.life > 0);
+  }
+
+  // ----- draw -----
+  function drawCup(c) {
+    const r = c.r;
+    // body (slight taper)
+    ctx.fillStyle = c.owner === 'ai' ? '#c62f2f' : RED;
+    ctx.beginPath();
+    ctx.moveTo(c.x - r, c.y);
+    ctx.lineTo(c.x + r, c.y);
+    ctx.lineTo(c.x + r * 0.66, c.y + r * 1.15);
+    ctx.lineTo(c.x - r * 0.66, c.y + r * 1.15);
+    ctx.closePath(); ctx.fill();
+    // rim
+    ctx.fillStyle = c.owner === 'ai' ? '#e23b3b' : '#ff5a5a';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, r, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    // beer
+    ctx.fillStyle = YEL;
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, r * 0.66, r * 0.33, 0, 0, Math.PI * 2); ctx.fill();
+    // foam highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.ellipse(c.x - r * 0.18, c.y - r * 0.08, r * 0.22, r * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // basement wall
+    ctx.fillStyle = '#1d1611'; ctx.fillRect(0, 0, W, H);
+    // string lights
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 14);
+    for (const l of lights) ctx.lineTo(l.x, 22);
+    ctx.lineTo(W, 14); ctx.stroke();
+    const lcol = ['#ff6b6b', '#ffd400', '#7fd8ff'];
+    for (const l of lights) {
+      ctx.fillStyle = lcol[l.hue]; ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.arc(l.x, 24, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // table
+    const tx0 = W/2 - 165, tx1 = W/2 + 165, ty0 = 70, ty1 = H - 52;
+    ctx.fillStyle = '#0d3b2e';
+    ctx.fillRect(tx0, ty0, tx1 - tx0, ty1 - ty0);
+    ctx.strokeStyle = RED; ctx.lineWidth = 3; ctx.strokeRect(tx0, ty0, tx1 - tx0, ty1 - ty0);
+    // center line
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx0, H/2); ctx.lineTo(tx1, H/2); ctx.stroke();
+
+    // cups (draw far/AI first so depth feels right)
+    cups.filter(c => c.owner === 'ai' && c.alive).forEach(drawCup);
+    cups.filter(c => c.owner === 'player' && c.alive).forEach(drawCup);
+
+    // aim reticle (player turn)
+    if (phase === 'aim') {
+      const ry = landYFromPower(power);
+      ctx.strokeStyle = YEL; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.ellipse(aimX, ry, 16, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(aimX, ry - 13); ctx.lineTo(aimX, ry + 13);
+      ctx.moveTo(aimX - 22, ry); ctx.lineTo(aimX + 22, ry); ctx.stroke();
+      ctx.globalAlpha = 1;
+      // aim line from thrower
+      ctx.strokeStyle = 'rgba(255,212,0,0.3)'; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(BOT_START.x, BOT_START.y); ctx.lineTo(aimX, ry); ctx.stroke();
+      ctx.setLineDash([]);
+      // power bar
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(tx0, H - 44, tx1 - tx0, 8);
+      ctx.fillStyle = power > 88 ? '#ff4400' : YEL; ctx.fillRect(tx0, H - 44, (tx1 - tx0) * power / 100, 8);
+    }
+
+    // ball
+    if (phase === 'throw' && ball) {
+      const x = ball.sx + (ball.tx - ball.sx) * ball.t;
+      const y = ball.sy + (ball.ty - ball.sy) * ball.t;
+      const z = Math.sin(ball.t * Math.PI) * ball.arc;
+      // shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(x, y, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+      // ball
+      ctx.fillStyle = BALLC;
+      ctx.beginPath(); ctx.arc(x, y - z, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.arc(x + 1.5, y - z + 1.5, 6, 0.3, 1.9); ctx.fill();
+    }
+
+    // splashes
+    for (const s of splashes) {
+      ctx.fillStyle = s.col; ctx.globalAlpha = Math.min(1, s.life / 22);
+      ctx.beginPath(); ctx.arc(s.x, s.y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // HUD
+    ctx.textAlign = 'center';
+    ctx.fillStyle = RED; ctx.font = 'bold 13px system-ui';
+    ctx.fillText('CHAD  ' + alive('ai').length + ' cups', W/2, 50);
+    ctx.fillText('YOU  ' + alive('player').length + ' cups', W/2, H - 12);
+    if (phase === 'ai-wait' || (phase === 'throw' && ball && ball.owner === 'ai')) {
+      ctx.fillStyle = YEL; ctx.font = 'bold 14px system-ui';
+      ctx.fillText('Chad is lining one up…', W/2, H/2 - 8);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  function loop() { step(); draw(); requestAnimationFrame(loop); }
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); requestAnimationFrame(loop);
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>

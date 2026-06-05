@@ -72,6 +72,78 @@
       "description": "Dr. Hognose PhD needs 25 graduation caps. Slither the dramatic hognose snake through the grid, collect caps, and don't eat your own tail. She will huff at you if you fail.",
       "controls": "Arrow keys or WASD to slither · Swipe or D-pad on mobile · Don't eat your tail",
       "type": "snake"
+    },
+    {
+      "id": "burnin-glory",
+      "name": "Burnin' Glory",
+      "file": "games/burnin-glory.html",
+      "description": "Jungle Rally Championship. Pilot the navy kart through a dirt-road jungle circuit — overtake rivals, dodge oncoming traffic, and reach 5000 points to cross the finish line.",
+      "controls": "← → or A/D to steer · Space or button to boost · Overtake rivals for points",
+      "type": "racing"
+    },
+    {
+      "id": "tippity-toes",
+      "name": "Tippity Toes",
+      "file": "games/tippity-toes.html",
+      "type": "Minesweeper",
+      "description": "Bun-Bun the Easter Bunny is tip-toeing through the egg basket. Clear the field without cracking a single egg.",
+      "controls": "Click to reveal · Right-click or long-press to flag a rabbit"
+    },
+    {
+      "id": "coeur-brise",
+      "name": "Coeur Brisé",
+      "file": "games/coeur-brise.html",
+      "type": "Hearts",
+      "description": "A game of polite betrayal at a Parisian card table. Avoid hearts and the Queen of Spades — or shoot the moon.",
+      "controls": "Click cards to select · Click Pass to confirm · Click to play a card"
+    },
+    {
+      "id": "oligarchs-dilemma",
+      "name": "Oligarch's Dilemma",
+      "file": "games/oligarchs-dilemma.html",
+      "type": "Deal or No Deal",
+      "description": "16 sealed cases. One holds your fortune. Elon the Banker phones in lowball offers. Greed is a strategy.",
+      "controls": "Click cases to open · Deal or No Deal to respond to offers"
+    },
+    {
+      "id": "frosty-freefall",
+      "name": "Frosty Freefall",
+      "file": "games/frosty-freefall.html",
+      "type": "Catcher",
+      "description": "Catch falling snowman parts in your mitten to rebuild Frosty — and dodge everything else.",
+      "controls": "← → arrows to move · Swipe or tilt on mobile"
+    },
+    {
+      "id": "rack-attack",
+      "name": "Rack Attack",
+      "file": "games/rack-attack.html",
+      "type": "Beer Pong",
+      "description": "Frat basement. Ten red cups a side. You vs. Chad. Sink all his cups before he sinks yours.",
+      "controls": "← → to aim · Hold Space to charge · Release to throw"
+    },
+    {
+      "id": "fly-by-the-seat-of-your-pants",
+      "name": "Fly by the Seat of Your Pants",
+      "file": "games/fly-by-the-seat-of-your-pants.html",
+      "type": "Shooter",
+      "description": "You're Rogue One, threading a canyon in a TIE fighter. Dodge the walls, shoot the asteroids, survive.",
+      "controls": "Arrows or WASD to fly · Space to fire"
+    },
+    {
+      "id": "chop-till-you-drop",
+      "name": "Chop Till You Drop",
+      "file": "games/chop-till-you-drop.html",
+      "type": "Chopper",
+      "description": "Benny the Beaver chops a tree before the stamina bar runs dry. Dodge branches labeled with rivals.",
+      "controls": "← → arrows to chop sides"
+    },
+    {
+      "id": "penalty-panic",
+      "name": "Penalty Panic",
+      "file": "games/penalty-panic.html",
+      "type": "Soccer",
+      "description": "Best of 5 from the spot. Pick your nation, aim your shot, and dive to save. Win it for your country.",
+      "controls": "Drag to aim · Hold Space to charge shot · Arrows to choose dive direction when defending"
     }
   ]
 }

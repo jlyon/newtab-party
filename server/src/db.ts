@@ -57,7 +57,7 @@ export const db = {
   // All scores for a specific game on a specific UTC date (YYYY-MM-DD), best first.
   getDailyScores(gameId: string, date: string): Play[] {
     return sqlite.prepare(
-      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 100'
+      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 10'
     ).all(gameId, date) as Play[];
   },
 

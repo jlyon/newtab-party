@@ -28,7 +28,7 @@ export async function getDailyScores(
 ): Promise<Play[]> {
   const { results } = await db
     .prepare(
-      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 100',
+      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 10',
     )
     .bind(gameId, date)
     .all<Play>();

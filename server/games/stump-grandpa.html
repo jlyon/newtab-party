@@ -178,7 +178,7 @@
     timer = setInterval(() => {
       const s = Math.floor((Date.now()-startTime)/1000);
       timeEl.textContent = s + 's';
-      if (!ended) setPatience(patience - 0.05);
+      if (!ended) setPatience(patience - 0.03);
     }, 250);
 
     const picks = SYMBOLS.slice(0, PAIRS);
@@ -233,9 +233,9 @@
         misses++; updateHud();
         lock = true;
         a.classList.add('wrong'); b.classList.add('wrong');
-        setPatience(patience - 6);
+        setPatience(patience - 4);
         heckle(pick(HECKLES_WRONG));
-        if (Math.random() < 0.10) {
+        if (Math.random() < 0.05) {
           setTimeout(() => {
             const candidates = cards.filter(c => !c.classList.contains('matched') && !c.classList.contains('flipped'));
             if (candidates.length >= 2) {

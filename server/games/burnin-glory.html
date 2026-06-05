@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>__GAME_NAME__</title>
+<title>Burnin' Glory</title>
 <style>
-  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  :root { --primary: #0a1628; --secondary: #aaff00; --bg: #f5e6c8; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; height: 100%; background: #111; color: #e8e8e8;
+  html, body { margin: 0; padding: 0; height: 100%; background: #0d1f0a; color: #e8e8e8;
     font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
-  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; font-weight: 800; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; font-weight: 800; color: #aaff00; }
   #hud { display: flex; gap: 14px; font-size: clamp(11px, 3vw, 13px); align-items: center; }
-  #kmh { font-size: clamp(14px, 3.5vw, 17px); font-weight: 800; color: #f5a623; min-width: 80px; }
+  #kmh { font-size: clamp(14px, 3.5vw, 17px); font-weight: 800; color: #aaff00; min-width: 80px; }
   #boosts { display: flex; gap: 4px; }
   .bpip { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #666; background: transparent; transition: background 0.15s; }
-  .bpip.charged { background: #f5a623; border-color: #f5a623; }
+  .bpip.charged { background: #aaff00; border-color: #aaff00; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
   #controls { display: flex; gap: 8px; max-width: 95vw; }
@@ -26,37 +26,38 @@
     display: flex; align-items: center; justify-content: center; user-select: none;
     -webkit-touch-callout: none; flex: 1; transition: background 0.1s; }
   .btn:active, .btn.held { background: #444; color: #fff; }
-  #btn-boost { border-color: #f5a623; color: #f5a623; flex: 1.2; font-size: 18px; }
-  #btn-boost:active, #btn-boost.held { background: #f5a623; color: #000; }
+  #btn-boost { border-color: #aaff00; color: #aaff00; flex: 1.2; font-size: 18px; }
+  #btn-boost:active, #btn-boost.held { background: #aaff00; color: #000; }
   #btn-boost.empty { opacity: 0.3; }
   #start-overlay {
     position: fixed; inset: 0; display: flex;
     align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.88); flex-direction: column;
+    background: rgba(0,0,0,0.92); flex-direction: column;
     text-align: center; padding: 20px; z-index: 10;
   }
   #start-card { max-width: 420px; }
-  #start-card h2 { color: #f5a623; font-size: clamp(22px,6vw,36px); margin: 0 0 12px; letter-spacing: 2px; }
+  #start-card h2 { color: #aaff00; font-size: clamp(22px,6vw,40px); margin: 0 0 8px; letter-spacing: 3px; font-weight: 900; text-shadow: 0 0 20px rgba(170,255,0,0.5); }
+  #start-card .subtitle { color: #f5e6c8; font-size: clamp(12px,3vw,15px); margin: 0 0 10px; letter-spacing: 1px; font-style: italic; }
   #start-card p { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.6; margin: 0 0 28px; }
   #start-btn {
     padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
-    background: #f5a623; color: #000; border: none; cursor: pointer;
+    background: #aaff00; color: #000; border: none; cursor: pointer;
     border-radius: 6px; font-family: inherit; transition: opacity 0.15s;
   }
   #start-btn:hover { opacity: 0.85; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; }
-  #overlay h2 { color: #f5a623; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; letter-spacing: 2px; }
+    background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: #aaff00; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; letter-spacing: 2px; }
   #overlay p { color: #ccc; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay button { margin-top: 18px; padding: 12px 32px; font-size: clamp(14px, 3.5vw, 16px);
-    background: #f5a623; color: #000; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 700; }
+    background: #aaff00; color: #000; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 700; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <h1>__GAME_NAME__</h1>
+  <h1>BURNIN' GLORY</h1>
   <div id="hud">
-    <span>__PLAYER_NAME__</span>
+    <span>🏎 Kart</span>
     <span id="kmh">0 KM/H</span>
     <span id="score">Score: 0</span>
     <span id="hi">Best: 0</span>
@@ -65,14 +66,15 @@
   <canvas id="game" width="360" height="580"></canvas>
   <div id="controls">
     <button class="btn" id="btn-left">◀</button>
-    <button class="btn" id="btn-boost">🔥 BOOST</button>
+    <button class="btn" id="btn-boost">🌿 BOOST</button>
     <button class="btn" id="btn-right">▶</button>
   </div>
 </div>
 <div id="start-overlay">
   <div id="start-card">
-    <h2>__GAME_NAME__</h2>
-    <p id="controls-hint">← → to steer · Space or button to boost · Overtake rivals, dodge oncoming cars</p>
+    <h2>BURNIN' GLORY</h2>
+    <div class="subtitle">Jungle Rally Championship</div>
+    <p>← → to steer &nbsp;·&nbsp; Space or button to boost<br>Overtake rivals, dodge traffic, reach the finish line!</p>
     <button id="start-btn">▶ Race</button>
   </div>
 </div>
@@ -80,7 +82,7 @@
   <h2 id="overTitle">CRASH!</h2>
   <p id="overMsg"></p>
   <p id="overScore"></p>
-  <button id="restart">Race again</button>
+  <button id="restart">Race Again</button>
 </div>
 <script>
 (() => {
@@ -100,31 +102,28 @@
     reset(); requestAnimationFrame(loop);
   });
   const css = getComputedStyle(document.documentElement);
-  const COL1 = css.getPropertyValue('--primary').trim();
-  const COL2 = css.getPropertyValue('--secondary').trim();
+  const COL1 = css.getPropertyValue('--primary').trim();   // dark navy
+  const COL2 = css.getPropertyValue('--secondary').trim(); // lime green
   const W = canvas.width, H = canvas.height;
 
   // ===== GAME-SPECIFIC SECTION =====
-  const PLAYER_NAME = '__PLAYER_NAME__';
-  const RIVAL_NAME  = '__ENEMY_NAME__';         // e.g. "cops", "rivals", "pizza delivery guys"
-  const WIN_SCORE   = 0;                         // 0 = endless; e.g. 3000 for a finish line
-  const BASE_SPEED  = 2.5;                       // starting scroll speed (px/frame)
-  const TOP_SPEED   = 7;                         // max speed
-  const STEER       = 4.5;                       // lateral movement speed
-  const BOOST_SPEED = 1.8;                       // speed multiplier while boosting
-  const BOOST_MAX   = 3;                         // max boost charges
-  const BOOST_DURATION = 110;                    // frames per boost
-  const BOOST_RECHARGE = 360;                    // frames per recharge
-  const CRASH_MSG   = PLAYER_NAME + ' got wrecked by the ' + RIVAL_NAME + '. Brutal.';
-  const WIN_MSG     = PLAYER_NAME + ' crossed the finish. Untouchable.';
-  // Car types spawned as rivals:
+  const PLAYER_NAME = 'The Kart';
+  const RIVAL_NAME  = 'jungle racers';
+  const WIN_SCORE   = 5000;                        // race to 5000 = finish line
+  const BASE_SPEED  = 2.5;
+  const TOP_SPEED   = 7;
+  const STEER       = 4.5;
+  const BOOST_SPEED = 1.8;
+  const BOOST_MAX   = 3;
+  const BOOST_DURATION = 110;
+  const BOOST_RECHARGE = 360;
+  const CRASH_MSG   = 'Wrecked by the ' + RIVAL_NAME + '. The jungle wins this round.';
+  const WIN_MSG     = 'THE KART IS UNSTOPPABLE. Burnin\' Glory is YOURS! 🏆';
   const CAR_TYPES = [
-    { w: 46, h: 74, spd: 0.25, pts: 25, col: '#e06020' }, // wide slow truck
-    { w: 36, h: 60, spd: 0.6,  pts: 50, col: COL2      }, // normal car
-    { w: 30, h: 54, spd: 1.3,  pts: 80, col: '#dd2244' }, // fast oncoming
+    { w: 46, h: 74, spd: 0.25, pts: 25, col: '#8B4513' }, // wide slow mud truck
+    { w: 36, h: 60, spd: 0.6,  pts: 50, col: COL2      }, // lime rival kart
+    { w: 30, h: 54, spd: 1.3,  pts: 80, col: '#cc2244' }, // fast oncoming hotshot
   ];
-  // Side decorations (scenery alongside road — customize col/count for theme)
-  const SIDE_DECO_COLORS = ['#1a5c0a','#2a7a14','#0d4008','#3a8a20'];
   // ==================================
 
   // Road geometry
@@ -151,19 +150,20 @@
   addEventListener('keyup', e => { keys[e.key] = false; if (e.key === ' ') held.boost = false; });
 
   let px, spd, frame, score, hiScore = 0, running;
-  let dashOff, rivals, particles, popups, sideDeco;
+  let dashOff, rivals, particles, popups, jungleDeco;
   let boostCharges, boostT, rechargeT;
   let boosting, nearMissStreak, lastBoostUse;
   let kmhDisplay;
 
-  function makeSideDeco() {
-    sideDeco = [];
-    for (let i = 0; i < 18; i++) {
-      sideDeco.push({
+  // Jungle-side decorations (trees, ferns)
+  function makeJungleDeco() {
+    jungleDeco = [];
+    for (let i = 0; i < 20; i++) {
+      jungleDeco.push({
         x: Math.random() < 0.5 ? Math.random() * (RX - 4) : RR + 4 + Math.random() * (W - RR - 4),
         y: Math.random() * H,
-        r: 5 + Math.random() * 12,
-        col: SIDE_DECO_COLORS[Math.floor(Math.random() * SIDE_DECO_COLORS.length)]
+        r: 6 + Math.random() * 14,
+        col: ['#1a5c0a','#2a7a14','#0d4008','#3a8a20','#166010'][Math.floor(Math.random()*5)]
       });
     }
   }
@@ -174,7 +174,7 @@
     boostCharges = BOOST_MAX; boostT = 0; rechargeT = 0;
     boosting = false; nearMissStreak = 0; lastBoostUse = 0; kmhDisplay = 60;
     running = true;
-    makeSideDeco();
+    makeJungleDeco();
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() {
@@ -188,7 +188,7 @@
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }
-    overTitle.textContent = won ? 'YOU WIN!' : 'CRASH!';
+    overTitle.textContent = won ? '🏆 GLORY!' : 'WRECKED!';
     overMsg.textContent = won ? WIN_MSG : CRASH_MSG;
     overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);
     updateHud(); overlay.style.display = 'flex';
@@ -219,12 +219,12 @@
     if (wantBoost && !boosting && boostCharges > 0) {
       boosting = true; boostT = BOOST_DURATION; boostCharges--;
       lastBoostUse = frame; rechargeT = 0;
-      addPopup(px, H * 0.7, '🔥 BOOST!', '#f5a623');
+      addPopup(px, H * 0.7, '🌿 BOOST!', '#aaff00');
     }
     if (boosting) { boostT--; if (boostT <= 0) boosting = false; }
     if (boostCharges < BOOST_MAX) {
       rechargeT++;
-      if (rechargeT >= BOOST_RECHARGE) { boostCharges++; rechargeT = 0; addPopup(px, H * 0.8, 'BOOST READY', '#f5a623'); }
+      if (rechargeT >= BOOST_RECHARGE) { boostCharges++; rechargeT = 0; addPopup(px, H * 0.8, 'BOOST READY', '#aaff00'); }
     }
 
     const targetSpd = Math.min(TOP_SPEED, BASE_SPEED + frame * 0.001) * (boosting ? BOOST_SPEED : 1);
@@ -238,17 +238,19 @@
 
     if (frame % 110 === 0) spawnRival();
 
-    for (const d of sideDeco) {
+    // Scroll jungle deco
+    for (const d of jungleDeco) {
       d.y += spd * 0.5;
       if (d.y > H + 20) { d.y = -20; d.x = Math.random() < 0.5 ? Math.random() * (RX - 4) : RR + 4 + Math.random() * (W - RR - 4); }
     }
+
     for (const r of rivals) r.y += r.dir * (spd - r.spd * r.dir);
 
     const PY = H - 90, PW = 34, PH = 60;
     for (const r of rivals) {
       const dx = Math.abs(px - r.x), dy = Math.abs(PY - r.y);
       const hit = dx < (PW + r.w) / 2 - 4 && dy < (PH + r.h) / 2 - 4;
-      if (hit) { addParticles(px, PY, '#fff', 20, 3); endGame(false); return; }
+      if (hit) { addParticles(px, PY, '#aaff00', 20, 3); endGame(false); return; }
       if (!r._nearMissed && dx < (PW + r.w) / 2 + 10 && dy < (PH + r.h) / 2 + 10) {
         if (!hit) {
           r._nearMissed = true; nearMissStreak++;
@@ -262,12 +264,12 @@
         r.overtaken = true;
         const bonus = r.pts * (boosting ? 2 : 1);
         score += bonus;
-        addPopup(RX + RW / 2, H * 0.3, 'OVERTAKE +' + bonus, COL1);
+        addPopup(RX + RW / 2, H * 0.3, 'OVERTAKE +' + bonus, COL2);
         nearMissStreak = 0;
       }
       if (!r.overtaken && r.dir === -1 && r.y < -r.h) {
         r.overtaken = true; score += 15;
-        addPopup(RX + RW / 2, H * 0.3, 'DODGED +15', '#88aaff');
+        addPopup(RX + RW / 2, H * 0.3, 'DODGED +15', '#aaddff');
       }
     }
     rivals = rivals.filter(r => !r.overtaken && r.y < H + 80 && r.y > -80);
@@ -282,7 +284,6 @@
     updateHud();
   }
 
-  // Rounded rect helper
   function rr(x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -295,15 +296,12 @@
     ctx.save();
     ctx.translate(x, y);
 
-    // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(3, 3, w/2, h/5, 0, 0, Math.PI*2); ctx.fill();
 
-    // Car body
     ctx.fillStyle = col;
     rr(-w/2, -h/2, w, h, 5); ctx.fill();
 
-    // Gloss overlay (top-left lighter)
     const gl = ctx.createLinearGradient(-w/2, -h/2, w/2, h/4);
     gl.addColorStop(0, 'rgba(255,255,255,0.28)');
     gl.addColorStop(0.45, 'rgba(255,255,255,0.06)');
@@ -311,19 +309,15 @@
     ctx.fillStyle = gl;
     rr(-w/2, -h/2, w, h, 5); ctx.fill();
 
-    // Roof panel (dark center)
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.fillRect(-w/2 + 5, -h/2 + 12, w - 10, h - 24);
 
-    // Front windshield
     ctx.fillStyle = 'rgba(160,210,255,0.55)';
     ctx.fillRect(-w/2 + 6, -h/2 + 7, w - 12, h * 0.21);
 
-    // Rear windshield
     ctx.fillStyle = 'rgba(130,185,230,0.4)';
     ctx.fillRect(-w/2 + 7, h/2 - 7 - h * 0.18, w - 14, h * 0.18);
 
-    // Wheels (4 corners)
     ctx.fillStyle = '#1a1a1a';
     const ww = 5, wh = 11;
     for (const [lx, ly] of [[-w/2-3, -h/2+9], [w/2-2, -h/2+9], [-w/2-3, h/2-9-wh], [w/2-2, h/2-9-wh]]) {
@@ -331,81 +325,90 @@
       ctx.fillStyle = '#3a3a3a'; ctx.fillRect(lx+1, ly+2, ww-2, 4); ctx.fillStyle = '#1a1a1a';
     }
 
-    // Headlights
     ctx.fillStyle = 'rgba(255,252,200,0.9)';
     ctx.fillRect(-w/2+4, -h/2+3, 5, 3); ctx.fillRect(w/2-9, -h/2+3, 5, 3);
 
-    // Taillights
     ctx.fillStyle = '#ff2200';
     ctx.fillRect(-w/2+4, h/2-4, 7, 3); ctx.fillRect(w/2-11, h/2-4, 7, 3);
+
+    // Lime green racing stripe for player (navy car)
+    if (col === COL1) {
+      ctx.fillStyle = 'rgba(170,255,0,0.7)';
+      ctx.fillRect(-3, -h/2+4, 6, h-8);
+    }
 
     ctx.restore();
   }
 
+  // Draw a jungle tree/bush blob
+  function drawTree(x, y, r, col) {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.beginPath(); ctx.arc(x - r*0.25, y - r*0.25, r*0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
   function draw() {
-    // Side scenery background
-    ctx.fillStyle = '#2a5c1a';
+    // Jungle floor sides
+    ctx.fillStyle = '#1a4a0a';
     ctx.fillRect(0, 0, W, H);
 
-    // Side deco blobs
-    for (const d of sideDeco) {
-      ctx.fillStyle = d.col;
-      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.07)';
-      ctx.beginPath(); ctx.arc(d.x - d.r*0.25, d.y - d.r*0.25, d.r*0.5, 0, Math.PI * 2); ctx.fill();
-    }
+    // Jungle deco (trees behind road)
+    for (const d of jungleDeco) drawTree(d.x, d.y, d.r, d.col);
 
-    // Road asphalt
-    ctx.fillStyle = '#282828';
+    // Dirt road
+    ctx.fillStyle = '#3d2a1a';
     ctx.fillRect(RX, 0, RW, H);
 
-    // Subtle road texture
-    ctx.fillStyle = 'rgba(255,255,255,0.025)';
+    // Road texture (lighter dirt patches)
+    ctx.fillStyle = 'rgba(255,220,150,0.04)';
     for (let y = -(dashOff * 0.4 | 0) % 60; y < H; y += 60)
       ctx.fillRect(RX, y, RW, 30);
 
-    // Rumble strips
+    // Rumble strips (warning strips at edges)
     for (let y = -(dashOff % 18); y < H + 18; y += 18) {
       const alt = Math.floor((y + dashOff) / 18) % 2;
-      ctx.fillStyle = alt ? '#cc1100' : '#e8e8e8';
+      ctx.fillStyle = alt ? '#cc1100' : '#f5e6c8';
       ctx.fillRect(RX, y, 10, 19); ctx.fillRect(RR - 10, y, 10, 19);
     }
 
-    // Inner asphalt (inside rumble strips)
-    ctx.fillStyle = '#242424';
+    // Inner road surface
+    ctx.fillStyle = '#4a3520';
     ctx.fillRect(RX + 10, 0, RW - 20, H);
 
-    // White lane dashes
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    // Lane dashes (beige for dirt road feel)
+    ctx.strokeStyle = 'rgba(245,230,200,0.45)'; ctx.lineWidth = 2;
     ctx.setLineDash([24, 18]); ctx.lineDashOffset = -dashOff;
     for (const lx of [RX + LW, RX + LW * 2]) {
       ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
     }
 
-    // Yellow center line
-    ctx.strokeStyle = 'rgba(255,200,0,0.7)'; ctx.lineWidth = 3;
+    // Lime center line
+    ctx.strokeStyle = 'rgba(170,255,0,0.5)'; ctx.lineWidth = 3;
     ctx.setLineDash([36, 24]); ctx.lineDashOffset = -dashOff;
     ctx.beginPath(); ctx.moveTo(RX + RW/2, 0); ctx.lineTo(RX + RW/2, H); ctx.stroke();
     ctx.setLineDash([]);
 
-    // White edge lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(245,230,200,0.45)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(RX+10, 0); ctx.lineTo(RX+10, H); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(RR-10, 0); ctx.lineTo(RR-10, H); ctx.stroke();
 
-    // Progress bar + finish line
+    // Progress bar / finish line
     if (WIN_SCORE > 0) {
       const t = Math.min(1, score / WIN_SCORE);
+      // Progress bar on right edge
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillRect(W - 8, 0, 6, H);
-      ctx.fillStyle = COL2;
+      ctx.fillStyle = '#aaff00';
       ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
+
+      // Finish line when close
       const fy = (1 - t) * H * 0.3;
       if (fy > 0 && fy < H) {
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#f5e6c8';
         for (let i = 0; i < 8; i++)
           if (i % 2 === 0) ctx.fillRect(RX+10 + i*(RW-20)/8, fy-4, (RW-20)/8, 8);
-        ctx.fillStyle = '#111';
+        ctx.fillStyle = '#1a1a1a';
         for (let i = 0; i < 8; i++)
           if (i % 2 !== 0) ctx.fillRect(RX+10 + i*(RW-20)/8, fy-4, (RW-20)/8, 8);
       }
@@ -422,10 +425,9 @@
     // Rival cars
     for (const r of rivals) drawCar(r.x, r.y, r.w, r.h, r.col);
 
-    // Player position
     const PY = H - 90;
 
-    // Tire marks when speeding
+    // Tire marks
     if (spd > BASE_SPEED * 1.15) {
       const alpha = Math.min(0.35, (spd - BASE_SPEED * 1.15) / (TOP_SPEED - BASE_SPEED) * 0.35);
       ctx.fillStyle = `rgba(0,0,0,${alpha})`;
@@ -434,27 +436,27 @@
       ctx.fillRect(px + 10, PY + 28, 5, len);
     }
 
-    // Boost exhaust flames
+    // Boost exhaust (lime green flare for jungle kart)
     if (boosting) {
       for (let i = 0; i < 6; i++) {
         const fh = 8 + Math.random() * 24;
         const fw = 3 + Math.random() * 4;
         const fx = px + (Math.random() - 0.5) * 22;
         ctx.globalAlpha = 0.5 + Math.random() * 0.45;
-        const g = 60 + Math.floor(Math.random() * 150);
-        ctx.fillStyle = `rgb(255,${g},0)`;
+        const g = 150 + Math.floor(Math.random() * 105);
+        ctx.fillStyle = `rgb(${Math.floor(g*0.6)},${g},0)`;
         ctx.beginPath(); ctx.ellipse(fx, PY + 32 + fh/2, fw/2, fh/2, 0, 0, Math.PI*2); ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
 
-    // Player car
+    // Player car (navy with lime stripe)
     drawCar(px, PY, 34, 58, COL1);
 
     // Speed motion lines
     if (spd > BASE_SPEED * 1.4) {
       const intensity = Math.min(0.45, (spd - BASE_SPEED*1.4) / (TOP_SPEED - BASE_SPEED*1.4) * 0.45);
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(170,255,0,0.8)'; ctx.lineWidth = 1;
       for (let i = 0; i < 10; i++) {
         const lx = RX + 14 + Math.random() * (RW - 28);
         const ly = Math.random() * H;
@@ -492,12 +494,13 @@
       const DEAD = 8, MAX = 40;
       const abs = Math.abs(g);
       tiltX = abs < DEAD ? 0 : Math.sign(g) * Math.min((abs - DEAD) / (MAX - DEAD), 1);
+      if (running) {
+        held.left  = tiltX < -0.3;
+        held.right = tiltX >  0.3;
+      }
     });
   }
   document.addEventListener('touchstart', enableTilt, { once: true });
-  // Apply tilt in step after keydown checks — patch into loop
-  const _step = step;
-  // (tiltX applied alongside held.left/right in step via STEER below)
 })();
 </script>
 </body>

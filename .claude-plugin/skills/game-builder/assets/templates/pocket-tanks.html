@@ -12,7 +12,7 @@
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(95vw, calc((100dvh - 80px) * 2)); height: auto; display: block; }
+    width: min(900px, 95vw, calc((100dvh - 80px) * 2)); height: auto; display: block; }
   #controls { display: flex; gap: 6px; align-items: center; max-width: 95vw; flex-wrap: wrap; }
   @media (pointer: fine) { #controls { display: none; } }
   @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 170px) * 2)); } }
@@ -92,7 +92,11 @@
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();
   const COL2 = css.getPropertyValue('--secondary').trim();
-  const W = canvas.width, H = canvas.height;
+  const SCALE = 2;
+  const W = 600, H = 300;
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  ctx.scale(SCALE, SCALE);
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = '__PLAYER_NAME__';

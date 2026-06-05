@@ -48,6 +48,11 @@ Full list of available game types:
 - Video Poker — "hold your best cards, pray for the rest"
 - Solitaire — "Klondike patience, one card at a time"
 - Hearts — "avoid the queen of spades at all costs"
+- Catcher — "dodge or catch what falls, move left and right"
+- Lumberjack — "tap to chop, switch sides, beat the clock"
+- Canyon shooter — "fly, dodge, blast your way through"
+- Beer pong — "aim, set power, sink the shots"
+- Penalty kicks — "pick your spot, time your shot, score"
 
 **2. Game name.** Just: "Name it. Whatever you want. I'm not your editor."
 
@@ -73,6 +78,11 @@ Tailor the deep-dive to the game:
 - **Video Poker:** Flavor/setting? Starting credits?
 - **Solitaire:** Any custom flavor text for the win message?
 - **Hearts:** Names for the 3 AI opponents? How cutthroat should the AI be?
+- **Catcher:** What are they catching/dodging? Any bad items mixed in? Lives or timer?
+- **Lumberjack:** What is the tree? What obstacles are on the branches? Speed increase over time?
+- **Canyon shooter:** What are they flying? What are they shooting at? Endless or boss fight?
+- **Beer pong:** Setting/theme? How many cups? AI opponent or solo challenge?
+- **Penalty kicks:** Player vs goalie or solo challenge? How many kicks? Theme?
 
 If the user goes off-script and just describes their game freeform, don't force the questions — extract what you need and ask only what's missing.
 
@@ -96,6 +106,11 @@ You have templates in `assets/templates/`:
 - `poker.html`
 - `solitaire.html`
 - `hearts.html`
+- `catcher.html`
+- `lumberjack.html`
+- `canyon-shooter.html`
+- `beer-pong.html`
+- `penalty-kicks.html`
 
 Each is a complete, working single-file game. Pick the one that matches the user's choice, **read it**, then customize. Don't rewrite from scratch — these are tuned to work, and reinventing the game loop wastes the user's 10 minutes.
 

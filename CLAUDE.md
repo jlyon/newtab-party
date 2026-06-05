@@ -35,10 +35,25 @@ The double-modulo handles negative days (before epoch) safely. Scores are date-s
 
 1. Build with the `game-builder` Claude Code skill (`/game-builder`)
 2. Copy `.html` to `worker/public/games/`
-3. Add entry to `worker/games.json` — required fields: `id`, `name`, `file`, `description`, `controls`, `type`
+3. Add entry to `worker/games.json` — **append to the end only** (see rotation rules below)
 4. `npm run deploy` from `worker/` — live immediately, no extension update needed
 
-Games with `controls` automatically get a pre-game start screen overlay in both the web player and extension.
+Games with `controls` automatically get a pre-game info card in both the web player and extension.
+
+### Rotation rules — read before touching games.json
+
+Games are served in the order they appear in `games.json`. The index for day D is:
+
+```
+index = ((day % games.length) + games.length) % games.length
+```
+
+**Critical constraints:**
+- **Always append** new games to the end of the `games` array. Never insert in the middle, never reorder, never remove.
+- **Deploy at midnight UTC** when adding games. Because changing `games.length` shifts `day % N` for all days, deploying mid-day would change the current day's game for everyone mid-session.
+- Past leaderboard records are stored in D1 by `game_id` and are unaffected by rotation changes — only the live computed mapping changes.
+
+If you need to retire a game, keep it in the array (it will cycle back naturally) rather than removing it.
 
 ### postHi() protocol
 

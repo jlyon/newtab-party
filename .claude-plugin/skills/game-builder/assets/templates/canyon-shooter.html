@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root {
+    --primary: __PRIMARY_COLOR__;
+    --secondary: __SECONDARY_COLOR__;
+    --bg: __BACKGROUND_COLOR__;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden; touch-action: none;
+  }
+  #wrap {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%; padding: 6px;
+  }
+  h1 { margin: 0 0 6px; font-size: clamp(15px, 4.5vw, 22px); letter-spacing: 2px; text-transform: uppercase; }
+  #hud {
+    width: 720px; max-width: 95vw;
+    display: flex; justify-content: space-between;
+    font-size: clamp(11px, 3vw, 14px); margin-bottom: 6px; opacity: 0.9;
+  }
+  canvas {
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    width: min(720px, 95vw); height: auto; display: block;
+  }
+  #controls {
+    display: flex; gap: 10px; margin-top: 12px; align-items: center;
+    width: min(720px, 95vw); justify-content: center; flex-wrap: wrap;
+  }
+  .pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 6px; }
+  .btn {
+    height: 52px; min-width: 48px; border: 1px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.06); color: var(--primary);
+    border-radius: 8px; font-size: 22px; cursor: pointer;
+    user-select: none; -webkit-touch-callout: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  #fireBtn { height: 110px; width: 90px; font-size: 15px; letter-spacing: 1px; font-weight: 700; border-color: var(--secondary); color: var(--secondary); }
+  #fireBtn:active, #fireBtn.held { background: var(--secondary); color: #fff; }
+  .gridcell-empty { visibility: hidden; }
+  .overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #overlay { display: none; background: rgba(0,0,0,0.78); }
+  .card { max-width: 460px; }
+  .card h2 { color: var(--primary); font-size: clamp(22px,6vw,38px); margin: 0 0 14px; letter-spacing: 2px; text-transform: uppercase; }
+  #overTitle { color: var(--secondary); }
+  .card p { color: rgba(255,255,255,0.5); font-size: clamp(12px,3.2vw,14px); line-height: 1.6; margin: 0 0 24px; }
+  .card .go { color: var(--primary); font-style: normal; margin: 4px 0; }
+  .play {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 6px; font-family: inherit;
+  }
+  .play:hover { opacity: 0.85; }
+@media (pointer: fine) {
+  #controls { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <!-- ── GAME-SPECIFIC SECTION — customize HUD labels ── -->
+  <div id="hud"><span>Pilot: __PLAYER_NAME__</span><span id="score">Distance: 0</span><span id="lives">Shields: 3</span></div>
+  <!-- ── END GAME-SPECIFIC SECTION ── -->
+  <canvas id="game" width="720" height="480"></canvas>
+  <div id="controls">
+    <div class="pad">
+      <div class="gridcell-empty"></div>
+      <div class="btn" id="upBtn">&#9650;</div>
+      <div class="gridcell-empty"></div>
+      <div class="btn" id="leftBtn">&#9664;</div>
+      <div class="btn" id="downBtn">&#9660;</div>
+      <div class="btn" id="rightBtn">&#9654;</div>
+    </div>
+    <div class="btn" id="fireBtn">FIRE</div>
+  </div>
+</div>
+
+<div id="start-overlay" class="overlay">
+  <div class="card">
+    <h2>__GAME_NAME__</h2>
+    <!-- ── GAME-SPECIFIC SECTION — customize start screen text ── -->
+    <p id="controls-hint">Arrows / WASD or on-screen D-pad to fly &middot; Space / FIRE to shoot &middot; Swipe or tilt on mobile.<br>Dodge the canyon walls and __ENEMY_NAME__. Survive.</p>
+    <button class="play" id="start-btn">&#9658; Launch</button>
+    <!-- ── END GAME-SPECIFIC SECTION ── -->
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="card">
+    <h2 id="overTitle">You crashed!</h2>
+    <p id="overMsg" class="go"></p>
+    <p class="go" id="bestMsg"></p>
+    <p>Arrows / WASD / D-pad to fly &nbsp;&middot;&nbsp; Space / FIRE to shoot</p>
+    <button class="play" id="restart">Fly again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const overlay = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+  const bestMsg = document.getElementById('bestMsg');
+  const startOverlay = document.getElementById('start-overlay');
+  const css = getComputedStyle(document.documentElement);
+  const PRIMARY = css.getPropertyValue('--primary').trim();
+  const SECONDARY = css.getPropertyValue('--secondary').trim();
+  const BG = css.getPropertyValue('--bg').trim();
+
+  /* ── GAME-SPECIFIC SECTION — customize for user's theme ── */
+  const PLAYER_SPEED = 5.2;
+  const BULLET_SPEED = 11;
+  const BULLET_COOLDOWN_MS = 200;
+  const START_SCROLL = 3.4;
+  const MAX_SCROLL = 8.5;
+  const SCROLL_RAMP = 0.00022;
+  const TILE = 24;
+  const MIN_GAP = 150;
+  const START_GAP = 300;
+  const OBSTACLE_SPAWN_MS = 1100;
+  const SHIELDS = 3;
+  // Crash messages — shown when the player dies
+  const CRASH_TITLES = [
+    'You ate the wall',
+    'The canyon wins again',
+    'That __ENEMY_NAME__ had your name on it',
+    'Scratch one __PLAYER_NAME__'
+  ];
+  // Distance unit label (e.g. 'clicks', 'km', 'miles', 'parsecs')
+  const DIST_UNIT = 'km';
+  /* ── END GAME-SPECIFIC SECTION ── */
+
+  const keys = {};
+  const held = { up:false, down:false, left:false, right:false, fire:false };
+  addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if ([' ','arrowleft','arrowright','arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
+  });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('upBtn','up'); holdBtn('downBtn','down'); holdBtn('leftBtn','left'); holdBtn('rightBtn','right'); holdBtn('fireBtn','fire');
+
+  let touchStart = null;
+  canvas.addEventListener('touchstart', e => { const t = e.touches[0]; touchStart = { x: t.clientX, y: t.clientY }; }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    if (!touchStart) return; e.preventDefault();
+    const t = e.touches[0];
+    const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    held.left = dx < -12; held.right = dx > 12;
+    held.up = dy < -12; held.down = dy > 12;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { touchStart = null; held.up = held.down = held.left = held.right = false; }, { passive: true });
+
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      if (!running) return;
+      const g = e.gamma || 0, b = e.beta || 0;
+      held.left = g < -12; held.right = g > 12;
+      held.up = b < 28; held.down = b > 55;
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+
+  let best = 0;
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.floor(n) || 0;
+    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  }
+
+  let player, bullets, obstacles, score, lives, lastShot, lastSpawn, running;
+  let scroll, columns, gap, frac, invuln, shake;
+
+  function makeColumn(prevCeil, prevFloor, g) {
+    let center = (prevCeil + prevFloor) / 2 + (Math.random() - 0.5) * 46;
+    const half = g / 2;
+    center = Math.max(half + 12, Math.min(H - half - 12, center));
+    return { ceil: center - half, floor: center + half };
+  }
+
+  function reset() {
+    player = { x: 110, y: H/2, w: 40, h: 26 };
+    bullets = []; obstacles = [];
+    score = 0; lives = SHIELDS;
+    lastShot = 0; lastSpawn = 0;
+    scroll = START_SCROLL; gap = START_GAP; frac = 0;
+    invuln = 0; shake = 0;
+    running = true;
+    columns = [];
+    const cols = Math.ceil(W / TILE) + 2;
+    let prev = { ceil: H/2 - gap/2, floor: H/2 + gap/2 };
+    for (let i = 0; i < cols; i++) {
+      const c = i < 6 ? { ceil: H/2 - gap/2, floor: H/2 + gap/2 } : makeColumn(prev.ceil, prev.floor, gap);
+      columns.push(c); prev = c;
+    }
+    overlay.style.display = 'none';
+    updateHud();
+  }
+
+  function updateHud() {
+    scoreEl.textContent = 'Distance: ' + Math.floor(score) + ' ' + DIST_UNIT;
+    livesEl.textContent = 'Shields: ' + lives;
+  }
+
+  function spawnObstacle() {
+    const lastCol = columns[columns.length - 1];
+    const r = 14 + Math.random() * 22;
+    const minY = lastCol.ceil + r + 6, maxY = lastCol.floor - r - 6;
+    if (maxY <= minY) return;
+    obstacles.push({
+      x: W + r, y: minY + Math.random() * (maxY - minY), r,
+      vx: -(scroll + 1.4 + Math.random() * 2.4),
+      vy: (Math.random() - 0.5) * 1.2,
+      spin: Math.random() * Math.PI, dspin: (Math.random() - 0.5) * 0.1,
+      hp: r > 26 ? 2 : 1
+    });
+  }
+
+  function colAt(px) {
+    const idx = Math.floor((px + frac) / TILE);
+    return columns[Math.max(0, Math.min(columns.length - 1, idx))];
+  }
+
+  function terrainHit(rect) {
+    for (let px = rect.x; px <= rect.x + rect.w; px += TILE/2) {
+      const c = colAt(px);
+      if (rect.y < c.ceil || rect.y + rect.h > c.floor) return true;
+    }
+    return false;
+  }
+
+  function loseShield(title) {
+    lives--; invuln = 70; shake = 12;
+    if (lives <= 0) { endGame(title); }
+    else { player.y = (colAt(player.x).ceil + colAt(player.x).floor) / 2 - player.h/2; }
+    updateHud();
+  }
+
+  function endGame(title) {
+    running = false;
+    overTitle.textContent = title || CRASH_TITLES[Math.floor(Math.random()*CRASH_TITLES.length)];
+    overMsg.textContent = 'You flew ' + Math.floor(score) + ' ' + DIST_UNIT + ' before the canyon won.';
+    if (score > best) { best = Math.floor(score); postHi(best); bestMsg.textContent = 'New personal best! ' + best + ' ' + DIST_UNIT; }
+    else { bestMsg.textContent = 'Best: ' + best + ' ' + DIST_UNIT; }
+    overlay.style.display = 'flex';
+  }
+
+  function step(now) {
+    scroll = Math.min(MAX_SCROLL, START_SCROLL + score * SCROLL_RAMP);
+    gap = Math.max(MIN_GAP, START_GAP - score * 0.018);
+
+    frac += scroll; score += scroll * 0.1;
+    while (frac >= TILE) {
+      frac -= TILE;
+      columns.shift();
+      const prev = columns[columns.length - 1];
+      columns.push(makeColumn(prev.ceil, prev.floor, gap));
+    }
+
+    let vx = 0, vy = 0;
+    if (keys['arrowleft']  || keys['a'] || held.left)  vx -= PLAYER_SPEED;
+    if (keys['arrowright'] || keys['d'] || held.right) vx += PLAYER_SPEED;
+    if (keys['arrowup']    || keys['w'] || held.up)    vy -= PLAYER_SPEED;
+    if (keys['arrowdown']  || keys['s'] || held.down)  vy += PLAYER_SPEED;
+    player.x = Math.max(0, Math.min(W * 0.6, player.x + vx));
+    player.y = Math.max(0, Math.min(H - player.h, player.y + vy));
+
+    if ((keys[' '] || held.fire) && now - lastShot > BULLET_COOLDOWN_MS) {
+      bullets.push({ x: player.x + player.w, y: player.y + player.h/2 - 2, w: 16, h: 4 });
+      lastShot = now;
+    }
+
+    const spawnEvery = Math.max(420, OBSTACLE_SPAWN_MS - score * 0.6);
+    if (now - lastSpawn > spawnEvery) { spawnObstacle(); lastSpawn = now; }
+
+    for (const b of bullets) b.x += BULLET_SPEED;
+    bullets = bullets.filter(b => b.x < W + 20 && !b.dead);
+
+    for (const a of obstacles) { a.x += a.vx; a.y += a.vy; a.spin += a.dspin; }
+    obstacles = obstacles.filter(a => a.x > -40 && !a.dead);
+
+    for (const a of obstacles) {
+      for (const b of bullets) {
+        if (b.x < a.x + a.r && b.x + b.w > a.x - a.r && b.y < a.y + a.r && b.y + b.h > a.y - a.r) {
+          b.dead = true; a.hp--; if (a.hp <= 0) { a.dead = true; score += 25; }
+        }
+      }
+    }
+
+    if (invuln > 0) invuln--;
+    if (shake > 0) shake--;
+
+    if (invuln <= 0) {
+      if (terrainHit(player)) loseShield(CRASH_TITLES[0]);
+      else {
+        for (const a of obstacles) {
+          const cx = Math.max(player.x, Math.min(a.x, player.x + player.w));
+          const cy = Math.max(player.y, Math.min(a.y, player.y + player.h));
+          if ((a.x - cx) ** 2 + (a.y - cy) ** 2 < a.r * a.r) {
+            a.dead = true; loseShield(CRASH_TITLES[2]); break;
+          }
+        }
+      }
+    }
+
+    bullets = bullets.filter(b => !b.dead);
+    obstacles = obstacles.filter(a => !a.dead);
+    updateHud();
+  }
+
+  function drawPlayer(x, y, w, h) {
+    const cx = x + w/2, cy = y + h/2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    // wings
+    ctx.fillStyle = PRIMARY;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+    [-1, 1].forEach(s => {
+      ctx.beginPath();
+      ctx.moveTo(s * w/2, -h/2);
+      ctx.lineTo(s * w/2 + s * 4, 0);
+      ctx.lineTo(s * w/2, h/2);
+      ctx.lineTo(s * (w/2 - 7), h/2 - 3);
+      ctx.lineTo(s * (w/2 - 7), -h/2 + 3);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    });
+    // fuselage struts
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-w/2 + 6, 0); ctx.lineTo(w/2 - 6, 0); ctx.stroke();
+    // cockpit
+    ctx.fillStyle = '#1c2230'; ctx.strokeStyle = SECONDARY; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, h * 0.42, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = SECONDARY;
+    ctx.beginPath(); ctx.arc(2, 0, h * 0.13, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+    const sy = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+    ctx.save(); ctx.translate(sx, sy);
+
+    ctx.fillStyle = BG; ctx.fillRect(-20, -20, W + 40, H + 40);
+    // background particles (stars, dust, etc.)
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    const t = performance.now() / 12;
+    for (let i = 0; i < 70; i++) {
+      const stx = (i * 97 - t) % (W + 40); const x = stx < 0 ? stx + W + 40 : stx;
+      ctx.fillRect(x - 20, (i * 53) % H, 2, 2);
+    }
+
+    // canyon walls
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.strokeStyle = PRIMARY; ctx.lineWidth = 2;
+    // ceiling
+    ctx.beginPath(); ctx.moveTo(-TILE, -10);
+    for (let i = 0; i < columns.length; i++) ctx.lineTo(i * TILE - frac, columns[i].ceil);
+    ctx.lineTo(W + TILE, -10); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-TILE, columns[0].ceil);
+    for (let i = 0; i < columns.length; i++) ctx.lineTo(i * TILE - frac, columns[i].ceil);
+    ctx.stroke();
+    // floor
+    ctx.beginPath(); ctx.moveTo(-TILE, H + 10);
+    for (let i = 0; i < columns.length; i++) ctx.lineTo(i * TILE - frac, columns[i].floor);
+    ctx.lineTo(W + TILE, H + 10); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-TILE, columns[0].floor);
+    for (let i = 0; i < columns.length; i++) ctx.lineTo(i * TILE - frac, columns[i].floor);
+    ctx.stroke();
+
+    // bullets
+    ctx.fillStyle = SECONDARY;
+    for (const b of bullets) ctx.fillRect(b.x, b.y, b.w, b.h);
+
+    // obstacles (rocky/irregular shapes)
+    for (const a of obstacles) {
+      ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.spin);
+      ctx.fillStyle = '#6b6f78'; ctx.strokeStyle = '#3c3f46'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      const pts = 8;
+      for (let i = 0; i <= pts; i++) {
+        const ang = (i / pts) * Math.PI * 2;
+        const rr = a.r * (0.78 + ((i * 37) % 10) / 25);
+        ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
+    // player craft (blink while invulnerable)
+    if (!(invuln > 0 && Math.floor(invuln / 5) % 2)) drawPlayer(player.x, player.y, player.w, player.h);
+
+    ctx.restore();
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = now - last; last = now;
+    if (running) step(now);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); last = performance.now(); requestAnimationFrame(loop);
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+  addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (startOverlay.style.display !== 'none') document.getElementById('start-btn').click();
+      else if (overlay.style.display !== 'none') document.getElementById('restart').click();
+    }
+  });
+})();
+</script>
+</body>
+</html>

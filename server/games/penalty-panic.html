@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Penalty Panic</title>
+<style>
+  :root { --bg:#16803d; --gold:#ffd23f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:#fff;
+    font-family:system-ui,sans-serif; overflow:hidden; touch-action:none; }
+  #wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:8px; }
+  h1 { margin:0; font-size:clamp(16px,5vw,26px); letter-spacing:2px; font-weight:800; color:var(--gold); }
+  #scoreboard { display:flex; gap:12px; align-items:center; font-size:clamp(12px,3vw,15px); font-weight:700; }
+  .sb-team { display:flex; align-items:center; gap:5px; }
+  .flagmoji { font-size:18px; line-height:1; }
+  .dots { display:flex; gap:3px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.18); }
+  .dot.goal { background:#3cd070; } .dot.miss { background:#ff3b50; }
+  canvas { border:2px solid rgba(255,255,255,.18); border-radius:6px; box-shadow:0 8px 30px rgba(0,0,0,.6);
+    width:min(600px,96vw,calc((100dvh - 230px) * 1.36)); height:auto; display:block; touch-action:none; }
+  #controls { display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; min-height:56px; max-width:96vw; }
+  .btn { padding:13px 18px; font-size:clamp(13px,3.4vw,17px); font-weight:800; letter-spacing:1px;
+    border:2px solid rgba(255,255,255,.35); border-radius:9px; background:rgba(255,255,255,.06); color:#fff;
+    cursor:pointer; user-select:none; -webkit-touch-callout:none; min-width:62px; }
+  .btn:active,.btn.held { background:var(--gold); color:#1a1a00; border-color:var(--gold); }
+  #shootBtn { background:var(--gold); color:#1a1a00; border-color:var(--gold); padding:13px 40px; }
+  #shootBtn:active,#shootBtn.held { background:#ffe680; }
+  #powerWrap { width:140px; height:18px; border:2px solid #fff; border-radius:5px; overflow:hidden; }
+  #powerBar { height:100%; width:0%; background:#3cd070; }
+  .overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(4,12,8,.94); flex-direction:column; padding:20px; z-index:10; overflow-y:auto; }
+  .card { max-width:640px; width:100%; text-align:center; }
+  .card h2 { font-size:clamp(20px,6vw,32px); margin:0 0 4px; font-weight:800; color:var(--gold); }
+  .card p { color:rgba(255,255,255,.62); font-size:13px; line-height:1.55; margin:6px 0 14px; }
+  #pickHead { font-size:clamp(15px,4vw,20px); font-weight:800; margin:4px 0 2px; }
+  #pickSub { color:var(--gold); font-size:13px; min-height:18px; margin-bottom:10px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(74px,1fr)); gap:7px;
+    max-height:54vh; overflow-y:auto; padding:4px; }
+  .flag { display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 3px;
+    border:2px solid rgba(255,255,255,.14); border-radius:9px; background:rgba(255,255,255,.04); cursor:pointer; }
+  .flag:hover { border-color:rgba(255,255,255,.5); }
+  .flag .em { font-size:30px; line-height:1; }
+  .flag .nm { font-size:10px; line-height:1.15; color:rgba(255,255,255,.85); }
+  .flag.sel { border-color:var(--gold); background:rgba(255,210,63,.15); }
+  .btn-go { margin-top:14px; padding:13px 34px; font-size:16px; font-weight:800; border:none; border-radius:9px;
+    background:var(--gold); color:#1a1a00; cursor:pointer; }
+  .btn-go:disabled { opacity:.4; cursor:default; }
+  #overlay { display:none; }
+@media (pointer: fine) {
+  #controls { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Penalty Panic</h1>
+  <div id="scoreboard">
+    <div class="sb-team"><span class="flagmoji" id="flagA"></span><span id="nameA">You</span> <span id="goalsA">0</span></div>
+    <div class="dots" id="dotsA"></div>
+    <span style="opacity:.4">vs</span>
+    <div class="dots" id="dotsB"></div>
+    <div class="sb-team"><span id="goalsB">0</span> <span id="nameB">CPU</span><span class="flagmoji" id="flagB"></span></div>
+  </div>
+  <canvas id="game" width="600" height="440"></canvas>
+  <div id="controls"></div>
+</div>
+
+<div id="picker" class="overlay">
+  <div class="card">
+    <h2>Penalty Panic</h2>
+    <p>Best of 5 from the spot. When you shoot: drag to aim, then <b>hold</b> Shoot to load power and release to strike. When you defend: pick which way your keeper dives. Win it for your nation.</p>
+    <div id="pickHead">Pick YOUR team</div>
+    <div id="pickSub"></div>
+    <div id="grid"></div>
+    <button class="btn-go" id="kickoff" disabled>▶ Kick off</button>
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="card">
+    <h2 id="overTitle">Champions!</h2>
+    <p id="overMsg"></p>
+    <button class="btn-go" id="restart">Play again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===== GAME-SPECIFIC SECTION: 48 teams of the 2026 World Cup [name, primary, secondary, flag] =====
+  const TEAMS = [
+    ["Algeria","#0a8a4f","#ffffff","🇩🇿"],["Argentina","#75AADB","#ffffff","🇦🇷"],["Australia","#00843D","#FFCD00","🇦🇺"],
+    ["Austria","#ED2939","#ffffff","🇦🇹"],["Belgium","#C8102E","#FDDA24","🇧🇪"],["Bosnia & Herzegovina","#002395","#FECB00","🇧🇦"],
+    ["Brazil","#FFDF00","#009C3B","🇧🇷"],["Cabo Verde","#003893","#CF2027","🇨🇻"],["Canada","#FF0000","#ffffff","🇨🇦"],
+    ["Colombia","#FCD116","#003893","🇨🇴"],["Croatia","#FF0000","#ffffff","🇭🇷"],["Curaçao","#002B7F","#F9E814","🇨🇼"],
+    ["Czechia","#11457E","#D7141A","🇨🇿"],["Côte d'Ivoire","#FF8200","#009E60","🇨🇮"],["DR Congo","#007FFF","#F7D618","🇨🇩"],
+    ["Ecuador","#FFDD00","#034EA2","🇪🇨"],["Egypt","#CE1126","#111111","🇪🇬"],["England","#ffffff","#CE1124","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],
+    ["France","#0055A4","#EF4135","🇫🇷"],["Germany","#111111","#DD0000","🇩🇪"],["Ghana","#006B3F","#FCD116","🇬🇭"],
+    ["Haiti","#00209F","#D21034","🇭🇹"],["Iran","#239F40","#DA0000","🇮🇷"],["Iraq","#CE1126","#007A3B","🇮🇶"],
+    ["Japan","#0a2c70","#ffffff","🇯🇵"],["Jordan","#007A3D","#CE1126","🇯🇴"],["Mexico","#006847","#CE1126","🇲🇽"],
+    ["Morocco","#C1272D","#006233","🇲🇦"],["Netherlands","#FF6C00","#21468B","🇳🇱"],["New Zealand","#222222","#ffffff","🇳🇿"],
+    ["Norway","#BA0C2F","#00205B","🇳🇴"],["Panama","#005293","#D21034","🇵🇦"],["Paraguay","#D52B1E","#0038A8","🇵🇾"],
+    ["Portugal","#006600","#FF0000","🇵🇹"],["Qatar","#8A1538","#ffffff","🇶🇦"],["Saudi Arabia","#006C35","#ffffff","🇸🇦"],
+    ["Scotland","#005EB8","#ffffff","🏴󠁧󠁢󠁳󠁣󠁴󠁿"],["Senegal","#00853F","#FDEF42","🇸🇳"],["South Africa","#007A4D","#FFB915","🇿🇦"],
+    ["South Korea","#CD2E3A","#0047A0","🇰🇷"],["Spain","#AA151B","#F1BF00","🇪🇸"],["Sweden","#006AA7","#FECC00","🇸🇪"],
+    ["Switzerland","#D52B1E","#ffffff","🇨🇭"],["Tunisia","#E70013","#ffffff","🇹🇳"],["Türkiye","#E30A17","#ffffff","🇹🇷"],
+    ["United States","#3C3B6E","#B22234","🇺🇸"],["Uruguay","#0a3aa0","#FCD116","🇺🇾"],["Uzbekistan","#1EB53A","#0099B5","🇺🇿"]
+  ];
+  // ====================================================================================================
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const SCALE = 2, W = 600, H = 440;
+  canvas.width = W*SCALE; canvas.height = H*SCALE; ctx.scale(SCALE, SCALE);
+
+  // Goal + pitch geometry
+  const GL = 130, GR = 470, GTOP = 56, GLINE = 200;   // posts, crossbar, keeper line
+  const OVER_BAR = GTOP + 18;
+  const SPOT_X = 300, SPOT_Y = 392;
+  const THIRD = (GR - GL) / 3;
+  const ZONE_X = [GL + THIRD*0.5, GL + THIRD*1.5, GL + THIRD*2.5]; // L, C, R centres
+  function zoneOf(x){ if (x < GL + THIRD) return 0; if (x < GL + 2*THIRD) return 1; return 2; }
+
+  // ---------- Flag picker ----------
+  const grid = document.getElementById('grid');
+  const pickHead = document.getElementById('pickHead'), pickSub = document.getElementById('pickSub');
+  const kickoffBtn = document.getElementById('kickoff');
+  let pickStage = 0, idxA = -1, idxB = -1;
+  TEAMS.forEach((t, i) => {
+    const d = document.createElement('div'); d.className = 'flag'; d.dataset.i = i;
+    d.innerHTML = '<span class="em">'+t[3]+'</span><span class="nm">'+t[0]+'</span>';
+    d.addEventListener('click', () => choose(i));
+    grid.appendChild(d);
+  });
+  function refreshGrid(){
+    [...grid.children].forEach(c => {
+      const i = +c.dataset.i;
+      c.classList.toggle('sel', (pickStage===0 && i===idxA) || (pickStage===1 && i===idxB));
+      c.style.opacity = (pickStage===1 && i===idxA) ? .3 : 1;
+    });
+  }
+  function choose(i){
+    if (pickStage === 0) { idxA = i; pickStage = 1;
+      pickHead.textContent = 'Pick your OPPONENT';
+      pickSub.textContent = 'You: ' + TEAMS[i][3] + ' ' + TEAMS[i][0];
+    } else { if (i === idxA) return; idxB = i;
+      pickSub.textContent = TEAMS[idxA][3]+' '+TEAMS[idxA][0]+'  vs  '+TEAMS[i][3]+' '+TEAMS[i][0];
+      kickoffBtn.disabled = false;
+    }
+    refreshGrid();
+  }
+
+  // ---------- Match state ----------
+  let _hiGoals = 0;
+  let teamA, teamB, pGoals, oGoals, pKicks, oKicks, sudden;
+  let whose;        // 'p' = you shoot, 'o' = you defend
+  let phase;        // 'aim' | 'fly' | 'result'
+  let t = 0;
+  let aim = { x: SPOT_X, y: 130 };
+  let charging, power, ball, keeper, shooter, resultText, resultColor, resultTimer, settleTimer, confetti = [];
+  let diveZone = -1;   // chosen keeper dive when defending
+  let resultsA = [], resultsB = [];
+
+  function setupTeams(){
+    teamA = TEAMS[idxA]; teamB = TEAMS[idxB];
+    document.getElementById('nameA').textContent = teamA[0];
+    document.getElementById('nameB').textContent = teamB[0];
+    document.getElementById('flagA').textContent = teamA[3];
+    document.getElementById('flagB').textContent = teamB[3];
+  }
+  function difficulty(){ return Math.min(0.6, 0.3 + (pKicks+oKicks)*0.035); }
+
+  function reset(){
+    setupTeams();
+    pGoals=oGoals=pKicks=oKicks=0; sudden=false; resultsA=[]; resultsB=[]; confetti=[];
+    document.getElementById('goalsA').textContent='0';
+    document.getElementById('goalsB').textContent='0';
+    renderDots();
+    document.getElementById('overlay').style.display='none';
+    whose='p'; startTurn();
+  }
+  function renderDots(){
+    const dA=document.getElementById('dotsA'), dB=document.getElementById('dotsB');
+    dA.innerHTML=''; dB.innerHTML='';
+    resultsA.forEach(r=>{const e=document.createElement('div');e.className='dot '+r;dA.appendChild(e);});
+    resultsB.forEach(r=>{const e=document.createElement('div');e.className='dot '+r;dB.appendChild(e);});
+  }
+
+  function startTurn(){
+    phase='aim'; charging=false; power=0; ball=null; diveZone=-1;
+    keeper={ x:SPOT_X, ty:SPOT_X, t:0, diving:false };
+    aim={ x:SPOT_X, y:130 };
+    if (whose==='p'){
+      shooter={ team:teamA, kicking:false };
+      buildShootControls();
+    } else {
+      shooter={ team:teamB, kicking:false };
+      buildSaveControls();
+    }
+  }
+
+  // ---------- Controls ----------
+  const controls = document.getElementById('controls');
+  function buildShootControls(){
+    controls.innerHTML =
+      '<button class="btn" id="bL">◀</button>'+
+      '<button class="btn" id="bU">▲</button>'+
+      '<button class="btn" id="bD">▼</button>'+
+      '<button class="btn" id="bR">▶</button>'+
+      '<button class="btn" id="shootBtn">HOLD&nbsp;TO&nbsp;SHOOT</button>'+
+      '<div id="powerWrap"><div id="powerBar"></div></div>';
+    nudge('bL',-12,0); nudge('bR',12,0); nudge('bU',0,-10); nudge('bD',0,10);
+    const sb=document.getElementById('shootBtn');
+    const dn=e=>{e.preventDefault(); if(phase==='aim'&&whose==='p'){charging=true; sb.classList.add('held');}};
+    const up=e=>{e.preventDefault(); sb.classList.remove('held'); releaseShot();};
+    sb.addEventListener('mousedown',dn); sb.addEventListener('mouseup',up); sb.addEventListener('mouseleave',up);
+    sb.addEventListener('touchstart',dn,{passive:false}); sb.addEventListener('touchend',up,{passive:false}); sb.addEventListener('touchcancel',up,{passive:false});
+  }
+  function nudge(id,dx,dy){
+    const el=document.getElementById(id); if(!el)return;
+    const f=e=>{e.preventDefault(); if(phase==='aim'&&whose==='p'){ aim.x=clamp(aim.x+dx,GL-12,GR+12); aim.y=clamp(aim.y+dy,GTOP-6,GLINE+6);} };
+    el.addEventListener('click',f); el.addEventListener('touchstart',f,{passive:false});
+  }
+  function buildSaveControls(){
+    controls.innerHTML =
+      '<button class="btn" id="dvL">◀ Dive left</button>'+
+      '<button class="btn" id="dvC">▲ Stay</button>'+
+      '<button class="btn" id="dvR">Dive right ▶</button>';
+    diveBtn('dvL',0); diveBtn('dvC',1); diveBtn('dvR',2);
+  }
+  function diveBtn(id,zone){
+    const el=document.getElementById(id);
+    const f=e=>{e.preventDefault(); if(phase==='aim'&&whose==='o'&&diveZone<0){ diveZone=zone; opponentShoot(); }};
+    el.addEventListener('click',f); el.addEventListener('touchstart',f,{passive:false});
+  }
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+  // canvas drag to aim
+  function canvasAim(clientX, clientY){
+    if (phase!=='aim'||whose!=='p') return;
+    const r=canvas.getBoundingClientRect();
+    aim.x=clamp((clientX-r.left)*(W/r.width), GL-12, GR+12);
+    aim.y=clamp((clientY-r.top)*(H/r.height), GTOP-6, GLINE+6);
+  }
+  canvas.addEventListener('mousemove',e=>{ if(e.buttons) canvasAim(e.clientX,e.clientY); });
+  canvas.addEventListener('mousedown',e=>{ canvasAim(e.clientX,e.clientY); });
+  canvas.addEventListener('touchstart',e=>{ e.preventDefault(); canvasAim(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  canvas.addEventListener('touchmove',e=>{ e.preventDefault(); canvasAim(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+
+  addEventListener('keydown',e=>{
+    if(phase==='aim'&&whose==='p'){
+      if(e.key==='ArrowLeft'){aim.x=clamp(aim.x-12,GL-12,GR+12);}
+      if(e.key==='ArrowRight'){aim.x=clamp(aim.x+12,GL-12,GR+12);}
+      if(e.key==='ArrowUp'){aim.y=clamp(aim.y-10,GTOP-6,GLINE+6);}
+      if(e.key==='ArrowDown'){aim.y=clamp(aim.y+10,GTOP-6,GLINE+6);}
+      if(e.key===' '){e.preventDefault(); charging=true;}
+    }
+    if(phase==='aim'&&whose==='o'&&diveZone<0){
+      if(e.key==='ArrowLeft'){diveZone=0;opponentShoot();}
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){diveZone=1;opponentShoot();}
+      if(e.key==='ArrowRight'){diveZone=2;opponentShoot();}
+    }
+    if(e.key==='Enter'){
+      if(document.getElementById('overlay').style.display==='flex') document.getElementById('restart').click();
+      else if(document.getElementById('picker').style.display!=='none'&&!kickoffBtn.disabled) kickoffBtn.click();
+    }
+  });
+  addEventListener('keyup',e=>{ if(e.key===' '&&phase==='aim'&&whose==='p'){ releaseShot(); } });
+
+  // ---------- Shooting (you attack) ----------
+  function releaseShot(){
+    if(phase!=='aim'||whose!=='p'||!charging) return;
+    charging=false;
+    const pw=power; power=0;
+    const liftedY = aim.y - pw*0.22;        // more power = higher = risk of over the bar
+    launch(aim.x, liftedY, pw);
+    // AI keeper guesses
+    const guess = Math.random()<difficulty() ? zoneOf(aim.x) : (Math.random()*3|0);
+    keeper.ty = ZONE_X[guess]; keeper.diving=true; keeper.t=0; keeper.zone=guess;
+  }
+  function launch(tx,ty,pw){
+    phase='fly'; shooter.kicking=true;
+    ball={ x:SPOT_X, y:SPOT_Y, tx, ty, t:0 };
+    ball.power=pw;
+  }
+  function resolveAttack(){
+    const tx=ball.tx, ty=ball.ty;
+    if(tx<GL+6||tx>GR-6||ty<OVER_BAR) return finish(false,'MISSED!','#ff8a00');
+    const sameZone = keeper.zone===zoneOf(tx);
+    const topCorner = ty<GTOP+52 && ball.power>52;   // precise + powerful beats the keeper
+    if(sameZone && !topCorner) return finish(false,'SAVED!','#ff3b50');
+    return finish(true,'GOAL!','#3cd070');
+  }
+
+  // ---------- Defending (you save) ----------
+  function opponentShoot(){
+    phase='fly';
+    let zone, ty;
+    if(Math.random()<0.08){ // skies it
+      zone = Math.random()*3|0; ty = OVER_BAR-14;
+    } else {
+      zone = Math.random()*3|0; ty = GTOP+30 + Math.random()*(GLINE-GTOP-50);
+    }
+    const tx = ZONE_X[zone] + (Math.random()-0.5)*THIRD*0.4;
+    shooter.kicking=true;
+    ball={ x:SPOT_X, y:SPOT_Y, tx, ty, t:0, zone, power:60 };
+    keeper.ty=ZONE_X[diveZone]; keeper.diving=true; keeper.t=0; keeper.zone=diveZone;
+  }
+  function resolveDefend(){
+    const ty=ball.ty;
+    if(ball.tx<GL+6||ball.tx>GR-6||ty<OVER_BAR) return finish(false,'MISSED!','#ff8a00');
+    if(diveZone===ball.zone) return finish(false,'SAVED!','#19a0ff');
+    return finish(true,'GOAL!','#ff3b50');   // they scored on you
+  }
+
+  // ---------- Resolve / scoring ----------
+  function finish(goal, text, col){
+    if(whose==='p'){
+      pKicks++; if(goal)pGoals++; resultsA.push(goal?'goal':'miss');
+      document.getElementById('goalsA').textContent=pGoals;
+    } else {
+      oKicks++; if(goal)oGoals++; resultsB.push(goal?'goal':'miss');
+      document.getElementById('goalsB').textContent=oGoals;
+    }
+    renderDots();
+    if(goal && whose==='p') spawnConfetti();
+    resultText=text; resultColor=col; phase='result'; resultTimer=80;
+  }
+  function nextTurn(){
+    if(checkWinner()) return;
+    whose = whose==='p' ? 'o' : 'p';
+    startTurn();
+  }
+  function checkWinner(){
+    if(!sudden){
+      const pLeft=5-pKicks, oLeft=5-oKicks;
+      if(pGoals>oGoals+oLeft) return endGame(true);
+      if(oGoals>pGoals+pLeft) return endGame(false);
+      if(pKicks>=5&&oKicks>=5){ if(pGoals!==oGoals) return endGame(pGoals>oGoals); sudden=true; }
+    } else {
+      if(pKicks===oKicks && pGoals!==oGoals) return endGame(pGoals>oGoals);
+    }
+    return false;
+  }
+  function endGame(won){
+    phase='over'; controls.innerHTML='';
+    const T=document.getElementById('overTitle'), M=document.getElementById('overMsg');
+    if(won){ T.textContent=teamA[3]+' '+teamA[0]+' win!';
+      M.textContent='You beat '+teamB[0]+' '+pGoals+'–'+oGoals+' on penalties. Lift the trophy. 🏆'; }
+    else { T.textContent=teamB[3]+' '+teamB[0]+' win!';
+      M.textContent=teamB[0]+' knocked you out '+oGoals+'–'+pGoals+'. Heartbreak from twelve yards.'; }
+    if (pGoals > _hiGoals) { _hiGoals = pGoals; window.parent.postMessage({ highScore: pGoals }, '*'); }
+    document.getElementById('overlay').style.display='flex';
+    return true;
+  }
+  function spawnConfetti(){
+    const cols=['#ff004d','#ff8a00','#ffd23f','#3cd070','#19a0ff','#a64bff','#ffffff'];
+    for(let i=0;i<90;i++) confetti.push({x:Math.random()*W,y:-10-Math.random()*80,
+      vx:(Math.random()-.5)*2.4,vy:2+Math.random()*3,c:cols[Math.random()*cols.length|0],s:3+Math.random()*4,life:90+Math.random()*40});
+  }
+
+  // ---------- Update ----------
+  function step(){
+    t++;
+    if(phase==='aim'&&whose==='p'){
+      if(charging){ power=Math.min(100,power+1.7); }
+      document.getElementById('powerBar').style.width=power+'%';
+      document.getElementById('powerBar').style.background = power>88?'#ff3b50':power>55?'#ffd23f':'#3cd070';
+      keeper.x=SPOT_X+Math.sin(t*0.06)*26;   // idle sway
+    }
+    if(phase==='fly'&&ball){
+      ball.t+=0.04; const p=Math.min(1,ball.t);
+      ball.x=SPOT_X+(ball.tx-SPOT_X)*p;
+      ball.y=SPOT_Y+(ball.ty-SPOT_Y)*p-Math.sin(p*Math.PI)*22;
+      if(keeper.diving){ keeper.t=Math.min(1,keeper.t+0.055); keeper.x=SPOT_X+(keeper.ty-SPOT_X)*keeper.t; }
+      if(p>=1){ phase='settle'; settleTimer=55; }   // hold the frozen moment for suspense
+    }
+    if(phase==='settle'){ if(settleTimer--<=0){ whose==='p'?resolveAttack():resolveDefend(); } }
+    if(phase==='result'){ if(resultTimer--<=0){ shooter.kicking=false; nextTurn(); } }
+    for(const c of confetti){ c.x+=c.vx; c.y+=c.vy; c.vy+=0.05; c.life--; }
+    confetti=confetti.filter(c=>c.life>0&&c.y<H+20);
+  }
+
+  // ---------- Draw ----------
+  function draw(){
+    // pitch stripes
+    for(let i=0;i<9;i++){ ctx.fillStyle=i%2?'#1a9447':'#15833f'; ctx.fillRect(0,i*H/9,W,H/9+1); }
+    // box
+    ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=3;
+    ctx.strokeRect(70,GLINE,W-140,170);
+    ctx.beginPath(); ctx.arc(SPOT_X,SPOT_Y,3,0,7); ctx.fillStyle='#fff'; ctx.fill();
+
+    // goal net
+    ctx.fillStyle='#0c5a2a'; ctx.fillRect(GL,GTOP,GR-GL,GLINE-GTOP);
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+    for(let x=GL+14;x<GR;x+=18){ctx.beginPath();ctx.moveTo(x,GTOP);ctx.lineTo(x,GLINE);ctx.stroke();}
+    for(let y=GTOP+14;y<GLINE;y+=16){ctx.beginPath();ctx.moveTo(GL,y);ctx.lineTo(GR,y);ctx.stroke();}
+    // frame
+    ctx.strokeStyle='#fff'; ctx.lineWidth=7; ctx.lineJoin='round';
+    ctx.strokeRect(GL,GTOP,GR-GL,GLINE-GTOP);
+
+    const defending = whose==='p'?teamB:teamA;
+    drawKeeper(keeper.x, defending);
+
+    // aim crosshair (your shot)
+    if(phase==='aim'&&whose==='p'){
+      ctx.strokeStyle='#ffd23f'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(aim.x,aim.y,14,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(aim.x-22,aim.y); ctx.lineTo(aim.x+22,aim.y);
+      ctx.moveTo(aim.x,aim.y-22); ctx.lineTo(aim.x,aim.y+22); ctx.stroke();
+    }
+    // dive zone hint (your save)
+    if(phase==='aim'&&whose==='o'){
+      ctx.fillStyle='rgba(25,160,255,.12)';
+      for(let z=0;z<3;z++){ ctx.fillRect(GL+z*THIRD+3,GTOP+3,THIRD-6,GLINE-GTOP-6); }
+      ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(GL+THIRD,GTOP); ctx.lineTo(GL+THIRD,GLINE);
+      ctx.moveTo(GL+2*THIRD,GTOP); ctx.lineTo(GL+2*THIRD,GLINE); ctx.stroke();
+    }
+
+    if(ball) drawBall(ball.x,ball.y);
+    else if(phase==='aim') drawBall(SPOT_X,SPOT_Y);
+
+    // shooter behind the ball
+    drawShooter(SPOT_X-30, SPOT_Y+2, shooter.team, shooter.kicking);
+
+    // banner
+    if(phase==='result'&&resultText){
+      ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,H/2-36,W,72);
+      ctx.fillStyle=resultColor; ctx.font='800 42px system-ui'; ctx.textAlign='center';
+      ctx.fillText(resultText,W/2,H/2+15); ctx.textAlign='left';
+    }
+    // prompt
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='700 15px system-ui'; ctx.textAlign='center';
+    if(phase==='aim'&&whose==='p') ctx.fillText('Drag to aim · hold SHOOT for power',W/2,H-12);
+    else if(phase==='aim'&&whose==='o') ctx.fillText(teamB[0]+' shoots — pick your dive!',W/2,H-12);
+    ctx.textAlign='left';
+
+    for(const c of confetti){ ctx.fillStyle=c.c; ctx.fillRect(c.x,c.y,c.s,c.s); }
+  }
+
+  function drawKeeper(x, team){
+    const y=GLINE-2, lean=(x-SPOT_X)/120; // lean into dive
+    ctx.save(); ctx.translate(x,y); ctx.rotate(lean*0.5); ctx.scale(1.75,1.75);
+    ctx.fillStyle=team[1]; ctx.fillRect(-15,-40,30,26);          // jersey
+    ctx.fillStyle=team[2]||'#fff'; ctx.fillRect(-15,-40,30,5);   // collar
+    ctx.fillStyle='#f1c9a5'; ctx.beginPath(); ctx.arc(0,-47,8,0,7); ctx.fill(); // head
+    ctx.fillStyle=team[1]; ctx.fillRect(-15,-14,8,16); ctx.fillRect(7,-14,8,16); // legs
+    ctx.fillStyle='#fff'; ctx.fillRect(-27,-44,9,9); ctx.fillRect(18,-44,9,9);  // gloves up
+    ctx.restore();
+  }
+  function drawShooter(x,y,team,kicking){
+    ctx.save(); ctx.translate(x,y); ctx.scale(2,2);
+    ctx.fillStyle=team[1]; ctx.fillRect(-10,-30,20,20);          // shirt
+    ctx.fillStyle=team[2]||'#222'; ctx.fillRect(-10,-30,20,4);   // trim
+    ctx.fillStyle='#f1c9a5'; ctx.beginPath(); ctx.arc(0,-36,7,0,7); ctx.fill(); // head
+    ctx.fillStyle='#1a1a1a'; // shorts/legs
+    if(kicking){ ctx.fillRect(-9,-11,7,12); ctx.save(); ctx.translate(4,-9); ctx.rotate(-0.7); ctx.fillRect(0,0,7,14); ctx.restore(); }
+    else { ctx.fillRect(-9,-11,7,13); ctx.fillRect(3,-11,7,13); }
+    ctx.restore();
+  }
+  function drawBall(x,y){
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,8,0,7); ctx.fill();
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.fill();
+    ctx.strokeStyle='#111'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(x,y,8,0,7); ctx.stroke();
+  }
+
+  function loop(){
+    if(teamA){ if(phase!=='over') step(); draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('kickoff').addEventListener('click',()=>{
+    document.getElementById('picker').style.display='none'; reset();
+  });
+  document.getElementById('restart').addEventListener('click',()=>{
+    document.getElementById('overlay').style.display='none';
+    pickStage=0; idxA=-1; idxB=-1; kickoffBtn.disabled=true;
+    pickHead.textContent='Pick YOUR team'; pickSub.textContent='';
+    refreshGrid(); document.getElementById('picker').style.display='flex';
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

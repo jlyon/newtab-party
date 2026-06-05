@@ -248,26 +248,49 @@ function renderArcade(): string {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>newtab.party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
   #app { display: flex; flex-direction: column; height: 100%; }
-  #topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; }
-  #game-title { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.85); white-space: nowrap; }
+  #topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
+  #game-title-wrap { position: relative; line-height: normal; }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; cursor: help; }
+  #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
+  #game-title-wrap.has-tip:hover #game-tooltip { display: block; }
+  #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
+  #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; flex: 1; }
   #high-score { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; transition: color 0.3s; min-width: 80px; text-align: center; }
   #high-score.new-best { color: #ffd700; animation: scorePop 0.35s ease; }
   @keyframes scorePop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
-  .topbar-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .topbar-actions { display: flex; gap: 6px; align-items: baseline; flex-shrink: 0; line-height: normal; }
   .btn-link { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 11px; cursor: pointer; padding: 4px 6px; font-family: inherit; transition: color 0.12s; text-decoration: none; }
   .btn-link:hover { color: rgba(255,255,255,0.75); }
+  .btn-install { background: rgba(255,215,0,0.14); border: 1px solid rgba(255,215,0,0.38); color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer; padding: 5px 11px; border-radius: 5px; letter-spacing: 1px; transition: background 0.12s, transform 0.12s; text-decoration: none; text-transform: uppercase; font-family: inherit; white-space: nowrap; }
+  .btn-install:hover { background: rgba(255,215,0,0.26); transform: translateY(-1px); }
+  @media (max-width: 600px) {
+    #game-title-wrap { flex: 1; min-width: 0; overflow: hidden; }
+    #game-title { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    #game-date { display: none; }
+    #high-score { display: none; }
+    .btn-install { display: none; }
+  }
   #game-frame-wrap { flex: 1; position: relative; overflow: hidden; }
   #game-frame { width: 100%; height: 100%; border: none; display: block; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #080810; color: rgba(255,255,255,0.25); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; transition: opacity 0.3s; }
   #loading.hidden { opacity: 0; pointer-events: none; }
+  #how-panel { position: absolute; top: 10px; left: 10px; z-index: 5; max-width: 280px; background: rgba(8,8,16,0.88); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 14px 16px; backdrop-filter: blur(4px); }
+  #how-panel.hidden { display: none; }
+  #how-close { position: absolute; top: 6px; right: 8px; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.12s; line-height: 1; font-family: inherit; }
+  #how-close:hover { color: rgba(255,255,255,0.7); }
+  #how-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.55; margin-bottom: 10px; }
+  #how-how { font-size: 9px; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  #how-controls { font-size: 12px; color: rgba(255,255,255,0.3); margin-bottom: 14px; }
+  #how-play { background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); font-size: 13px; font-family: inherit; padding: 7px 20px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; transition: background 0.12s; }
+  #how-play:hover { background: rgba(255,255,255,0.16); }
   #about-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
   #about-overlay.open { display: flex; }
   #about-modal { background: #111118; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; max-width: 700px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 44px 48px 40px; position: relative; }
@@ -277,6 +300,8 @@ function renderArcade(): string {
   #about-close:hover { color: rgba(255,255,255,0.7); }
   #about-modal .modal-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.3); margin: 28px 0 10px; }
   #about-modal p, #about-modal li { color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.65; margin-bottom: 6px; }
+  .about-link { color: rgba(255,255,255,0.55); text-decoration: underline; text-decoration-color: rgba(255,255,255,0.2); text-underline-offset: 2px; transition: color 0.12s, text-decoration-color 0.12s; }
+  .about-link:hover { color: rgba(255,255,255,0.85); text-decoration-color: rgba(255,255,255,0.5); }
   #about-modal ol { padding-left: 18px; }
   #about-modal code { background: rgba(255,255,255,0.09); padding: 2px 7px; border-radius: 4px; font-family: 'SF Mono','Monaco',monospace; font-size: 12px; color: #e2e8f0; }
   #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin: 4px 0; }
@@ -309,17 +334,31 @@ function renderArcade(): string {
 <div id="app">
   <div id="topbar">
     <span>🥳 </span>
-    <span id="game-title">Loading…</span>
+    <div id="game-title-wrap">
+      <span id="game-title"></span>
+      <div id="game-tooltip">
+        <div id="game-tooltip-desc"></div>
+        <div id="game-tooltip-controls"></div>
+      </div>
+    </div>
     <span id="game-date"></span>
     <span id="high-score"></span>
     <div class="topbar-actions">
-      <a class="btn-link" href="/leaderboard">Leaderboard</a>
+      <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
+      <a class="btn-link" id="lb-link" href="/leaderboard">Leaderboard</a>
       <button class="btn-link" onclick="openAbout()">About</button>
     </div>
   </div>
   <div id="game-frame-wrap">
     <div id="loading">Loading…</div>
-    <iframe id="game-frame" title="Game"></iframe>
+    <div id="how-panel" class="hidden">
+      <button id="how-close">×</button>
+      <div id="how-desc"></div>
+      <div id="how-how">Okay, but how???</div>
+      <div id="how-controls"></div>
+      <button id="how-play">▶ Play</button>
+    </div>
+    <iframe id="game-frame" title="Game" tabindex="0"></iframe>
   </div>
 </div>
 
@@ -338,21 +377,22 @@ function renderArcade(): string {
 <div id="about-overlay">
   <div id="about-modal">
     <button id="about-close" onclick="closeAbout()">×</button>
-    <div class="modal-title">newtab.party</div>
+    <div class="modal-title">🥳 newtab.party</div>
     <p class="modal-subtitle" style="text-transform:none;letter-spacing:0;font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:32px;">A new arcade game every day. Built by AI. Played by humans. Judged by the leaderboard.</p>
     <div class="modal-section">What is this?</div>
     <p>Every day at midnight UTC, a brand-new arcade game drops — same one for everyone, 24 hours to post your best score. After that the leaderboard locks and you're just playing for your own ego. You're already here, so you're already winning.</p>
     <div class="modal-section">Recent games</div>
     <div id="about-game-list"></div>
     <div class="modal-section">Add your own game</div>
+    <p style="margin-bottom:14px;">You don't need to know how to code games. Tell Claude what you want, iterate until it's fun, send a PR. Your game gets its own day on the rotation.</p>
     <ol>
-      <li>Clone the repo and install the <code>game-builder</code> Claude Code skill (link below)</li>
-      <li>Open Claude Code in any project and run <code>/game-builder</code> — it'll walk you through designing your game</li>
-      <li>Drop the generated <code>.html</code> file into <code>worker/public/games/</code> and add an entry to <code>worker/games.json</code></li>
-      <li>Run <code>npm run deploy</code> from <code>worker/</code> — live immediately, no extension update needed</li>
-      <li>Submit a pull request — we'd love to grow the library</li>
+      <li>Add the newtab.party plugin marketplace to Claude Code: <code>/plugin marketplace add jlyon/newtab-party</code> (<a href="https://code.claude.com/docs/en/discover-plugins" target="_blank" class="about-link">docs</a>)</li>
+      <li>Use the <code>/game-builder</code> skill to build your game</li>
+      <li>Play to your heart's delight. Keep the chat going with the robots to get your game just right.</li>
+      <li>Open a PR in the <a href="https://github.com/jlyon/newtab-party" target="_blank" class="about-link">GitHub repo</a> to get your game featured on its special date</li>
     </ol>
     <div class="modal-links">
+      <a href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener" style="background:rgba(255,215,0,0.14);border-color:rgba(255,215,0,0.38);color:#ffd700;font-weight:700;">+ Add to Chrome</a>
       <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub repo →</a>
       <button id="about-open-lb">Leaderboard →</button>
     </div>
@@ -362,7 +402,7 @@ function renderArcade(): string {
 <script>
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
 let games = [], currentGame = null, sessionHighScore = 0;
-let sessionPlayId = null, sessionNameDone = false;
+let sessionPlayId = null;
 
 function dailyGame(gs) {
   if (!gs.length) return null;
@@ -379,7 +419,32 @@ async function init() {
   loadGame(dailyGame(games));
   loadRecentGames();
   window.addEventListener('message', handleMessage);
-  document.addEventListener('keydown', e => { if (e.key==='Escape') { closeAbout(); closeNamePrompt(); } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeAbout(); closeNamePrompt(); return; }
+    const anyModalOpen =
+      document.getElementById('about-overlay').classList.contains('open') ||
+      document.getElementById('name-overlay').classList.contains('open');
+    if (anyModalOpen) return;
+    const frame = document.getElementById('game-frame');
+    if (document.activeElement !== frame) {
+      e.preventDefault();
+      frame.focus();
+      try {
+        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', {
+          key: e.key, code: e.code, keyCode: e.keyCode, shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, repeat: e.repeat,
+          bubbles: true, cancelable: true
+        }));
+      } catch(err) {}
+    }
+  });
+  document.getElementById('how-close').addEventListener('click', () => {
+    document.getElementById('how-panel').classList.add('hidden');
+  });
+  document.getElementById('how-play').addEventListener('click', () => {
+    document.getElementById('how-panel').classList.add('hidden');
+    document.getElementById('game-frame').focus();
+  });
   document.getElementById('about-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeAbout(); });
   document.getElementById('name-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeNamePrompt(); });
   document.getElementById('name-input').addEventListener('keydown', e => { if (e.key==='Enter') submitName(); if (e.key==='Escape') closeNamePrompt(); });
@@ -411,16 +476,34 @@ async function loadRecentGames() {
 
 function loadGame(game) {
   if (!game) return;
-  currentGame = game; sessionHighScore = 0; sessionPlayId = null; sessionNameDone = false;
+  currentGame = game; sessionHighScore = 0; sessionPlayId = null;
   document.getElementById('game-title').textContent = game.name;
   document.getElementById('game-date').textContent = todayLabel();
   document.getElementById('high-score').textContent = '';
   document.getElementById('high-score').classList.remove('new-best');
-  const loading = document.getElementById('loading');
-  loading.classList.remove('hidden'); loading.textContent = 'Loading…';
+  const wrap = document.getElementById('game-title-wrap');
+  if (game.description || game.controls) {
+    document.getElementById('game-tooltip-desc').textContent = game.description || '';
+    document.getElementById('game-tooltip-controls').textContent = game.controls || '';
+    wrap.classList.add('has-tip');
+  } else {
+    wrap.classList.remove('has-tip');
+  }
   const frame = document.getElementById('game-frame');
-  frame.onload = () => loading.classList.add('hidden');
-  frame.src = '/' + game.file;
+  const loading = document.getElementById('loading');
+  if (game.controls) {
+    document.getElementById('how-desc').textContent = game.description || '';
+    document.getElementById('how-controls').textContent = game.controls;
+    document.getElementById('how-panel').classList.remove('hidden');
+    loading.classList.add('hidden');
+    frame.onload = () => { frame.focus(); };
+    frame.src = '/' + game.file;
+  } else {
+    document.getElementById('how-panel').classList.add('hidden');
+    loading.classList.remove('hidden'); loading.textContent = 'Loading…';
+    frame.onload = () => { loading.classList.add('hidden'); frame.focus(); };
+    frame.src = '/' + game.file;
+  }
 }
 
 function handleMessage(event) {
@@ -441,18 +524,20 @@ async function reportScore(gameId, gameName, score) {
     if (!r.ok) return;
     const { id, rank } = await r.json();
     sessionPlayId = id;
-    if (!sessionNameDone) showNamePrompt(rank);
+    showNamePrompt(rank);
   } catch {}
 }
 
 function showNamePrompt(rank) {
+  const saved = localStorage.getItem('playerName');
   document.getElementById('name-rank-val').textContent = rank;
+  document.getElementById('name-input').value = saved || '';
   document.getElementById('name-overlay').classList.add('open');
   document.getElementById('name-input').focus();
+  if (saved) document.getElementById('name-input').select();
 }
 function closeNamePrompt() {
   document.getElementById('name-overlay').classList.remove('open');
-  sessionNameDone = true;
 }
 function submitName() {
   const name = document.getElementById('name-input').value.trim();
@@ -492,7 +577,7 @@ function renderLeaderboard({
 
   const scoreRows = scores.length
     ? scores
-        .slice(0, 20)
+        .slice(0, 10)
         .map(
           (s, i) => `
         <tr>
@@ -512,8 +597,8 @@ function renderLeaderboard({
         <tr>
           <td class="prev-date">${fmtDate(d.play_date)}</td>
           <td class="prev-game"><a href="/play/${d.play_date}" class="prev-play-link">${esc(d.game_name)}</a></td>
-          <td class="prev-top">${d.top_score.toLocaleString()}</td>
-          <td class="prev-plays">${d.total_plays} plays</td>
+          <td class="prev-top"><a href="/play/${d.play_date}" class="prev-play-link">${d.top_score.toLocaleString()}</a></td>
+          <td class="prev-plays"><a href="/play/${d.play_date}" class="prev-play-link">${d.total_plays} plays</a></td>
         </tr>`,
         )
         .join("")
@@ -523,15 +608,19 @@ function renderLeaderboard({
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>newtab.party — leaderboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 48px 24px 80px; }
-  .back { display: inline-block; font-size: 12px; color: rgba(255,255,255,0.3); text-decoration: none; margin-bottom: 32px; letter-spacing: 0.3px; transition: color 0.12s; }
+  .back { font-size: 12px; color: rgba(255,255,255,0.3); text-decoration: none; letter-spacing: 0.3px; transition: color 0.12s; }
   .back:hover { color: rgba(255,255,255,0.65); }
   .wrap { max-width: 600px; margin: 0 auto; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 32px; }
+  .btn-install { background: rgba(255,215,0,0.14); border: 1px solid rgba(255,215,0,0.38); color: #ffd700; font-size: 11px; font-weight: 700; padding: 7px 14px; border-radius: 5px; letter-spacing: 1px; transition: background 0.12s, transform 0.12s; text-decoration: none; text-transform: uppercase; white-space: nowrap; }
+  .btn-install:hover { background: rgba(255,215,0,0.26); transform: translateY(-1px); }
+  @media (max-width: 600px) { .btn-install { display: none; } }
 
   /* Daily header */
   .daily-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 6px; }
@@ -571,14 +660,14 @@ function renderLeaderboard({
   .prev-top { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); text-align: right; padding: 9px 16px; }
   .prev-plays { font-size: 11px; color: rgba(255,255,255,0.2); text-align: right; white-space: nowrap; }
 
-  footer { margin-top: 64px; font-size: 11px; color: rgba(255,255,255,0.15); }
-  footer a { color: rgba(255,255,255,0.25); text-decoration: none; }
-  footer a:hover { color: rgba(255,255,255,0.5); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="/">← Play today's game</a>
+  <div class="top-row">
+    <a class="back" href="/">← Play today's game</a>
+    <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
+  </div>
 
   <div class="daily-label">Today · ${fmtDate(today)}</div>
   <div class="daily-game">${esc(game?.name ?? "No game configured")}</div>
@@ -604,9 +693,6 @@ function renderLeaderboard({
     <tbody>${prevRows}</tbody>
   </table>
 
-  <footer>
-    <a href="https://github.com/shoppad/newtab.party">github.com/shoppad/newtab.party</a>
-  </footer>
 </div>
 <script>
 // Live countdown to midnight UTC
@@ -635,7 +721,7 @@ function renderReplay(
 
   const scoreRows = scores.length
     ? scores
-        .slice(0, 20)
+        .slice(0, 10)
         .map(
           (s, i) => `
         <tr>
@@ -652,23 +738,30 @@ function renderReplay(
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>${esc(game.name)} — ${esc(dateLabel)} — newtab.party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
   #app { display: flex; flex-direction: column; height: 100%; }
-  #topbar { display: flex; align-items: center; padding: 0 16px; height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; }
-  #game-title { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.85); white-space: nowrap; }
+  #topbar { display: flex; align-items: baseline; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
+  #game-title-wrap { position: relative; line-height: normal; }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; cursor: help; }
+  #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
+  #game-title-wrap.has-tip:hover #game-tooltip { display: block; }
+  #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
+  #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
   #high-score { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; transition: color 0.3s; min-width: 80px; text-align: center; }
   #high-score.new-best { color: #ffd700; animation: scorePop 0.35s ease; }
   @keyframes scorePop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
-  .replay-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,200,0,0.5); background: rgba(255,200,0,0.08); border: 1px solid rgba(255,200,0,0.2); border-radius: 3px; padding: 2px 6px; white-space: nowrap; flex: 1; }
-  .topbar-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .replay-badge { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; flex: 1; }
+  .topbar-actions { display: flex; gap: 6px; align-items: baseline; flex-shrink: 0; line-height: normal; }
   .btn-link { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 11px; cursor: pointer; padding: 4px 6px; font-family: inherit; transition: color 0.12s; text-decoration: none; }
   .btn-link:hover { color: rgba(255,255,255,0.75); }
+  .btn-install { background: rgba(255,215,0,0.14); border: 1px solid rgba(255,215,0,0.38); color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer; padding: 5px 11px; border-radius: 5px; letter-spacing: 1px; transition: background 0.12s, transform 0.12s; text-decoration: none; text-transform: uppercase; font-family: inherit; white-space: nowrap; }
+  .btn-install:hover { background: rgba(255,215,0,0.26); transform: translateY(-1px); }
   #game-frame-wrap { flex: 1; position: relative; overflow: hidden; }
   #game-frame { width: 100%; height: 100%; border: none; display: block; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #080810; color: rgba(255,255,255,0.25); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; transition: opacity 0.3s; }
@@ -699,17 +792,25 @@ function renderReplay(
   .empty-row { font-size: 13px; color: rgba(255,255,255,0.25); padding: 20px 0; text-align: center; }
   .footer-note { font-size: 12px; color: rgba(255,255,255,0.25); padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
   .locked-note { font-size: 11px; color: rgba(255,200,0,0.35); margin-top: 6px; }
+  @media (max-width: 600px) { #game-date { display: none; } #high-score { display: none; } .btn-install { padding: 4px 8px; font-size: 10px; letter-spacing: 0.5px; } }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="topbar">
     <span>🥳 </span>
-    <span id="game-title">${esc(game.name)}</span>
+    <div id="game-title-wrap"${game.description || game.controls ? ' class="has-tip"' : ''}>
+      <span id="game-title">${esc(game.name)}</span>
+      ${game.description || game.controls ? `<div id="game-tooltip">
+        <div id="game-tooltip-desc">${esc(game.description || '')}</div>
+        <div id="game-tooltip-controls">${esc(game.controls || '')}</div>
+      </div>` : ''}
+    </div>
     <span id="game-date">${esc(dateLabel)}</span>
     <span id="high-score"></span>
     <span class="replay-badge">Replay · scores not saved</span>
     <div class="topbar-actions">
+      <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
       <button class="btn-link" id="btn-scores">Scores</button>
       <a class="btn-link" href="/leaderboard">← Leaderboard</a>
     </div>

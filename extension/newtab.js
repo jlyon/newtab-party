@@ -1,4 +1,5 @@
-// For local dev: 'http://localhost:8787' (wrangler dev default port)the const SERVER_URL = "https://newtab.party";
+// For local dev: change to 'http://localhost:8787'
+const SERVER_URL = "https://newtab.party";
 
 // Deterministic daily rotation — must match server's algorithm exactly.
 // Day 0 = 2026-05-01 UTC. Cycles through games in order.
@@ -31,8 +32,7 @@ function fmtCountdown(ms) {
 let games = [],
   currentGame = null,
   sessionHighScore = 0;
-let sessionPlayId = null,
-  sessionNameDone = false;
+let sessionPlayId = null;
 
 function fmtDate(s) {
   try {
@@ -66,6 +66,13 @@ async function init() {
       closeAbout();
       closeLeaderboard();
       closeNamePrompt();
+    } else {
+      const anyModalOpen =
+        document.getElementById("lb-overlay").classList.contains("open") ||
+        document.getElementById("about-overlay").classList.contains("open") ||
+        document.getElementById("name-overlay").classList.contains("open") ||
+        !document.getElementById("how-panel").classList.contains("hidden");
+      if (!anyModalOpen) document.getElementById("game-frame").focus();
     }
   });
 
@@ -107,8 +114,14 @@ async function init() {
     if (e.key === "Escape") closeNamePrompt();
   });
 
-  // Start screen
-  document.getElementById("start-btn").addEventListener("click", startGame);
+  // How-to panel
+  document.getElementById("how-close").addEventListener("click", () => {
+    document.getElementById("how-panel").classList.add("hidden");
+  });
+  document.getElementById("how-play").addEventListener("click", () => {
+    document.getElementById("how-panel").classList.add("hidden");
+    document.getElementById("game-frame").focus();
+  });
 }
 
 async function loadRecentGames() {
@@ -164,7 +177,6 @@ function loadGame(game) {
   currentGame = game;
   sessionHighScore = 0;
   sessionPlayId = null;
-  sessionNameDone = false;
 
   document.getElementById("game-title").textContent = game.name;
   document.getElementById("game-date").textContent = todayLabel();
@@ -185,23 +197,19 @@ function loadGame(game) {
   const frame = document.getElementById("game-frame");
   const loading = document.getElementById("loading");
   if (game.controls) {
-    document.getElementById("start-name").textContent = game.name;
-    document.getElementById("start-desc").textContent = game.description || "";
-    document.getElementById("start-controls").textContent = game.controls;
-    document.getElementById("start-overlay").classList.remove("hidden");
+    document.getElementById("how-desc").textContent = game.description || "";
+    document.getElementById("how-controls").textContent = game.controls;
+    document.getElementById("how-panel").classList.remove("hidden");
     loading.classList.add("hidden");
+    frame.onload = () => { frame.focus(); };
     frame.src = `${SERVER_URL}/${game.file}`;
   } else {
-    document.getElementById("start-overlay").classList.add("hidden");
+    document.getElementById("how-panel").classList.add("hidden");
     loading.classList.remove("hidden");
     loading.textContent = "Loading…";
-    frame.onload = () => loading.classList.add("hidden");
+    frame.onload = () => { loading.classList.add("hidden"); frame.focus(); };
     frame.src = `${SERVER_URL}/${game.file}`;
   }
-}
-
-function startGame() {
-  document.getElementById("start-overlay").classList.add("hidden");
 }
 
 function handleMessage(event) {
@@ -231,7 +239,7 @@ async function reportScore(gameId, gameName, score) {
     if (!r.ok) return;
     const { id, rank } = await r.json();
     sessionPlayId = id;
-    if (!sessionNameDone) showNamePrompt(rank);
+    showNamePrompt(rank);
   } catch {
     // Server not reachable — score silently dropped
   }
@@ -302,18 +310,16 @@ function closeAbout() {
 // ── Name prompt ───────────────────────────────────
 
 function showNamePrompt(rank) {
-  document.getElementById("name-rank-val").textContent = rank;
   const saved = localStorage.getItem("playerName");
-  const input = document.getElementById("name-input");
-  input.value = saved || "";
+  document.getElementById("name-rank-val").textContent = rank;
+  document.getElementById("name-input").value = saved || "";
   document.getElementById("name-overlay").classList.add("open");
-  input.focus();
-  if (saved) input.select();
+  document.getElementById("name-input").focus();
+  if (saved) document.getElementById("name-input").select();
 }
 
 function closeNamePrompt() {
   document.getElementById("name-overlay").classList.remove("open");
-  sessionNameDone = true;
 }
 
 function submitName() {
