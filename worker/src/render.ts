@@ -161,7 +161,7 @@ ${FAVICON}
     <input id="name-input" type="text" placeholder="Your name" maxlength="30" autocomplete="off">
     <div class="name-btns">
       <button id="name-submit-btn" onclick="submitName()">Save to leaderboard</button>
-      <button id="name-skip-btn" onclick="closeNamePrompt()">Skip</button>
+      <button id="name-skip-btn" onclick="skipName()">Skip</button>
     </div>
   </div>
 </div>
@@ -195,6 +195,7 @@ ${FAVICON}
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
 let games = [], currentGame = null, sessionHighScore = 0;
 let sessionPlayId = null;
+let lastEvaluatedScore = -1;
 
 function dailyGame(gs) {
   if (!gs.length) return null;
@@ -215,15 +216,21 @@ async function init() {
   loadGame(dailyGame(games));
   loadRecentGames();
   window.addEventListener('message', handleMessage);
+  // Keep keyboard focus on the game frame so games respond to keys without a
+  // mouse click first. Re-grab focus on the events where the browser is most
+  // likely to have parked focus elsewhere (tab shown, window refocused, any tap).
+  window.addEventListener('focus', focusGame);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) focusGame(); });
+  document.addEventListener('pointerdown', () => { setTimeout(focusGame, 0); });
   document.addEventListener('keydown', e => {
-    if (e.key==='Escape') { closeAbout(); closeNamePrompt(); return; }
+    if (e.key==='Escape') { closeAbout(); skipName(); return; }
     const anyModalOpen = document.getElementById('about-overlay').classList.contains('open') ||
       document.getElementById('name-overlay').classList.contains('open');
     if (anyModalOpen) return;
     const frame = document.getElementById('game-frame');
     if (document.activeElement !== frame) {
       e.preventDefault();
-      frame.focus();
+      focusGame();
       try {
         frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', {
           key: e.key, code: e.code, keyCode: e.keyCode, shiftKey: e.shiftKey,
@@ -234,14 +241,14 @@ async function init() {
     }
   });
   document.getElementById('about-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeAbout(); });
-  document.getElementById('name-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeNamePrompt(); });
-  document.getElementById('name-input').addEventListener('keydown', e => { if (e.key==='Enter') submitName(); if (e.key==='Escape') closeNamePrompt(); });
+  document.getElementById('name-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) skipName(); });
+  document.getElementById('name-input').addEventListener('keydown', e => { if (e.key==='Enter') submitName(); if (e.key==='Escape') skipName(); });
   document.getElementById('how-close').addEventListener('click', () => {
     document.getElementById('how-panel').classList.add('hidden');
   });
   document.getElementById('how-play').addEventListener('click', () => {
     document.getElementById('how-panel').classList.add('hidden');
-    document.getElementById('game-frame').focus();
+    focusGame();
   });
 }
 
@@ -270,6 +277,18 @@ async function loadRecentGames() {
   } catch {}
 }
 
+function focusGame() {
+  // Don't steal focus while a modal (about / name prompt) is open.
+  if (document.getElementById('about-overlay').classList.contains('open') ||
+      document.getElementById('name-overlay').classList.contains('open')) return;
+  const frame = document.getElementById('game-frame');
+  if (!frame) return;
+  try { frame.focus(); } catch (e) {}
+  // Also focus the inner window — needed in the extension where the iframe is
+  // cross-origin and a synthetic-event bridge isn't possible.
+  try { frame.contentWindow.focus(); } catch (e) {}
+}
+
 function loadGame(game) {
   if (!game) return;
   currentGame = game; sessionHighScore = 0; sessionPlayId = null;
@@ -292,12 +311,12 @@ function loadGame(game) {
     document.getElementById('how-controls').textContent = game.controls;
     document.getElementById('how-panel').classList.remove('hidden');
     loading.classList.add('hidden');
-    frame.onload = () => { frame.focus(); };
+    frame.onload = () => { focusGame(); };
     frame.src = '/' + game.file;
   } else {
     document.getElementById('how-panel').classList.add('hidden');
     loading.classList.remove('hidden'); loading.textContent = 'Loading…';
-    frame.onload = () => { loading.classList.add('hidden'); frame.focus(); };
+    frame.onload = () => { loading.classList.add('hidden'); focusGame(); };
     frame.src = '/' + game.file;
   }
 }
@@ -306,16 +325,28 @@ function handleMessage(event) {
   const d = event.data;
   if (!d || typeof d.highScore !== 'number') return;
   const score = Math.floor(d.highScore);
-  if (score <= sessionHighScore) return;
-  sessionHighScore = score;
-  const el = document.getElementById('high-score');
-  el.textContent = 'Best: ' + score.toLocaleString();
-  el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best');
-  if (currentGame) reportScore(currentGame.id, currentGame.name, score);
+  if (score <= 0) return;
+  // Topbar "Best" reflects the best score of this local session.
+  if (score > sessionHighScore) {
+    sessionHighScore = score;
+    const el = document.getElementById('high-score');
+    el.textContent = 'Best: ' + score.toLocaleString();
+    el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best');
+  }
+  if (!currentGame) return;
+  // Offer the leaderboard whenever the score makes the day's top board —
+  // not only when it beats the local session best. Dedupe identical scores
+  // and don't stack prompts.
+  if (score === lastEvaluatedScore) return;
+  lastEvaluatedScore = score;
+  if (document.getElementById('name-overlay').classList.contains('open')) return;
+  maybePromptForScore(currentGame.id, currentGame.name, score);
 }
 
-async function reportScore(gameId, gameName, score) {
+async function maybePromptForScore(gameId, gameName, score) {
   try {
+    const q = await fetch('/api/qualify?gameId=' + encodeURIComponent(gameId) + '&score=' + score).then(r => r.ok ? r.json() : null);
+    if (!q || !q.qualifies) return;   // not in today's top scores — don't pester
     const r = await fetch('/api/plays', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ gameId, gameName, score }) });
     if (!r.ok) return;
     const { id, rank } = await r.json();
@@ -335,12 +366,25 @@ function showNamePrompt(rank) {
 function closeNamePrompt() {
   document.getElementById('name-overlay').classList.remove('open');
 }
+// Skipping means "don't put me on the leaderboard" — delete the pending anonymous play.
+function skipName() {
+  closeNamePrompt();
+  discardPlay();
+}
+function discardPlay() {
+  const id = sessionPlayId;
+  sessionPlayId = null;
+  if (!id) return;
+  fetch('/api/plays/' + id, { method: 'DELETE' }).catch(()=>{});
+}
 function submitName() {
   const name = document.getElementById('name-input').value.trim();
+  if (!name || !sessionPlayId) { skipName(); return; }
   closeNamePrompt();
-  if (!name || !sessionPlayId) return;
+  const id = sessionPlayId;
+  sessionPlayId = null;
   localStorage.setItem('playerName', name);
-  fetch('/api/plays/' + sessionPlayId, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playerName: name }) }).catch(()=>{});
+  fetch('/api/plays/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playerName: name }) }).catch(()=>{});
 }
 
 function openAbout() { document.getElementById('about-overlay').classList.add('open'); }
@@ -373,7 +417,7 @@ export function renderLeaderboard({
   const footerNote = `${totalToday} ${totalToday === 1 ? 'play' : 'plays'} today`;
 
   const scoreRows = scores.length
-    ? scores.slice(0, 10).map((s, i) => `
+    ? scores.slice(0, 20).map((s, i) => `
         <tr>
           <td class="rank">${i + 1}</td>
           <td class="player-name">${s.player_name ? esc(s.player_name) : '<span class="anon">—</span>'}</td>
@@ -382,13 +426,18 @@ export function renderLeaderboard({
     : `<tr><td colspan="3" class="empty-row">No scores yet today — be the first</td></tr>`;
 
   const prevRows = previousDays.length
-    ? previousDays.map((d) => `
+    ? previousDays.map((d) => {
+        const dayLabel = fmtDate(d.play_date);
+        const scoresHref = `/play/${d.play_date}?scores`;
+        const scoresLabel = `See leaderboard for ${dayLabel}`;
+        return `
         <tr>
-          <td class="prev-date">${fmtDate(d.play_date)}</td>
-          <td class="prev-game"><a href="/play/${d.play_date}" class="prev-play-link">${esc(d.game_name)}</a></td>
-          <td class="prev-top"><a href="/play/${d.play_date}" class="prev-play-link">${d.top_score.toLocaleString()}</a></td>
-          <td class="prev-plays"><a href="/play/${d.play_date}" class="prev-play-link">${d.total_plays} plays</a></td>
-        </tr>`).join('')
+          <td class="prev-date">${dayLabel}</td>
+          <td class="prev-game"><a href="/play/${d.play_date}" class="prev-play-link" aria-label="Play ${esc(d.game_name)}">${esc(d.game_name)}</a></td>
+          <td class="prev-top"><a href="${scoresHref}" class="prev-play-link" aria-label="${esc(scoresLabel)}">${d.top_score.toLocaleString()}</a></td>
+          <td class="prev-plays"><a href="${scoresHref}" class="prev-play-link" aria-label="${esc(scoresLabel)}">${d.total_plays} plays</a></td>
+        </tr>`;
+      }).join('')
     : `<tr><td colspan="4" class="empty-row">No previous games yet</td></tr>`;
 
   return `<!doctype html>
@@ -490,11 +539,12 @@ export function renderReplay(
   date: string,
   scores: Play[],
   totalPlays: number,
+  openScores = false,
 ): string {
   const dateLabel = fmtDate(date);
 
   const scoreRows = scores.length
-    ? scores.slice(0, 10).map((s, i) => `
+    ? scores.slice(0, 20).map((s, i) => `
         <tr>
           <td class="rank">${i + 1}</td>
           <td class="player-name">${s.player_name ? esc(s.player_name) : '<span class="anon">—</span>'}</td>
@@ -588,9 +638,9 @@ ${FAVICON}
   </div>
 </div>
 
-<div id="scores-overlay">
+<div id="scores-overlay"${openScores ? ' class="open"' : ''}>
   <div id="scores-modal">
-    <button class="modal-close" onclick="document.getElementById('scores-overlay').classList.remove('open')">×</button>
+    <button class="modal-close" onclick="closeScores()">×</button>
     <div class="modal-label">${esc(dateLabel)}</div>
     <div class="modal-title">${esc(game.name)}</div>
     <div class="modal-subtitle">${esc(game.type ?? '')}</div>
@@ -618,10 +668,22 @@ window.addEventListener('message', function(e) {
   el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best');
 });
 const frame = document.getElementById('game-frame');
-frame.onload = () => document.getElementById('loading').classList.add('hidden');
-frame.src = '/${game.file}';
-document.getElementById('scores-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('scores-overlay').classList.remove('open'); });
+const loadingEl = document.getElementById('loading');
+let gameLoaded = false;
+function loadGameFrame() {
+  if (gameLoaded) return;
+  gameLoaded = true;
+  loadingEl.classList.remove('hidden');
+  frame.onload = () => loadingEl.classList.add('hidden');
+  frame.src = '/${game.file}';
+}
+const scoresOverlay = document.getElementById('scores-overlay');
+function closeScores() { scoresOverlay.classList.remove('open'); loadGameFrame(); }
+scoresOverlay.addEventListener('click', e => { if (e.target === e.currentTarget) closeScores(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeScores(); });
+// When arriving via a "see scores" link, show the leaderboard first and only
+// load the game once the viewer dismisses it — don't navigate them into the game.
+${openScores ? "loadingEl.classList.add('hidden');" : 'loadGameFrame();'}
 </script>
 </body>
 </html>`;

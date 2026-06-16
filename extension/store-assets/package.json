@@ -1,0 +1,12 @@
+{
+  "name": "newtab-party-store-assets",
+  "private": true,
+  "type": "module",
+  "description": "Playwright capture script for newtab.party Chrome Web Store listing assets.",
+  "scripts": {
+    "capture": "node capture.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}

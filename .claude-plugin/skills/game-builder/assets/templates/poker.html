@@ -74,6 +74,12 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME   = '__PLAYER_NAME__';
   const START_CREDITS = 100;
+  // SCORE_SCALE: posted score = peak credit balance, scaled so a strong session
+  // lands ≈ 1000 (mediocre = low hundreds). No fixed ceiling — credits can grow
+  // without bound, so the metric keeps spreading. With the default 10x, roughly
+  // doubling your stack to ~100 credits ≈ 1000. Tune if START_CREDITS changes.
+  // Integer; posted only on a new peak (monotonic).
+  const SCORE_SCALE = 10;  // tuned so a great run ≈ 1000
   // Jacks-or-Better pay table (multiplier × bet):
   const PAY = [
     { name: 'Royal Flush',    mult: 250 },
@@ -120,7 +126,12 @@
     return null;
   }
 
-  let deck, hand, held, credits, bet, phase, hiScore = 0;
+  let deck, hand, held, credits, bet, phase;
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
 
   function reset() { credits = START_CREDITS; bet = 1; phase = 'deal'; renderPayTable(null); newHand(); }
 
@@ -145,7 +156,7 @@
       const pay = PAY.find(p=>p.name===name);
       const won = pay ? pay.mult * bet : 0;
       credits += won; creditsEl.textContent = credits;
-      if (credits > hiScore) { hiScore = credits; window.parent.postMessage({ highScore: hiScore }, '*'); }
+      postHi(credits);  // RAW peak credits; postHi applies SCORE_SCALE
       resultEl.textContent = name ? '🎉 ' + name + ' +' + won + ' cr' : 'No win. Better luck next time.';
       if (credits <= 0) { credits = START_CREDITS; resultEl.textContent += ' (wallet reloaded!)'; }
       renderHand(); renderPayTable(name);
@@ -196,6 +207,10 @@
     if (e.key >= '1' && e.key <= '5') toggleHold(+e.key - 1);
     if (e.key === 'Enter' || e.key === 'd' || e.key === 'D') draw();
   });
+  // Keyboard-controlled: grab focus so hotkeys work without a manual click.
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
   reset();
 })();
 </script>

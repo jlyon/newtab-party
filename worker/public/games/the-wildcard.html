@@ -48,11 +48,24 @@
 </div>
 <script>
 (() => {
-  // High score reporting — scenes visited on a win ending is the "score"
+  // High score reporting.
+  // We post a CONTINUOUS skill metric on ANY ending (not only wins) so most
+  // plays register and results spread out. The raw metric rewards EXPLORATION
+  // (distinct story nodes ever seen this session — replaying to find new
+  // branches climbs the score) plus a big bonus for actually reaching a WIN
+  // ending, minus a small penalty per restart after a non-win ending (rewards
+  // getting there cleanly). SCORE_SCALE then normalizes onto the shared ~1000
+  // scale: a thorough WIN run that has seen most of the ~22 nodes lands ≈ 1000;
+  // a quick lose registers a modest spread of points instead of zero.
+  const WIN_BONUS       = 9;   // raw points for landing any win ending
+  const NODE_POINTS     = 1;   // raw per distinct node discovered this session
+  const RESTART_PENALTY = 1;   // raw per restart taken after a non-win ending
+  // ~22 nodes total; a thorough win ≈ 22*1 + 9 = 31 raw → 31*32 ≈ 992 ≈ 1000.
+  const SCORE_SCALE = 32;
   let _hi = 0;
-  function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
   }
 
   const sparkleLayer = document.getElementById('sparkles');
@@ -208,20 +221,28 @@
     }
   };
 
-  let visited = 0;
+  let visited = 0;                 // nodes seen in the current run
+  let restarts = 0;                // restarts after a non-win ending this session
+  const seenNodes = new Set();     // distinct nodes ever discovered this session
   function go(id) {
     const node = story[id];
     if (!node) { sceneEl.textContent = "(missing scene: " + id + ")"; return; }
     visited++;
+    seenNodes.add(id);
     sceneEl.textContent = node.text;
     choicesEl.innerHTML = '';
     choicesEl.classList.toggle('ending', !!node.ending);
     if (node.ending) {
-      if (node.ending === 'win') postHi(visited);
+      // Post on ANY ending so most plays register a (continuous) score.
+      const raw = NODE_POINTS * seenNodes.size
+        + (node.ending === 'win' ? WIN_BONUS : 0)
+        - RESTART_PENALTY * restarts;
+      postHi(Math.max(0, raw));
+      const lostRun = node.ending !== 'win';
       const b = document.createElement('button');
       b.className = 'choice';
       b.textContent = '↺ Start over (you didn\'t learn anything)';
-      b.onclick = () => { visited = 0; go('start'); };
+      b.onclick = () => { if (lostRun) restarts++; visited = 0; go('start'); };
       choicesEl.appendChild(b);
       metaEl.textContent = node.ending === 'win'
         ? '… Ending: somehow, you won …'

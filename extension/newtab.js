@@ -5,14 +5,29 @@ const SERVER_URL = "https://newtab.party";
 // Day 0 = 2026-05-01 UTC. Cycles through games in order.
 const DAY_EPOCH = Date.UTC(2026, 4, 1); // May 1 2026
 
-function dailyIndex(count) {
-  const day = Math.floor((Date.now() - DAY_EPOCH) / 86400000);
-  return ((day % count) + count) % count;
+// Day number since DAY_EPOCH for a given epoch-ms instant.
+function dayNumber(utcMs) {
+  return Math.floor((utcMs - DAY_EPOCH) / 86400000);
+}
+function dayNumberFromStr(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return dayNumber(Date.UTC(y, m - 1, d));
 }
 
+// The daily pick. Uses the explicit `schedule` list from games.json (anchored at
+// `scheduleEpoch`) so appending a game only adds a future slot — the current
+// cycle never moves. Falls back to plain modulo. MUST match worker/src/index.ts.
 function getDailyGame(games) {
   if (!games.length) return null;
-  return games[dailyIndex(games.length)];
+  if (schedule.length && scheduleEpoch) {
+    const off = dayNumber(Date.now()) - dayNumberFromStr(scheduleEpoch);
+    const L = schedule.length;
+    const id = schedule[((off % L) + L) % L];
+    const g = games.find((x) => x.id === id);
+    if (g) return g;
+  }
+  const day = dayNumber(Date.now());
+  return games[((day % games.length) + games.length) % games.length];
 }
 
 function todayLabel() {
@@ -30,9 +45,12 @@ function fmtCountdown(ms) {
 }
 
 let games = [],
+  schedule = [],
+  scheduleEpoch = null,
   currentGame = null,
   sessionHighScore = 0;
 let sessionPlayId = null;
+let lastEvaluatedScore = -1;
 
 function fmtDate(s) {
   try {
@@ -53,6 +71,8 @@ async function init() {
       return r.json();
     });
     games = data.games || [];
+    schedule = data.schedule || [];
+    scheduleEpoch = data.scheduleEpoch || null;
     loadGame(getDailyGame(games));
   } catch {
     showServerError();
@@ -61,18 +81,22 @@ async function init() {
   loadRecentGames();
 
   window.addEventListener("message", handleMessage);
+  // Keep keyboard focus on the game frame so games respond without a click first.
+  window.addEventListener("focus", focusGame);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) focusGame(); });
+  document.addEventListener("pointerdown", () => { setTimeout(focusGame, 0); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeAbout();
       closeLeaderboard();
-      closeNamePrompt();
+      skipName();
     } else {
       const anyModalOpen =
         document.getElementById("lb-overlay").classList.contains("open") ||
         document.getElementById("about-overlay").classList.contains("open") ||
         document.getElementById("name-overlay").classList.contains("open") ||
         !document.getElementById("how-panel").classList.contains("hidden");
-      if (!anyModalOpen) document.getElementById("game-frame").focus();
+      if (!anyModalOpen) focusGame();
     }
   });
 
@@ -101,17 +125,17 @@ async function init() {
 
   // Name prompt
   document.getElementById("name-overlay").addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeNamePrompt();
+    if (e.target === e.currentTarget) skipName();
   });
   document
     .getElementById("name-submit-btn")
     .addEventListener("click", submitName);
   document
     .getElementById("name-skip-btn")
-    .addEventListener("click", closeNamePrompt);
+    .addEventListener("click", skipName);
   document.getElementById("name-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") submitName();
-    if (e.key === "Escape") closeNamePrompt();
+    if (e.key === "Escape") skipName();
   });
 
   // How-to panel
@@ -120,8 +144,22 @@ async function init() {
   });
   document.getElementById("how-play").addEventListener("click", () => {
     document.getElementById("how-panel").classList.add("hidden");
-    document.getElementById("game-frame").focus();
+    focusGame();
   });
+}
+
+// Focus the game frame (and its inner window, for the cross-origin iframe) so
+// keyboard input reaches the game without a mouse click first.
+function focusGame() {
+  if (
+    document.getElementById("lb-overlay").classList.contains("open") ||
+    document.getElementById("about-overlay").classList.contains("open") ||
+    document.getElementById("name-overlay").classList.contains("open")
+  ) return;
+  const frame = document.getElementById("game-frame");
+  if (!frame) return;
+  try { frame.focus(); } catch (e) {}
+  try { frame.contentWindow.focus(); } catch (e) {}
 }
 
 async function loadRecentGames() {
@@ -158,12 +196,11 @@ async function loadRecentGames() {
 }
 
 function showServerError() {
-  document.getElementById("game-title").textContent = "Server offline";
+  document.getElementById("game-title").textContent = "Offline";
   document.getElementById("game-date").textContent = "";
   document.getElementById("loading").innerHTML = `
     <div class="server-error">
-      <p>The newtab.party server isn't running.<br>Start it to play today's game.</p>
-      <code>cd server &amp;&amp; npm start</code>
+      <p>Couldn't reach newtab.party.<br>Check your connection and try again.</p>
       <button id="retry-btn">RETRY</button>
     </div>
   `;
@@ -201,13 +238,13 @@ function loadGame(game) {
     document.getElementById("how-controls").textContent = game.controls;
     document.getElementById("how-panel").classList.remove("hidden");
     loading.classList.add("hidden");
-    frame.onload = () => { frame.focus(); };
+    frame.onload = () => { focusGame(); };
     frame.src = `${SERVER_URL}/${game.file}`;
   } else {
     document.getElementById("how-panel").classList.add("hidden");
     loading.classList.remove("hidden");
     loading.textContent = "Loading…";
-    frame.onload = () => { loading.classList.add("hidden"); frame.focus(); };
+    frame.onload = () => { loading.classList.add("hidden"); focusGame(); };
     frame.src = `${SERVER_URL}/${game.file}`;
   }
 }
@@ -217,20 +254,34 @@ function handleMessage(event) {
   if (!d || typeof d.highScore !== "number") return;
 
   const score = Math.floor(d.highScore);
-  if (score <= sessionHighScore) return;
+  if (score <= 0) return;
 
-  sessionHighScore = score;
-  const el = document.getElementById("high-score");
-  el.textContent = `Best: ${score.toLocaleString()}`;
-  el.classList.remove("new-best");
-  void el.offsetWidth;
-  el.classList.add("new-best");
+  // Topbar "Best" reflects the best score of this local session.
+  if (score > sessionHighScore) {
+    sessionHighScore = score;
+    const el = document.getElementById("high-score");
+    el.textContent = `Best: ${score.toLocaleString()}`;
+    el.classList.remove("new-best");
+    void el.offsetWidth;
+    el.classList.add("new-best");
+  }
 
-  if (currentGame) reportScore(currentGame.id, currentGame.name, score);
+  if (!currentGame) return;
+  // Offer the leaderboard whenever the score makes the day's top board — not
+  // only when it beats the local session best. Dedupe identical scores and
+  // don't stack prompts.
+  if (score === lastEvaluatedScore) return;
+  lastEvaluatedScore = score;
+  if (document.getElementById("name-overlay").classList.contains("open")) return;
+  maybePromptForScore(currentGame.id, currentGame.name, score);
 }
 
-async function reportScore(gameId, gameName, score) {
+async function maybePromptForScore(gameId, gameName, score) {
   try {
+    const q = await fetch(
+      `${SERVER_URL}/api/qualify?gameId=${encodeURIComponent(gameId)}&score=${score}`,
+    ).then((r) => (r.ok ? r.json() : null));
+    if (!q || !q.qualifies) return; // not in today's top scores — don't pester
     const r = await fetch(`${SERVER_URL}/api/plays`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -322,12 +373,30 @@ function closeNamePrompt() {
   document.getElementById("name-overlay").classList.remove("open");
 }
 
+// Skipping means "don't put me on the leaderboard" — delete the pending play.
+function skipName() {
+  closeNamePrompt();
+  discardPlay();
+}
+
+function discardPlay() {
+  const id = sessionPlayId;
+  sessionPlayId = null;
+  if (!id) return;
+  fetch(`${SERVER_URL}/api/plays/${id}`, { method: "DELETE" }).catch(() => {});
+}
+
 function submitName() {
   const name = document.getElementById("name-input").value.trim();
+  if (!name || !sessionPlayId) {
+    skipName();
+    return;
+  }
   closeNamePrompt();
-  if (!name || !sessionPlayId) return;
+  const id = sessionPlayId;
+  sessionPlayId = null;
   localStorage.setItem("playerName", name);
-  fetch(`${SERVER_URL}/api/plays/${sessionPlayId}`, {
+  fetch(`${SERVER_URL}/api/plays/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ playerName: name }),

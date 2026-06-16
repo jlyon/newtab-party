@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Build the Boardwalk</title>
+<style>
+  :root {
+    --primary: #C8102E;      /* boardwalk red */
+    --secondary: #0A3161;    /* deep ocean blue */
+    --bg: #F2D49B;           /* warm sand */
+    --white: #FFFFFF;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; touch-action: none;
+    font-family: system-ui, -apple-system, sans-serif; color: var(--secondary);
+    overflow: hidden; background: #0A3161; }
+  #wrap { display: flex; flex-direction: column; align-items: center; height: 100%; gap: 7px;
+    padding: 8px 8px 10px; max-width: 540px; margin: 0 auto; }
+  h1 { margin: 0; font-size: clamp(16px, 4.6vw, 24px); color: var(--white);
+    letter-spacing: 1px; text-align: center; }
+  #hud { display: flex; gap: 8px; width: 100%; justify-content: center; }
+  .stat { background: var(--white); border: 2px solid var(--secondary); border-radius: 10px;
+    padding: 4px 10px; font-size: clamp(13px, 3.4vw, 17px); font-weight: 800; flex: 1; text-align: center; max-width: 150px; }
+  .stat small { display: block; font-size: 9px; font-weight: 700; opacity: 0.55; letter-spacing: 1px; }
+  #cash .v { color: #1a7a36; }
+  #crowd .v { color: var(--secondary); }
+  #timer .v { color: var(--primary); }
+  canvas { width: min(94vw, 56vh, 460px); height: auto; display: block; border-radius: 12px;
+    border: 3px solid var(--secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.4); touch-action: none; }
+  #shop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; max-width: 480px; }
+  .item { background: var(--white); border: 2px solid var(--secondary); border-radius: 8px; padding: 3px 2px;
+    cursor: grab; user-select: none; -webkit-touch-callout: none; touch-action: none; text-align: center; min-height: 40px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; transition: all 0.1s; }
+  .item .ic { font-size: clamp(15px, 4.4vw, 21px); line-height: 1.05; }
+  .item .nm { font-size: 8.5px; font-weight: 700; line-height: 1; }
+  .item .pr { font-size: 9.5px; font-weight: 800; color: #1a7a36; }
+  .item.sel { border-color: var(--primary); background: #fff3f4; box-shadow: 0 0 0 2px var(--primary) inset; }
+  .item.broke { opacity: 0.4; }
+  #hint { font-size: 12px; font-weight: 600; color: var(--white); opacity: 0.85; text-align: center; min-height: 15px; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(10,49,97,0.93); flex-direction: column; text-align: center; padding: 24px; z-index: 10; }
+  .card { max-width: 440px; }
+  .card h2 { color: var(--white); font-size: clamp(24px, 7vw, 40px); margin: 0 0 10px; letter-spacing: 1px; }
+  .card p { color: #d7e6f5; font-size: clamp(13px, 3.6vw, 16px); line-height: 1.6; margin: 0 0 20px; }
+  .card .big { color: #FFD166; font-size: clamp(30px, 10vw, 52px); font-weight: 800; margin: 4px 0 14px; }
+  .card button { padding: 13px 38px; font-size: 17px; font-weight: 800; letter-spacing: 1px;
+    background: var(--primary); color: var(--white); border: none; cursor: pointer; border-radius: 8px; font-family: inherit; }
+  .card button:hover { opacity: 0.9; }
+  #endOverlay { display: none; }
+  .item.dragging { opacity: 0.5; }
+  #dragGhost { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 30; display: none;
+    font-size: 38px; transform: translate(-50%, -55%); filter: drop-shadow(0 4px 5px rgba(0,0,0,0.45)); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>🎡 Build the Boardwalk</h1>
+  <div id="hud">
+    <div class="stat" id="cash"><small>CASH</small><span class="v">$300</span></div>
+    <div class="stat" id="crowd"><small>CROWD</small><span class="v">0</span></div>
+    <div class="stat" id="timer"><small>TIME</small><span class="v">60</span></div>
+  </div>
+  <canvas id="game" width="480" height="480"></canvas>
+  <div id="shop"></div>
+  <div id="hint">Drag a ride onto the sand to build it.</div>
+</div>
+<div id="dragGhost"></div>
+
+<div class="overlay" id="startOverlay">
+  <div class="card">
+    <h2>🎡 Build the Boardwalk</h2>
+    <p>Santa Cruz, baby. You've got <b>60 seconds</b> and an empty beach.
+       <b>Drag attractions</b> from the tray onto the sand, and watch tourists stream in and spend their cash.
+       The more you build, the bigger the crowd. Tap a ride to <b>upgrade</b> it.
+       End with the fattest wallet on the coast.</p>
+    <button id="startBtn">▶ Open the gates</button>
+  </div>
+</div>
+
+<div class="overlay" id="endOverlay">
+  <div class="card">
+    <h2 id="endTitle">Park's closed!</h2>
+    <div class="big" id="endCash">$0</div>
+    <p id="endMsg"></p>
+    <button id="restartBtn">Run it back</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const START_CASH = 300;
+  const GAME_SECONDS = 60;
+  const COLS = 8, ROWS = 8, TILE = 60;       // 480x480
+  const W = COLS * TILE, H = ROWS * TILE;
+  const OCEAN_ROWS = 2;                       // top rows = sea (not buildable)
+  const MAX_TOURISTS = 280;
+  const TOURIST_SPEED = 195;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // cost = build price; payout = $ per visitor; draw = how many tourists it pulls in.
+  // Upgrades multiply payout and draw by the new level.
+  const TYPES = [
+    { id:'dog',     emoji:'🌭', name:'Hot Dogs',    cost:120,   payout:15,   draw:3   },
+    { id:'pop',     emoji:'🍿', name:'Popcorn',     cost:190,   payout:22,   draw:4   },
+    { id:'cream',   emoji:'🍦', name:'Ice Cream',   cost:280,   payout:32,   draw:6   },
+    { id:'ring',    emoji:'🎯', name:'Ring Toss',   cost:420,   payout:46,   draw:8   },
+    { id:'cotton',  emoji:'🍭', name:'Candy',       cost:600,   payout:64,   draw:11  },
+    { id:'crab',    emoji:'🦀', name:'Crab Shack',  cost:850,   payout:88,   draw:15  },
+    { id:'carousel',emoji:'🎠', name:'Carousel',    cost:1200,  payout:120,  draw:20  },
+    { id:'fun',     emoji:'🎪', name:'Funhouse',    cost:1700,  payout:168,  draw:27  },
+    { id:'bumper',  emoji:'🚗', name:'Bumpers',     cost:2400,  payout:235,  draw:36  },
+    { id:'arcade',  emoji:'🕹️', name:'Arcade',      cost:3400,  payout:330,  draw:48  },
+    { id:'wheel',   emoji:'🎡', name:'Ferris',      cost:4800,  payout:460,  draw:64  },
+    { id:'band',    emoji:'🎤', name:'Bandstand',   cost:6800,  payout:650,  draw:88  },
+    { id:'coaster', emoji:'🎢', name:'Giant Dipper',cost:9500,  payout:910,  draw:118 },
+    { id:'haunt',   emoji:'🏰', name:'Haunt House', cost:13500, payout:1300, draw:160 },
+    { id:'splash',  emoji:'🌊', name:'Log Splash',  cost:19000, payout:1850, draw:215 },
+    { id:'ship',    emoji:'🚢', name:'Pirate Ship', cost:28000, payout:2750, draw:300 },
+  ];
+  const endLines = [
+    "Stan Lee himself would tip his hat. Empire status.",
+    "The seagulls have unionized. This is your legacy.",
+    "Funnel-cake futures just hit an all-time high.",
+    "Not bad for a pile of sand and pure ambition.",
+  ];
+  // little beachgoers that wander the park
+  const PEOPLE = ['🧍','🚶','🧍‍♀️','🚶‍♀️','👨','👩','🧒','👧','👦','🧑','👴','👵','🏃','🏃‍♀️'];
+  // ==================================
+
+  const fmt = n => '$' + Math.floor(n).toLocaleString('en-US');
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const shop = document.getElementById('shop');
+  const cashV = document.querySelector('#cash .v');
+  const crowdV = document.querySelector('#crowd .v');
+  const timerV = document.querySelector('#timer .v');
+  const hint = document.getElementById('hint');
+  const startOverlay = document.getElementById('startOverlay');
+  const endOverlay = document.getElementById('endOverlay');
+
+  const typeById = id => TYPES.find(t => t.id === id);
+  const tileCX = c => c * TILE + TILE/2;
+  const tileCY = r => r * TILE + TILE/2;
+  const ENTRANCE = { x: W/2, y: H + 14 };
+
+  let cash = START_CASH, selected = TYPES[0].id, running = false, timeLeft = GAME_SECONDS, lastT = 0, hiScore = 0, bestCash = 0;
+  let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  let tourists = [], floats = [], spawnAcc = 0, t0 = 0;
+
+  function init() {
+    cash = START_CASH;
+    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null)); // {type,level}
+    selected = TYPES[0].id;
+    running = true; timeLeft = GAME_SECONDS;
+    tourists = []; floats = []; spawnAcc = 0; t0 = 0;
+    lastT = performance.now();
+    buildShop();
+    endOverlay.style.display = 'none';
+    renderHud();
+    requestAnimationFrame(loop);
+  }
+
+  function buildShop() {
+    shop.innerHTML = '';
+    TYPES.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'item'; el.dataset.id = t.id;
+      el.innerHTML = `<span class="ic">${t.emoji}</span><span class="nm">${t.name}</span><span class="pr">${fmt(t.cost)}</span>`;
+      el.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        el.classList.add('dragging');
+        flashHint(`${t.name}: ${fmt(t.cost)}. Drag onto the sand. Pays ${fmt(t.payout)}/visitor.`);
+        startDrag(t.id, e.clientX, e.clientY);
+      });
+      shop.appendChild(el);
+    });
+    renderShop();
+  }
+
+  function attractions() {
+    const a = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+      if (grid[r][c]) a.push({ r, c, p: grid[r][c] });
+    return a;
+  }
+  function totalDraw() { return attractions().reduce((s, a) => s + typeById(a.p.type).draw * a.p.level, 0); }
+  function upgradeCost(p) { return Math.floor(typeById(p.type).cost * p.level * 0.85); }
+
+  // ---- input ----
+  function canvasToTile(clientX, clientY) {
+    const rect = cv.getBoundingClientRect();
+    const x = (clientX - rect.left) * (W / rect.width);
+    const y = (clientY - rect.top) * (H / rect.height);
+    return { c: Math.floor(x / TILE), r: Math.floor(y / TILE), x, y };
+  }
+  // Build the selected ride on an empty tile, or upgrade an existing one.
+  function placeAt(c, r) {
+    if (!running) return false;
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+    if (r < OCEAN_ROWS) { flashHint("Can't build in the ocean. Tourists hate swimming for a corndog."); return false; }
+    const cell = grid[r][c];
+    if (!cell) {
+      const t = typeById(selected);
+      if (cash >= t.cost) { cash -= t.cost; grid[r][c] = { type: t.id, level: 1, bob: Math.random()*6 };
+        popText(tileCX(c), tileCY(r), 'NEW!', '#0A3161'); renderHud(); return true; }
+      flashHint(`Need ${fmt(t.cost)} for a ${t.name}. Sell more hot dogs first.`); return false;
+    } else {
+      const uc = upgradeCost(cell);
+      if (cash >= uc) { cash -= uc; cell.level++; popText(tileCX(c), tileCY(r), 'LV '+cell.level, '#C8102E'); renderHud();
+        flashHint(`${typeById(cell.type).name} upgraded to Lv ${cell.level}.`); return true; }
+      flashHint(`Upgrade costs ${fmt(uc)}. So close.`); return false;
+    }
+  }
+
+  // status for a tile while dragging: 'build' (green), 'upgrade' (blue), 'no' (red)
+  function tileStatus(c, r) {
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS || r < OCEAN_ROWS) return 'no';
+    const cell = grid[r][c];
+    if (!cell) return cash >= typeById(selected).cost ? 'build' : 'no';
+    return cash >= upgradeCost(cell) ? 'upgrade' : 'no';
+  }
+
+  // ---- unified pointer input: drag rides from the tray, or tap the canvas ----
+  const ghost = document.getElementById('dragGhost');
+  let drag = null;       // { type } while dragging from the tray
+  let tapInfo = null;    // { x0, y0, moved } while a canvas press is in progress
+  let hoverTile = null;  // {c,r,status} shown as a preview during drag
+
+  function startDrag(typeId, clientX, clientY) {
+    selected = typeId; renderShop();
+    drag = { type: typeId };
+    ghost.textContent = typeById(typeId).emoji;
+    ghost.style.display = 'block';
+    moveGhost(clientX, clientY);
+  }
+  function moveGhost(x, y) { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; }
+  function tileAt(clientX, clientY) {
+    const rect = cv.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+    const t = canvasToTile(clientX, clientY); return { c: t.c, r: t.r };
+  }
+
+  window.addEventListener('pointermove', e => {
+    if (drag) {
+      moveGhost(e.clientX, e.clientY);
+      const t = tileAt(e.clientX, e.clientY);
+      hoverTile = t ? { c: t.c, r: t.r, status: tileStatus(t.c, t.r) } : null;
+    } else if (tapInfo) {
+      if (Math.abs(e.clientX - tapInfo.x0) > 8 || Math.abs(e.clientY - tapInfo.y0) > 8) tapInfo.moved = true;
+    }
+  });
+  window.addEventListener('pointerup', e => {
+    if (drag) {
+      const t = tileAt(e.clientX, e.clientY);
+      if (t) placeAt(t.c, t.r);
+      ghost.style.display = 'none';
+      [...shop.children].forEach(el => el.classList.remove('dragging'));
+      drag = null; hoverTile = null;
+    } else if (tapInfo) {
+      if (!tapInfo.moved) { const tl = canvasToTile(e.clientX, e.clientY); placeAt(tl.c, tl.r); }
+      tapInfo = null;
+    }
+  });
+  window.addEventListener('pointercancel', () => {
+    if (drag) { ghost.style.display = 'none'; [...shop.children].forEach(el => el.classList.remove('dragging')); }
+    drag = null; hoverTile = null; tapInfo = null;
+  });
+  // canvas press = potential tap-to-build/upgrade (only if it doesn't turn into a scroll/drag)
+  cv.addEventListener('pointerdown', e => { if (drag) return; tapInfo = { x0: e.clientX, y0: e.clientY, moved: false }; });
+
+  // ---- tourists ----
+  function spawnTourist() {
+    const list = attractions();
+    if (!list.length || tourists.length >= MAX_TOURISTS) return;
+    // weighted pick by draw
+    let total = 0; for (const a of list) total += typeById(a.p.type).draw * a.p.level;
+    let roll = Math.random() * total, target = list[0];
+    for (const a of list) { roll -= typeById(a.p.type).draw * a.p.level; if (roll <= 0) { target = a; break; } }
+    tourists.push({
+      x: ENTRANCE.x + (Math.random()*40-20), y: ENTRANCE.y,
+      tx: tileCX(target.c) + (Math.random()*26-13), ty: tileCY(target.r) + (Math.random()*26-13),
+      target, state: 'toRide', paid: false, t: Math.random()*Math.PI*2,
+      face: PEOPLE[Math.floor(Math.random()*PEOPLE.length)],
+      size: 15 + Math.random()*4, lastX: ENTRANCE.x,
+    });
+  }
+  function popText(x, y, txt, col) { floats.push({ x, y, txt, col, life: 1 }); }
+
+  function stepTourists(dt) {
+    const speed = TOURIST_SPEED;
+    for (let i = tourists.length - 1; i >= 0; i--) {
+      const u = tourists[i];
+      u.t += dt * 8;
+      let gx, gy;
+      if (u.state === 'toRide') { gx = u.tx; gy = u.ty; } else { gx = u.exitX; gy = u.exitY; }
+      const dx = gx - u.x, dy = gy - u.y, d = Math.hypot(dx, dy) || 1;
+      u.dir = dx < -0.5 ? -1 : (dx > 0.5 ? 1 : (u.dir || 1));
+      const mv = speed * dt;
+      if (d <= mv) {
+        u.x = gx; u.y = gy;
+        if (u.state === 'toRide') {
+          // pay out (ride may have been there; if removed, still pay base)
+          const a = u.target; const cell = grid[a.r] && grid[a.r][a.c];
+          const pay = cell ? typeById(cell.type).payout * cell.level : 0;
+          if (pay > 0) { cash += pay; popText(tileCX(a.c), tileCY(a.r) - 6, '+' + fmt(pay), '#1a7a36'); }
+          u.state = 'leaving';
+          u.exitX = (Math.random() < 0.5 ? -20 : W + 20); u.exitY = H + 20;
+        } else { tourists.splice(i, 1); }
+      } else { u.x += dx / d * mv; u.y += dy / d * mv; }
+    }
+  }
+
+  function stepFloats(dt) {
+    for (let i = floats.length - 1; i >= 0; i--) {
+      const f = floats[i]; f.y -= 26 * dt; f.life -= dt * 1.1;
+      if (f.life <= 0) floats.splice(i, 1);
+    }
+  }
+
+  // ---- draw ----
+  function draw(now) {
+    // sea
+    const seaH = OCEAN_ROWS * TILE;
+    ctx.fillStyle = '#2E86C1'; ctx.fillRect(0, 0, W, seaH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+    for (let k = 0; k < 4; k++) {
+      ctx.beginPath();
+      const yy = 14 + k * 14;
+      for (let x = 0; x <= W; x += 8) ctx.lineTo(x, yy + Math.sin((x + now/260 + k*30) / 22) * 3);
+      ctx.stroke();
+    }
+    // sand
+    ctx.fillStyle = '#F2D49B'; ctx.fillRect(0, seaH, W, H - seaH);
+    // wet sand line + boardwalk planks on first sand row
+    ctx.fillStyle = '#E7C079'; ctx.fillRect(0, seaH, W, 10);
+    ctx.fillStyle = '#D9A441';
+    for (let c = 0; c < COLS; c++) { ctx.fillRect(c*TILE+2, seaH+12, TILE-4, 6); }
+    // faint tile lines on sand
+    ctx.strokeStyle = 'rgba(10,49,97,0.07)'; ctx.lineWidth = 1;
+    for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c*TILE, seaH); ctx.lineTo(c*TILE, H); ctx.stroke(); }
+    for (let r = OCEAN_ROWS; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*TILE); ctx.lineTo(W, r*TILE); ctx.stroke(); }
+
+    // drag drop-target preview
+    if (drag && hoverTile) {
+      const { c, r, status } = hoverTile;
+      const fill = status === 'no' ? 'rgba(200,16,46,0.30)' : status === 'upgrade' ? 'rgba(10,49,97,0.28)' : 'rgba(26,122,54,0.32)';
+      const stroke = status === 'no' ? '#C8102E' : status === 'upgrade' ? '#0A3161' : '#1a7a36';
+      ctx.fillStyle = fill; ctx.fillRect(c*TILE+2, r*TILE+2, TILE-4, TILE-4);
+      ctx.strokeStyle = stroke; ctx.lineWidth = 3; ctx.strokeRect(c*TILE+2, r*TILE+2, TILE-4, TILE-4);
+      if (status !== 'no') {
+        ctx.globalAlpha = 0.5; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = (TILE*0.42|0) + 'px serif';
+        ctx.fillText(typeById(selected).emoji, tileCX(c), tileCY(r));
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // attractions
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const a of attractions()) {
+      const x = tileCX(a.c), y = tileCY(a.r), p = a.p;
+      const bob = Math.sin(now/300 + (p.bob||0)) * 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath(); ctx.ellipse(x, y + TILE*0.32, TILE*0.28, TILE*0.1, 0, 0, Math.PI*2); ctx.fill();
+      // platform
+      ctx.fillStyle = (p.level > 1) ? '#C8102E' : '#FFFFFF';
+      roundRect(x - TILE*0.34, y - TILE*0.30 + bob, TILE*0.68, TILE*0.60, 7); ctx.fill();
+      ctx.strokeStyle = '#0A3161'; ctx.lineWidth = 2; roundRect(x - TILE*0.34, y - TILE*0.30 + bob, TILE*0.68, TILE*0.60, 7); ctx.stroke();
+      ctx.font = (TILE*0.42|0) + 'px serif';
+      ctx.fillText(typeById(p.type).emoji, x, y + bob);
+      if (p.level > 1) {
+        ctx.font = 'bold 11px system-ui'; ctx.fillStyle = '#FFFFFF';
+        ctx.fillText('L' + p.level, x + TILE*0.22, y - TILE*0.20 + bob);
+      }
+    }
+    // tourists (little beachgoers)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    for (const u of tourists) {
+      const wob = Math.abs(Math.sin(u.t)) * 2.4;     // bouncy walking step
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath(); ctx.ellipse(u.x, u.y + 2, u.size*0.26, u.size*0.11, 0, 0, Math.PI*2); ctx.fill();
+      ctx.font = (u.size|0) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",serif';
+      ctx.save();
+      ctx.translate(u.x, u.y - wob);
+      if ((u.dir || 1) < 0) ctx.scale(-1, 1);
+      ctx.fillText(u.face, 0, 0);
+      ctx.restore();
+    }
+    ctx.textBaseline = 'middle';
+    // floating money
+    ctx.textAlign = 'center';
+    for (const f of floats) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = f.col;
+      ctx.fillText(f.txt, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+    // entrance marker
+    ctx.fillStyle = '#0A3161'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('▲ ENTRANCE ▲', W/2, H - 6);
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+  }
+
+  function renderHud() {
+    cashV.textContent = fmt(cash);
+    crowdV.textContent = tourists ? tourists.length : 0;
+    timerV.textContent = Math.ceil(timeLeft);
+  }
+  function renderShop() {
+    [...shop.children].forEach(el => {
+      const t = typeById(el.dataset.id);
+      el.classList.toggle('sel', el.dataset.id === selected);
+      el.classList.toggle('broke', cash < t.cost);
+    });
+  }
+  let hintTimer;
+  function flashHint(msg) { hint.textContent = msg; clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hint.textContent = 'Tap the sand to build. Tap a ride to upgrade it.'; }, 2600); }
+
+  // Score normalization: final cash is large & continuous (can reach tens of thousands),
+  // so scale it down so a great run (~20k cash) ≈ 1000 and a weak run = low hundreds.
+  // posted = round(cash * SCORE_SCALE). On-screen $ readout is unaffected.
+  const SCORE_SCALE = 0.05;
+  function postHi(s) { window.parent.postMessage({ highScore: Math.floor(s) || 0 }, '*'); }
+  function endGame() {
+    running = false;
+    const score = Math.round(cash * SCORE_SCALE);
+    if (score > hiScore) hiScore = score;
+    if (cash > bestCash) bestCash = cash;
+    postHi(hiScore);
+    document.getElementById('endCash').textContent = fmt(cash);
+    document.getElementById('endMsg').textContent =
+      endLines[Math.floor(Math.random()*endLines.length)] + `  (Best: ${fmt(bestCash)})`;
+    endOverlay.style.display = 'flex';
+  }
+
+  let hudAcc = 0;
+  function loop(now) {
+    if (!running) return;
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    timeLeft -= dt;
+    // spawn pacing scales with how much draw the park has
+    const drawAmt = totalDraw();
+    if (drawAmt > 0) {
+      const interval = Math.max(0.03, 0.85 / (1 + drawAmt * 0.16));
+      spawnAcc += dt;
+      while (spawnAcc >= interval) { spawnAcc -= interval; spawnTourist(); }
+    }
+    stepTourists(dt); stepFloats(dt);
+    draw(now);
+    hudAcc += dt; if (hudAcc >= 0.1) { renderHud(); renderShop(); hudAcc = 0; }
+    if (timeLeft <= 0) { timeLeft = 0; renderHud(); draw(now); endGame(); return; }
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', () => { startOverlay.style.display = 'none'; init(); });
+  document.getElementById('restartBtn').addEventListener('click', init);
+  addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (startOverlay.style.display !== 'none') document.getElementById('startBtn').click();
+      else if (endOverlay.style.display === 'flex') document.getElementById('restartBtn').click();
+    }
+  });
+
+  // initial idle frame on canvas behind start overlay
+  draw(0);
+})();
+</script>
+</body>
+</html>

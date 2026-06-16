@@ -106,6 +106,12 @@
   const AI_NAMES    = ['__ENEMY_NAME__ 1', '__ENEMY_NAME__ 2', '__ENEMY_NAME__ 3'];
   // (Customize AI names — or replace with specific names like 'Bob', 'Carol', 'Dave')
   const GAME_OVER_SCORE = 100; // first player to reach this triggers final scoring
+  // SCORE_SCALE: skill metric (RAW) = how few points you collected (lower is
+  // better in Hearts). Raw "headroom" = GAME_OVER_SCORE - your total, spanning
+  // 0..100. SCORE_SCALE normalizes so a flawless game (0 points taken) ≈ 1000
+  // and a mediocre finish lands in the low hundreds. No fixed ceiling everyone
+  // ties at. postHi applies the scale; pass it the RAW headroom.
+  const SCORE_SCALE = 10;  // tuned so a great run ≈ 1000
   const WIN_MSG  = PLAYER_NAME + ' had the lowest score. Utterly ruthless.';
   const LOSE_MSG = PLAYER_NAME + ' collected too many hearts. Oops.';
   // ==================================
@@ -127,7 +133,11 @@
 
   let hands, totalScores, roundScores, trickCards, trickLeader;
   let phase, roundNum, heartsBroken, passSelection, currentPlayer, aiDelay;
-  let hiScore = null;
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
 
   const NAMES = [PLAYER_NAME, ...AI_NAMES];
   function nameOf(i) { return NAMES[i] || 'P'+(i+1); }
@@ -147,25 +157,19 @@
     // find who has 2♣
     trickLeader = hands.findIndex(h => h.some(c => c.r==='2'&&c.s==='♣'));
     currentPlayer = trickLeader;
-    const passDir = [1,3,2,0][(roundNum-1)%4]; // left, right, across, hold
-    if (passDir === 0) { phase = 'play'; startTrick(); }
+    const passDir = passTarget();
+    if (passDir === 0) { phase = 'play'; renderAll(); startTrick(); }
     else { phase = 'pass'; passBtn.style.display = ''; renderAll(); }
   }
 
-  function passTarget() { return [1,3,2,0][(roundNum-1)%4]; }
+  function passTarget() { return [1,3,2,0][(roundNum-1)%4]; } // left, right, across, hold
 
   function doPass() {
     if (passSelection.length !== 3) return;
-    const target = passTarget();
-    // AI pass: give away highest-point cards
-    for (let p = 1; p <= 3; p++) {
-      const from = p, to = (p + target - 1) % 4 + (target>0?0:0);
-      // simplified: each AI passes 3 highest-value cards
-    }
-    // Circular pass
-    const buffers = hands.map(h => [...h]);
+    // Collect each player's 3 cards BEFORE mutating any hand, so card references
+    // stay valid (mutating hands[p] mid-loop would corrupt later lookups).
     const passCards = hands.map((h,p) => {
-      if (p === 0) return passSelection.map(c => hands[0].find(x=>x===c));
+      if (p === 0) return passSelection.slice();
       return aiChoosePass(p, h);
     });
     for (let p = 0; p < 4; p++) {
@@ -174,15 +178,25 @@
         const idx = hands[p].indexOf(c); if (idx>=0) hands[p].splice(idx,1);
         hands[to].push(c);
       }
-      hands[p] = sortHand(hands[p]);
     }
+    for (let p = 0; p < 4; p++) hands[p] = sortHand(hands[p]);
+    // recompute who leads — the holder of 2♣ may have changed during the pass
+    trickLeader = hands.findIndex(h => h.some(c => c.r==='2'&&c.s==='♣'));
+    currentPlayer = trickLeader;
     passSelection = []; passBtn.style.display = 'none';
-    phase = 'play'; startTrick(); renderAll();
+    phase = 'play'; renderAll(); startTrick();
   }
 
+  // Cutthroat pass: dump the Queen of Spades, high spades that could catch her,
+  // then the highest hearts. These three play to hurt.
   function aiChoosePass(p, hand) {
-    const sorted = [...hand].sort((a,b)=>pointsOf(b)-pointsOf(a)||RV[b.r]-RV[a.r]);
-    return sorted.slice(0,3);
+    const score = c => {
+      if (isQueenSpades(c)) return 1000;
+      if (c.s === '♠' && (c.r === 'A' || c.r === 'K')) return 900 + RV[c.r];
+      if (isHeart(c)) return 100 + RV[c.r];
+      return RV[c.r];
+    };
+    return [...hand].sort((a,b)=>score(b)-score(a)).slice(0,3);
   }
 
   function startTrick() {
@@ -194,27 +208,27 @@
 
   function canPlay(card, playerIdx) {
     const h = hands[playerIdx];
-    if (!trickCards.some(c=>c)) {
-      // leading: can't lead hearts until broken (unless only hearts left)
+    const trickEmpty = !trickCards.some(c=>c);
+    const isFirstTrick = roundScores.every(s=>s===0) && totalTaken()===0;
+    if (trickEmpty) {
+      // first trick of round must open with 2♣
+      if (isFirstTrick) return card.r==='2' && card.s==='♣';
+      // can't lead hearts until broken (unless only hearts left)
       if (!heartsBroken && isHeart(card) && h.some(c=>!isHeart(c))) return false;
-      // first trick: must play 2♣
-      if (roundScores.every(s=>s===0) && trickCards.every(c=>!c)) {
-        if (!(card.r==='2' && card.s==='♣')) return false;
-      }
       return true;
     }
     const ledSuit = trickCards.find(c=>c)?.s;
-    if (card.s === ledSuit) return true;
-    if (h.some(c=>c.s===ledSuit)) return false; // must follow suit
-    // can't play hearts on first trick (if have other cards)
-    if (roundScores.every(s=>s===0) && trickCards.some(c=>c) && !h.some(c=>!isHeart(c)&&!isQueenSpades(c))) {
-      // only has hearts/queen: must play
-    } else if (roundScores.every(s=>s===0) && trickCards.some(c=>c)) {
-      if (isHeart(card) || isQueenSpades(card)) {
-        if (h.some(c=>!isHeart(c)&&!isQueenSpades(c))) return false;
-      }
+    if (h.some(c=>c.s===ledSuit)) return card.s===ledSuit; // must follow suit
+    // void in led suit: on first trick can't dump points unless forced
+    if (isFirstTrick && (isHeart(card)||isQueenSpades(card))) {
+      if (h.some(c=>!isHeart(c)&&!isQueenSpades(c))) return false;
     }
     return true;
+  }
+
+  function totalTaken() {
+    // number of cards already played out of hands this round
+    return 13 - hands[0].length - (trickCards[0]?1:0);
   }
 
   function playCard(playerIdx, card) {
@@ -246,20 +260,23 @@
     if (!valid.length) return h[0]; // fallback
     const led = trickCards.find(c=>c)?.s;
     if (!led) {
-      // leading: play lowest non-heart
+      // leading: prefer low non-point cards; lead spades to flush the Queen if we don't hold her
       const safe = valid.filter(c=>!isHeart(c)&&!isQueenSpades(c));
+      const lowSpades = safe.filter(c=>c.s==='♠' && RV[c.r] < RV['Q']);
+      const holdsQueen = h.some(isQueenSpades);
+      if (!holdsQueen && lowSpades.length) return lowSpades.sort((a,b)=>RV[a.r]-RV[b.r])[0];
       if (safe.length) return safe.sort((a,b)=>RV[a.r]-RV[b.r])[0];
       return valid.sort((a,b)=>RV[a.r]-RV[b.r])[0];
     }
-    // following: try not to win, dump points if can't follow
+    // following: duck just under the current winner, else bleed lowest
     const following = valid.filter(c=>c.s===led);
     if (following.length) {
       const top = trickCards.filter(c=>c&&c.s===led).sort((a,b)=>RV[b.r]-RV[a.r])[0];
       const under = following.filter(c=>RV[c.r]<RV[top.r]);
-      if (under.length) return under.sort((a,b)=>RV[b.r]-RV[a.r])[0]; // highest under
-      return following.sort((a,b)=>RV[a.r]-RV[b.r])[0]; // must win, play lowest
+      if (under.length) return under.sort((a,b)=>RV[b.r]-RV[a.r])[0]; // duck just under
+      return following.sort((a,b)=>RV[a.r]-RV[b.r])[0]; // forced to win, bleed lowest
     }
-    // can't follow: dump highest point card
+    // void: slam the Queen, then highest hearts, then highest junk
     const qs = valid.find(isQueenSpades);
     if (qs) return qs;
     const hearts = valid.filter(isHeart).sort((a,b)=>RV[b.r]-RV[a.r]);
@@ -279,31 +296,35 @@
     roundScores[winner] += pts;
     trickLeader = winner;
     trickCards = [null,null,null,null];
-    msgEl.textContent = nameOf(winner) + ' takes the trick' + (pts>0?` (+${pts}pts)`:'') + '.';
+    msgEl.textContent = nameOf(winner) + ' takes the trick' + (pts>0?` (+${pts})`:'') + '.';
+    renderAll();
     if (hands[0].length === 0) {
-      finishRound();
+      setTimeout(finishRound, 900);
     } else {
-      startTrick();
+      setTimeout(startTrick, 600);
     }
   }
 
   function finishRound() {
     // shoot the moon check
     const shooter = roundScores.findIndex(s=>s===26);
+    let moonMsg = '';
     if (shooter >= 0) {
       for (let i = 0; i < 4; i++) roundScores[i] = shooter===i ? 0 : 26;
+      moonMsg = nameOf(shooter) + ' shot the moon! Everyone else +26.';
     }
     for (let i = 0; i < 4; i++) totalScores[i] += roundScores[i];
     updateScoreChips();
     if (totalScores.some(s=>s>=GAME_OVER_SCORE)) { endGame(); return; }
-    setTimeout(newRound, 1500);
+    msgEl.textContent = (moonMsg || 'Round ' + roundNum + ' done.') + ' Dealing next hand...';
+    setTimeout(newRound, 1600);
   }
 
   function endGame() {
     const min = Math.min(...totalScores);
     const winner = totalScores.findIndex(s=>s===min);
     const youWon = winner === 0;
-    window.parent.postMessage({ highScore: GAME_OVER_SCORE - totalScores[0] }, '*');
+    postHi(Math.max(0, GAME_OVER_SCORE - totalScores[0]));  // RAW headroom; postHi applies SCORE_SCALE
     overTitle.textContent = youWon ? 'You win!' : nameOf(winner) + ' wins!';
     overMsg.textContent = youWon ? WIN_MSG : LOSE_MSG;
     overScores.textContent = NAMES.map((n,i)=>n+': '+totalScores[i]).join('  ·  ');

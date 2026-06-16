@@ -35,9 +35,8 @@
     border-radius: 8px; font-family: inherit; text-transform: uppercase;
   }
   .card button:hover { opacity: 0.88; }
-@media (pointer: fine) {
-  #controls { display: none !important; }
-}
+#controls { display: none; }
+body.touch #controls { display: flex; }
 </style>
 </head>
 <body>
@@ -106,10 +105,14 @@
   const NEAR_Y = H - 64;
 
   let _hi = 0;
-  function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
-  }
+  const SCORE_SCALE = 100;   // tuned so a great run ≈ 1000 (full 10-cup clear)
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // Reveal the on-screen controls only once the player touches the screen.
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
   let cups, aimX, power, charging, phase, ball, timer, thrower, splashes, lights;
 
@@ -221,7 +224,7 @@
     const sunk = 10 - alive('ai').length;
     overTitle.textContent = won ? 'You win!' : AI_NAME + ' wins';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
-    if (sunk > _hi) postHi(sunk);
+    postHi(sunk);
     overlay.style.display = 'flex';
   }
 
@@ -352,6 +355,7 @@
 
   document.getElementById('start-btn').addEventListener('click', () => {
     startOverlay.style.display = 'none';
+    grabFocus();
     reset(); requestAnimationFrame(loop);
   });
   document.getElementById('restart').addEventListener('click', reset);

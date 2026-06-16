@@ -145,7 +145,7 @@ Reload the extension in `chrome://extensions`.
 
 Two pieces: a thin Chrome extension that loads today's game in an iframe, and a Cloudflare Worker that serves the games, renders the web UI, and tracks scores.
 
-**Daily rotation.** Both sides compute today's game from the same deterministic algorithm — `index = ((day % games.length) + games.length) % games.length` where `day = floor((Date.now() - Date.UTC(2026, 4, 1)) / 86_400_000)`. No round-trip needed, they always agree.
+**Daily rotation.** Both sides compute today's game from the same deterministic algorithm: index into the explicit `schedule` list in `games.json` (game ids in air order) anchored at `scheduleEpoch` — `schedule[((offset % L) + L) % L]` where `offset = dayNumber(today) - dayNumber(scheduleEpoch)`. An append-only schedule (rather than `day % games.length`) means adding a game only appends a future slot, so the current cycle never reshuffles. No round-trip needed, they always agree.
 
 **Score flow.** Game → `postMessage({ highScore: int })` → extension/web player → `POST /api/plays` → Cloudflare D1. The API returns `{ id, rank }` so the player sees their leaderboard position.
 

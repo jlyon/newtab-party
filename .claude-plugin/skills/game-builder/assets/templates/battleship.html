@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root{
+    --primary: __PRIMARY_COLOR__;     /* accent / hits / frame */
+    --secondary: __SECONDARY_COLOR__; /* "ship" timber tone */
+    --bg: __BACKGROUND_COLOR__;       /* page background */
+    /* derived theme shades — tweak to taste */
+    --primary-dark:#5e1410;
+    --secondary-dark:#3f2c1a;
+    --white:#f4efe6;
+    --water:#1c6b8c;
+    --water-hover:#2a86ab;
+    --water-miss:#123f56;
+    --bg2:#241d18;
+    --line:rgba(244,239,230,.20);
+    --ink:#f4efe6;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{touch-action:manipulation;margin:0;height:100%;}
+  body{
+    background:radial-gradient(circle at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink);
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    min-height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:14px 10px 30px;
+    user-select:none;-webkit-user-select:none;
+  }
+  h1{
+    font-size:clamp(28px,8vw,48px);
+    margin:.1em 0 0;
+    color:var(--white);
+    letter-spacing:3px;
+    text-shadow:0 0 18px rgba(0,0,0,.55), 0 2px 0 rgba(0,0,0,.5);
+    font-weight:800;
+  }
+  .tag{color:var(--primary);font-weight:bold;font-size:clamp(11px,3.2vw,14px);letter-spacing:2px;margin-bottom:6px;}
+  #status{
+    min-height:1.4em;font-size:clamp(14px,4vw,18px);font-weight:bold;
+    text-align:center;margin:10px 0;max-width:680px;
+  }
+  .boards{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;margin-top:4px;}
+  .panel{display:flex;flex-direction:column;align-items:center;}
+  .panel h2{font-size:clamp(12px,3.4vw,15px);margin:0 0 6px;color:var(--primary);letter-spacing:1.5px;}
+  .panel small{color:rgba(234,246,248,.55);font-size:11px;height:14px;margin-top:4px;}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(10, 1fr);
+    grid-template-rows:repeat(10, 1fr);
+    width:min(330px, 92vw);
+    aspect-ratio:1/1;
+    gap:2px;
+    background:var(--line);
+    border:2px solid var(--primary);
+    border-radius:6px;
+    padding:2px;
+  }
+  .cell{
+    background:var(--water);
+    border-radius:3px;
+    aspect-ratio:1/1;
+    min-width:0;min-height:0;
+    overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(10px,2.8vw,16px);
+    font-weight:bold;line-height:1;
+    cursor:default;position:relative;
+    transition:background .08s;
+    color:#fff;
+  }
+  .cell svg{width:64%;height:64%;display:block;pointer-events:none;}
+  .enemy .cell{cursor:crosshair;}
+  .enemy .cell:not(.hit):not(.miss):not(.sunk):hover{background:var(--water-hover);}
+  .cell.ship{background:var(--secondary);box-shadow:inset 0 0 0 1px var(--secondary-dark);}
+  .cell.hit{background:var(--primary);}
+  .cell.miss{background:var(--water-miss);}
+  .cell.sunk{background:var(--primary-dark);}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:16px 0 4px;}
+  .btn{
+    background:var(--bg2);color:var(--primary);
+    border:2px solid var(--primary);border-radius:8px;
+    font:inherit;font-weight:bold;letter-spacing:.5px;
+    padding:11px 18px;min-height:48px;cursor:pointer;
+    user-select:none;-webkit-touch-callout:none;
+  }
+  .btn:active,.btn.held{background:var(--primary);color:var(--bg);}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn.primary:active{background:#e0503f;}
+  .fleet{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;max-width:380px;}
+  .ship-chip{font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);color:rgba(234,246,248,.8);letter-spacing:.5px;}
+  .ship-chip.dead{text-decoration:line-through;color:var(--primary);border-color:var(--primary);}
+  .overlay{
+    position:absolute;inset:0;min-height:100%;
+    background:rgba(6,22,27,.93);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px;z-index:10;border-radius:10px;
+  }
+  .overlay h1{margin-bottom:4px;}
+  .overlay p{max-width:440px;font-size:clamp(14px,4vw,17px);line-height:1.55;color:var(--ink);}
+  .overlay .big{font-size:clamp(24px,7vw,36px);color:var(--primary);font-weight:800;margin:6px 0;}
+  .best{color:var(--primary);font-weight:bold;margin-top:2px;font-size:13px;}
+  .wrap{position:relative;z-index:1;width:100%;max-width:760px;display:flex;flex-direction:column;align-items:center;min-height:440px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <!-- ── GAME-SPECIFIC SECTION — header / flavor copy ── -->
+  <div class="tag">~ __GAME_NAME__ · 10 x 10 ~</div>
+  <h1>__GAME_NAME__</h1>
+  <div id="status">Plot yer fire, __PLAYER_NAME__.</div>
+  <!-- ── END GAME-SPECIFIC SECTION ── -->
+
+  <div class="boards">
+    <div class="panel">
+      <h2>ENEMY WATERS</h2>
+      <div class="grid enemy" id="enemyGrid"></div>
+      <small id="enemyHint">Tap to fire</small>
+    </div>
+    <div class="panel">
+      <h2>YOUR FLEET</h2>
+      <div class="grid own" id="ownGrid"></div>
+      <small id="ownHint"></small>
+    </div>
+  </div>
+
+  <div class="fleet" id="enemyFleet"></div>
+
+  <div class="controls" id="setupControls">
+    <button class="btn" id="reroll">Re-roll fleet</button>
+    <button class="btn primary" id="setsail">Start!</button>
+  </div>
+  <div class="controls" id="battleControls" style="display:none;">
+    <button class="btn" id="surrender">New game</button>
+  </div>
+
+  <!-- ── GAME-SPECIFIC SECTION — start screen copy ── -->
+  <div class="overlay" id="startOverlay">
+    <div class="tag">a game of</div>
+    <h1>__GAME_NAME__</h1>
+    <p>Sink the enemy fleet before they sink yours. Tap squares in <b>Enemy Waters</b> to fire. Sink all 5 ships to win. Fewer shots = higher score.</p>
+    <div class="best" id="startBest"></div>
+    <div class="controls"><button class="btn primary" id="playBtn">Play</button></div>
+    <p style="font-size:12px;color:rgba(234,246,248,.5)">Tap / click to fire · Enter to restart</p>
+  </div>
+  <!-- ── END GAME-SPECIFIC SECTION ── -->
+
+  <div class="overlay" id="overOverlay" style="display:none;">
+    <div class="big" id="overTitle"></div>
+    <p id="overMsg"></p>
+    <div class="big" id="overScore" style="font-size:clamp(18px,5vw,24px)"></div>
+    <div class="best" id="overBest"></div>
+    <div class="controls"><button class="btn primary" id="againBtn">Play again</button></div>
+    <p style="font-size:12px;color:rgba(234,246,248,.5)">Press Enter</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const N = 10;
+
+  /* ── GAME-SPECIFIC SECTION — fleet, marker SVGs, win/lose copy ──────────────────────
+     SHIPS: the fleet. Sizes 5/4/3/3/2 is the classic spread (17 cells total). Keep them
+            <= N and the total well under the board area so random placement succeeds.
+     ICON_*: inline SVGs drawn in each cell for a miss / hit / sunk. Swap freely.
+     WIN_MSG / LOSE_MSG: end-screen flavor. Use {shots} for the player's shot count.
+  */
+  const SHIPS = [
+    {name:"Carrier",    size:5},
+    {name:"Battleship", size:4},
+    {name:"Cruiser",    size:3},
+    {name:"Submarine",  size:3},
+    {name:"Destroyer",  size:2},
+  ];
+
+  const ICON_MISS = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="#f4efe6"/><circle cx="12" cy="12" r="7" fill="none" stroke="#f4efe6" stroke-width="1.4" opacity="0.45"/></svg>';
+  const ICON_HIT  = '<svg viewBox="0 0 24 24"><path d="M12 1l2.3 6.4L20 4.4l-2.6 5.9L24 12l-6.6 1.7L20 19.6l-5.7-2.6L12 23l-2.3-6L4 19.6l2.6-5.9L0 12l6.6-1.7L4 4.4l5.7 2.6z" fill="#f4efe6"/><circle cx="12" cy="12" r="3" fill="#5e1410"/></svg>';
+  const ICON_SUNK = '<svg viewBox="0 0 24 24"><path d="M12 2C7 2 4 5.5 4 9.8c0 2.6 1.3 4.5 3 5.7V18a2 2 0 0 0 2 2h.6v-2.2h1.1V20h2.6v-2.2h1.1V20H15a2 2 0 0 0 2-2v-2.5c1.7-1.2 3-3.1 3-5.7C20 5.5 17 2 12 2zM8.7 11.4a1.8 1.8 0 1 1 0-3.6 1.8 1.8 0 0 1 0 3.6zm6.6 0a1.8 1.8 0 1 1 0-3.6 1.8 1.8 0 0 1 0 3.6zM12 12.4l1.3 2.6h-2.6L12 12.4z" fill="#f4efe6"/></svg>';
+
+  const WIN_MSG  = 'You sank their whole fleet in {shots} shots. The win be yours!';
+  const LOSE_MSG = 'Your fleet sleeps with the fishes. Better luck next time.';
+  const WIN_TITLE = 'VICTORY!';
+  const LOSE_TITLE = 'SUNK!';
+  const BEST_KEY = '__GAME_NAME___best';   // localStorage key for local best
+  /* ── END GAME-SPECIFIC SECTION ── */
+
+  const enemyGrid = document.getElementById('enemyGrid');
+  const ownGrid   = document.getElementById('ownGrid');
+  const statusEl  = document.getElementById('status');
+
+  let player, enemy;
+  let phase = "setup";
+  let busy = false;
+  let playerShots = 0;
+
+  function getBest(){ try{ return parseInt(localStorage.getItem(BEST_KEY)||'0',10)||0; }catch(e){ return 0; } }
+  function setBest(v){ try{ localStorage.setItem(BEST_KEY, String(v)); }catch(e){} }
+
+  // ===== SCORING =====
+  // Single match: score = a continuous EFFICIENCY metric so wins don't tie at a flat value.
+  //   posted = round(SCORE_SCALE * totalShipCells / max(shots, totalShipCells))
+  // A perfect game (every shot a hit, shots == cells) ≈ SCORE_SCALE; each wasted shot drops
+  // it smoothly. With the default 5-ship fleet (17 cells), SCORE_SCALE = 1000 makes a perfect
+  // game ≈ 1000 and a typical sloppy win lands in the mid-hundreds. Losing posts nothing.
+  const SCORE_SCALE = 1000;
+  let _hi = 0;
+  function postHi(raw){ const n=Math.round((Number(raw)||0)); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
+  function makeBoard(){
+    return {
+      ships:[],
+      occupied:Array.from({length:N},()=>Array(N).fill(null)),
+      shotsAt:Array.from({length:N},()=>Array(N).fill(false)),
+    };
+  }
+  function inBounds(r,c){ return r>=0&&r<N&&c>=0&&c<N; }
+
+  function placeFleet(board){
+    board.ships=[];
+    board.occupied=Array.from({length:N},()=>Array(N).fill(null));
+    for(const def of SHIPS){
+      let placed=false, guard=0;
+      while(!placed && guard++<2000){
+        const horiz = Math.random()<0.5;
+        const r = Math.floor(Math.random()*N);
+        const c = Math.floor(Math.random()*N);
+        const cells=[]; let ok=true;
+        for(let i=0;i<def.size;i++){
+          const rr = r + (horiz?0:i);
+          const cc = c + (horiz?i:0);
+          if(!inBounds(rr,cc) || board.occupied[rr][cc]){ ok=false; break; }
+          cells.push({r:rr,c:cc});
+        }
+        if(!ok) continue;
+        const ship={name:def.name,size:def.size,cells,hits:new Set()};
+        cells.forEach(({r,c})=>{ board.occupied[r][c]=ship; });
+        board.ships.push(ship);
+        placed=true;
+      }
+    }
+  }
+
+  function buildGridDOM(el, isEnemy){
+    el.innerHTML='';
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      const d=document.createElement('div');
+      d.className='cell';
+      d.dataset.r=r; d.dataset.c=c;
+      if(isEnemy) d.addEventListener('click', ()=>onFire(r,c));
+      el.appendChild(d);
+    }
+  }
+  function cellAt(el,r,c){ return el.children[r*N+c]; }
+
+  function renderOwn(){
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      const cell=cellAt(ownGrid,r,c);
+      cell.className='cell'; cell.innerHTML='';
+      const ship=player.occupied[r][c];
+      if(ship) cell.classList.add('ship');
+      if(player.shotsAt[r][c]){
+        if(ship){
+          const sunk=ship.hits.size===ship.size;
+          cell.classList.remove('ship');
+          cell.classList.add(sunk?'sunk':'hit');
+          cell.innerHTML=sunk?ICON_SUNK:ICON_HIT;
+        } else { cell.classList.add('miss'); cell.innerHTML=ICON_MISS; }
+      }
+    }
+  }
+
+  function renderEnemy(){
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      const cell=cellAt(enemyGrid,r,c);
+      cell.className='cell'; cell.innerHTML='';
+      if(phase==='over' && enemy.occupied[r][c] && !enemy.shotsAt[r][c]) cell.classList.add('ship');
+      if(enemy.shotsAt[r][c]){
+        const ship=enemy.occupied[r][c];
+        if(ship){
+          const sunk=ship.hits.size===ship.size;
+          cell.classList.add(sunk?'sunk':'hit');
+          cell.innerHTML=sunk?ICON_SUNK:ICON_HIT;
+        } else { cell.classList.add('miss'); cell.innerHTML=ICON_MISS; }
+      }
+    }
+  }
+
+  function renderFleet(){
+    const wrap=document.getElementById('enemyFleet');
+    wrap.innerHTML='';
+    enemy.ships.forEach(s=>{
+      const chip=document.createElement('span');
+      const dead=s.hits.size===s.size;
+      chip.className='ship-chip'+(dead?' dead':'');
+      chip.textContent=s.name+' ('+s.size+')';
+      wrap.appendChild(chip);
+    });
+  }
+
+  function onFire(r,c){
+    if(phase!=='battle' || busy) return;
+    if(enemy.shotsAt[r][c]) return;
+    enemy.shotsAt[r][c]=true;
+    playerShots++;
+    const ship=enemy.occupied[r][c];
+    if(ship){
+      ship.hits.add(r+','+c);
+      const sunk=ship.hits.size===ship.size;
+      setStatus(sunk?('You sank their '+ship.name+'!'):'Direct hit!');
+      renderEnemy(); renderFleet();
+      if(enemy.ships.every(s=>s.hits.size===s.size)){ endGame(true); return; }
+    } else {
+      setStatus('Splash! You missed.');
+      renderEnemy();
+    }
+    busy=true;
+    setTimeout(aiTurn, 600);
+  }
+
+  // ---- AI: hunt/target with parity search + line refinement ----
+  const ai = { targets:[], lastHits:[] };
+
+  function allUntried(){
+    const a=[];
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++) if(!player.shotsAt[r][c]) a.push({r,c});
+    return a;
+  }
+  function aiBestParityCell(){
+    const cands=[];
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(player.shotsAt[r][c]) continue;
+      if(((r+c)%2)===0) cands.push({r,c});
+    }
+    const pool = cands.length?cands:allUntried();
+    return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
+  }
+  function pushNeighbors(r,c){
+    const dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+    for(const d of dirs){
+      const rr=r+d[0], cc=c+d[1];
+      if(inBounds(rr,cc) && !player.shotsAt[rr][cc] && !ai.targets.some(t=>t.r===rr&&t.c===cc))
+        ai.targets.push({r:rr,c:cc});
+    }
+  }
+  function refineToLine(){
+    if(ai.lastHits.length<2) return;
+    const rs=new Set(ai.lastHits.map(h=>h.r));
+    const cs=new Set(ai.lastHits.map(h=>h.c));
+    let line=null;
+    if(rs.size===1){
+      const r=ai.lastHits[0].r;
+      const cols=ai.lastHits.map(h=>h.c);
+      line=[{r,c:Math.min(...cols)-1},{r,c:Math.max(...cols)+1}];
+    } else if(cs.size===1){
+      const c=ai.lastHits[0].c;
+      const rows=ai.lastHits.map(h=>h.r);
+      line=[{r:Math.min(...rows)-1,c},{r:Math.max(...rows)+1,c}];
+    }
+    if(line){
+      const valid=line.filter(t=>inBounds(t.r,t.c)&&!player.shotsAt[t.r][t.c]);
+      if(valid.length) ai.targets=valid;
+    }
+  }
+
+  function aiTurn(){
+    if(phase!=='battle'){ busy=false; return; }
+    let pick=null;
+    while(ai.targets.length && !pick){
+      const t=ai.targets.shift();
+      if(!player.shotsAt[t.r][t.c]) pick=t;
+    }
+    if(!pick) pick = aiBestParityCell();
+    if(!pick){ busy=false; return; }
+
+    const {r,c}=pick;
+    player.shotsAt[r][c]=true;
+    const ship=player.occupied[r][c];
+    if(ship){
+      ship.hits.add(r+','+c);
+      ai.lastHits.push({r,c});
+      const sunk=ship.hits.size===ship.size;
+      if(sunk){
+        setStatus('They sank your '+ship.name+'!');
+        ai.targets=[]; ai.lastHits=[];
+      } else {
+        setStatus('They hit your fleet!');
+        pushNeighbors(r,c);
+        refineToLine();
+      }
+      renderOwn();
+      if(player.ships.every(s=>s.hits.size===s.size)){ endGame(false); return; }
+    } else {
+      setStatus('Their shot splashes harmlessly. Your turn.');
+      renderOwn();
+    }
+    busy=false;
+  }
+
+  function setStatus(t){ statusEl.textContent=t; }
+
+  function newSetup(){
+    player=makeBoard(); enemy=makeBoard();
+    placeFleet(player); placeFleet(enemy);
+    ai.targets=[]; ai.lastHits=[];
+    playerShots=0; phase='setup'; busy=false;
+    buildGridDOM(enemyGrid,true);
+    buildGridDOM(ownGrid,false);
+    renderEnemy(); renderOwn(); renderFleet();
+    document.getElementById('setupControls').style.display='flex';
+    document.getElementById('battleControls').style.display='none';
+    document.getElementById('enemyHint').textContent='Locked till you start';
+    document.getElementById('ownHint').textContent='Re-roll for a new layout';
+    setStatus('Re-roll your fleet or start when ready.');
+  }
+
+  function startBattle(){
+    phase='battle';
+    document.getElementById('setupControls').style.display='none';
+    document.getElementById('battleControls').style.display='flex';
+    document.getElementById('enemyHint').textContent='Tap to fire';
+    document.getElementById('ownHint').textContent='Your waters';
+    setStatus('Fire when ready!');
+  }
+
+  function endGame(won){
+    phase='over'; busy=false;
+    renderEnemy(); renderOwn();
+    let score=0;
+    if(won){
+      const shipCells = SHIPS.reduce((s, sh) => s + sh.size, 0);   // total cells across the fleet
+      score = Math.round(SCORE_SCALE * shipCells / Math.max(playerShots, shipCells));
+      if(score>getBest()){ setBest(score); }
+      postHi(score);
+    }
+    document.getElementById('overTitle').textContent = won?WIN_TITLE:LOSE_TITLE;
+    document.getElementById('overMsg').textContent = won
+      ? WIN_MSG.replace('{shots}', playerShots)
+      : LOSE_MSG;
+    document.getElementById('overScore').textContent = won?('Score: '+score):'';
+    document.getElementById('overBest').textContent = 'Best: '+getBest();
+    document.getElementById('overOverlay').style.display='flex';
+  }
+
+  document.getElementById('reroll').addEventListener('click', ()=>{ if(phase==='setup'){ placeFleet(player); renderOwn(); setStatus('New layout, fresh start.'); }});
+  document.getElementById('setsail').addEventListener('click', ()=>{ if(phase==='setup') startBattle(); });
+  document.getElementById('surrender').addEventListener('click', ()=>{ newSetup(); });
+  document.getElementById('playBtn').addEventListener('click', ()=>{ document.getElementById('startOverlay').style.display='none'; newSetup(); });
+  document.getElementById('againBtn').addEventListener('click', ()=>{ document.getElementById('overOverlay').style.display='none'; newSetup(); });
+
+  document.addEventListener('keydown',(e)=>{
+    if(e.key!=='Enter') return;
+    if(document.getElementById('startOverlay').style.display!=='none'){ document.getElementById('playBtn').click(); }
+    else if(document.getElementById('overOverlay').style.display==='flex'){ document.getElementById('againBtn').click(); }
+    else if(phase==='setup'){ startBattle(); }
+  });
+
+  document.getElementById('startBest').textContent='Best score: '+getBest();
+  buildGridDOM(enemyGrid,true);
+  buildGridDOM(ownGrid,false);
+})();
+</script>
+</body>
+</html>

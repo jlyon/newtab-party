@@ -14,8 +14,8 @@
   #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(440px, 92vw); height: auto; display: block; }
-  #dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
-  @media (pointer: fine) { #dpad { display: none; } }
+  #dpad { display: none; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
+  body.touch #dpad { display: grid; }
   @media (pointer: coarse) { canvas { width: min(440px, 92vw, calc(100dvh - 200px)); } }
   .dp { width: 50px; height: 50px; font-size: 22px; border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
@@ -38,7 +38,7 @@
   <h1>HOGNOSE</h1>
   <div id="hud">
     <span>Snake: Hognose</span>
-    <span id="score">Caps: 0 / 25</span>
+    <span id="score">Caps: 0</span>
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="440" height="440"></canvas>
@@ -76,7 +76,7 @@
   const FOOD_NAME   = 'graduation cap';
   const GRID        = 20;
   const MOVE_MS     = 200;
-  const WIN_SCORE   = 25;
+  const WIN_SCORE   = 0;            // 0 = endless (fixed score ceilings hurt leaderboard fairness)
   const DIE_WALL_MSG  = 'Hognose smacked the wall and played dead. The wall did not call 911.';
   const DIE_SELF_MSG  = 'Hognose ate her own tail. She is now huffing dramatically about it.';
   const WIN_MSG       = 'DR. HOGNOSE, PhD. 25 caps collected. Diploma earned. Will huff for tenure.';
@@ -103,10 +103,16 @@
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() {
-    scoreEl.textContent = 'Caps: ' + score + ' / ' + WIN_SCORE;
+    scoreEl.textContent = 'Caps: ' + score;
     hiEl.textContent = 'Best: ' + hiScore;
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // Normalize caps eaten so a strong run (~30+ caps) posts ~1000.
+  const SCORE_SCALE = 30;
+  let _hi = 0;
+  function postHi(n) {
+    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
+    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+  }
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }
@@ -243,8 +249,13 @@
     setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
   });
 
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   function loop(now) { if (running) step(now); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); started = true; });
   reset();
   requestAnimationFrame(loop);
 })();

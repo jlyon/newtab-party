@@ -89,11 +89,17 @@
 </div>
 <script>
 (() => {
-  // High score reporting
+  // High score reporting.
+  // Skill metric (RAW) = matches earned, leftover patience, and clean play (few
+  // wasted moves / misses). Raw spread runs ~0..1800; SCORE_SCALE (0.56)
+  // normalizes so a near-perfect game (all 18 pairs, ~minimal moves, no misses,
+  // high patience) lands ≈ 1000, and a sloppy win sits in the low hundreds.
+  // No fixed ceiling everyone ties at. Integer; only a new best is posted.
+  const SCORE_SCALE = 0.56;  // tuned so a great run ≈ 1000
   let _hi = 0;
-  function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
   }
 
   const board = document.getElementById('board');
@@ -263,8 +269,9 @@
     ended = true;
     clearInterval(timer);
     const s = Math.floor((Date.now()-startTime)/1000);
-    const gameScore = Math.max(0, matches * 100 + Math.round(patience) - moves * 3 - misses * 10);
-    postHi(gameScore);
+    // Pass the RAW skill metric; postHi applies SCORE_SCALE. On-screen badges below unchanged.
+    const raw = Math.max(0, matches * 100 + Math.round(patience) - moves * 3 - misses * 10);
+    postHi(raw);
     overTitle.textContent = 'STUMPED!';
     overMsg.innerHTML = pick(YOU_WIN) + '<br><br>' +
       '<span class="badge">' + moves + ' moves</span> ' +

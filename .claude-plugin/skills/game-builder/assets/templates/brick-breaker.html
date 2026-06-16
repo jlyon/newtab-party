@@ -97,11 +97,24 @@
   const startOverlay = document.getElementById('start-overlay');
   document.getElementById('start-btn').addEventListener('click', () => {
     startOverlay.style.display = 'none';
-    reset(); requestAnimationFrame(loop);
+    grabFocus(); reset(); requestAnimationFrame(loop);
   });
   const css = getComputedStyle(document.documentElement);
   const PRIMARY = css.getPropertyValue('--primary').trim();
   const SECONDARY = css.getPropertyValue('--secondary').trim();
+
+  // High score reporting. Endless: when the board clears it refills, so score
+  // accumulates with no ceiling. SCORE_SCALE normalizes the posted value so a
+  // great multi-board run ≈ 1000; a typical decent run = low hundreds. Tune to
+  // your brick layout (here ~600 chips per board, great run ~1500).
+  let _hi = 0;
+  const SCORE_SCALE = 0.66;   // tuned so a great run (~1500) ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
+  // Keyboard self-focus so arrow keys / Space work without a manual click.
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
 
   // ===== GAME-SPECIFIC SECTION =====
   // Customize brick layout, ball speed, and flavor text.
@@ -158,6 +171,7 @@
     launched = true;
   }
   function endGame(won) {
+    postHi(score);
     running = false;
     overTitle.textContent = won ? 'You win!' : 'Game over';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
@@ -222,7 +236,8 @@
       if (lives <= 0) endGame(false);
     }
 
-    if (bricks.every(b => !b.alive)) endGame(true);
+    // Endless: refill the board when cleared instead of ending. No score ceiling.
+    if (bricks.every(b => !b.alive)) bricks = buildBricks();
     updateHud();
   }
 

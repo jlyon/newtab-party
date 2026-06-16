@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root {
@@ -10,13 +10,13 @@
     --secondary: __SECONDARY_COLOR__;
     --bg: __BACKGROUND_COLOR__;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg);
     color: var(--primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden;
+    overflow: hidden; touch-action: none;
   }
   #wrap {
     display: flex; flex-direction: column;
@@ -34,7 +34,34 @@
     border: 1px solid rgba(255,255,255,0.12);
     box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 0.857)); height: auto;
+    display: block;
   }
+  body.touch canvas { width: min(95vw, calc((100dvh - 260px) * 0.857)); }
+  /* On-screen controls: touch devices only, revealed after first touch. */
+  #touch-controls {
+    display: none;
+    align-items: center; justify-content: space-between;
+    width: min(95vw, calc((100dvh - 260px) * 0.857));
+    margin-top: 8px; padding: 2px 0;
+  }
+  body.touch #touch-controls { display: flex; }
+  .dpad { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dpad-row { display: flex; gap: 4px; align-items: center; }
+  .btn {
+    min-width: 48px; height: 52px; padding: 0 6px; font-size: 22px;
+    border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.4); color: var(--primary); cursor: pointer;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    font-family: inherit;
+  }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+  .dpad-gap { min-width: 48px; }
+  .btn-fire {
+    min-width: 76px; height: 76px; font-size: 28px;
+    border-color: var(--secondary); color: var(--secondary); border-radius: 50%;
+  }
+  .btn-fire:active, .btn-fire.held { background: var(--secondary); color: var(--bg); }
   #start-overlay {
     position: fixed; inset: 0; display: flex;
     align-items: center; justify-content: center;
@@ -71,6 +98,18 @@
   <h1>__GAME_NAME__</h1>
   <div id="hud"><span>Pilot: __PLAYER_NAME__</span><span id="score">Score: 0</span><span id="lives">Lives: 3</span></div>
   <canvas id="game" width="600" height="700"></canvas>
+  <div id="touch-controls">
+    <div class="dpad">
+      <div class="dpad-row"><button class="btn" id="btn-up">↑</button></div>
+      <div class="dpad-row">
+        <button class="btn" id="btn-left">←</button>
+        <div class="dpad-gap"></div>
+        <button class="btn" id="btn-right">→</button>
+      </div>
+      <div class="dpad-row"><button class="btn" id="btn-down">↓</button></div>
+    </div>
+    <button class="btn btn-fire" id="btn-fire">⚡</button>
+  </div>
 </div>
 <div id="start-overlay">
   <div id="start-card">
@@ -96,7 +135,14 @@
   const overTitle = document.getElementById('overTitle');
   const overMsg = document.getElementById('overMsg');
   const startOverlay = document.getElementById('start-overlay');
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // On-screen controls are mobile-only: reveal on first touch.
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); requestAnimationFrame(loop);
   });
@@ -107,7 +153,11 @@
   // ===== GAME-SPECIFIC SECTION =====
   // Customize: enemy name, enemy speed, scoring, win condition.
   const ENEMY_NAME = '__ENEMY_NAME__';
-  const WIN_SCORE = 500;            // hit this score to win
+  // WIN_SCORE is an optional cosmetic milestone, NOT a hard ending. A fixed
+  // finish-score that every competent player reaches caps the leaderboard and is
+  // discouraged for fairness — leave at 0 to stay endless (the game ends only on
+  // death). If set > 0 it shows a one-time toast and keeps play going.
+  const WIN_SCORE = 0;
   const ENEMY_SPAWN_MS = 900;       // lower = harder
   const ENEMY_SPEED_MIN = 1.2;
   const ENEMY_SPEED_MAX = 2.6;
@@ -123,7 +173,30 @@
   });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
+  // On-screen control flags, set by the D-pad / fire buttons (touch + mouse).
+  const held = { left: false, right: false, up: false, down: false, fire: false };
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
+  holdBtn('btn-up', 'up'); holdBtn('btn-down', 'down');
+  holdBtn('btn-fire', 'fire');
+
+  // High score reporting. SCORE_SCALE normalizes raw score to a leaderboard
+  // magnitude where a strong ~60-90s run posts ≈ 1000 (low hundreds for a mediocre
+  // run). Tune to your scoring: with 10 points/enemy, ~0.5 is a reasonable start.
+  let _hi = 0;
+  const SCORE_SCALE = 0.5;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
   let player, bullets, enemies, score, lives, lastShot, lastSpawn, running;
+  let milestoneShown, toastText = '', toastUntil = 0;
+  function showToast(msg) { toastText = msg; toastUntil = performance.now() + 1800; }
 
   function reset() {
     player = { x: W/2, y: H - 60, w: 36, h: 28 };
@@ -131,6 +204,7 @@
     score = 0; lives = 3;
     lastShot = 0; lastSpawn = 0;
     running = true;
+    milestoneShown = false; toastText = ''; toastUntil = 0;
     overlay.style.display = 'none';
     updateHud();
   }
@@ -151,26 +225,25 @@
     return a.x < b.x + b.w && a.x + a.w > b.x &&
            a.y < b.y + b.h && a.y + a.h > b.y;
   }
-  function endGame(won) {
+  function endGame() {
+    postHi(score);
     running = false;
-    overTitle.textContent = won ? 'You win!' : 'Game over';
-    overMsg.textContent = won
-      ? '__PLAYER_NAME__ has crushed the ' + ENEMY_NAME + ' menace. Hero status: confirmed.'
-      : 'The ' + ENEMY_NAME + ' got __PLAYER_NAME__. Tragic. Avenge them.';
+    overTitle.textContent = 'Game over';
+    overMsg.textContent = 'The ' + ENEMY_NAME + ' got __PLAYER_NAME__. Tragic. Avenge them.';
     overlay.style.display = 'flex';
   }
 
   function step(dt, now) {
     // input
     let vx = 0, vy = 0;
-    if (keys['arrowleft']  || keys['a']) vx -= PLAYER_SPEED;
-    if (keys['arrowright'] || keys['d']) vx += PLAYER_SPEED;
-    if (keys['arrowup']    || keys['w']) vy -= PLAYER_SPEED;
-    if (keys['arrowdown']  || keys['s']) vy += PLAYER_SPEED;
+    if (keys['arrowleft']  || keys['a'] || held.left)  vx -= PLAYER_SPEED;
+    if (keys['arrowright'] || keys['d'] || held.right) vx += PLAYER_SPEED;
+    if (keys['arrowup']    || keys['w'] || held.up)    vy -= PLAYER_SPEED;
+    if (keys['arrowdown']  || keys['s'] || held.down)  vy += PLAYER_SPEED;
     player.x = Math.max(0, Math.min(W - player.w, player.x + vx));
     player.y = Math.max(0, Math.min(H - player.h, player.y + vy));
 
-    if (keys[' '] && now - lastShot > BULLET_COOLDOWN_MS) {
+    if ((keys[' '] || held.fire) && now - lastShot > BULLET_COOLDOWN_MS) {
       bullets.push({ x: player.x + player.w/2 - 2, y: player.y, w: 4, h: 12 });
       lastShot = now;
     }
@@ -198,8 +271,9 @@
     enemies = enemies.filter(e => !e.dead && e.y < H + 40);
 
     updateHud();
-    if (lives <= 0) endGame(false);
-    if (score >= WIN_SCORE) endGame(true);
+    // Optional one-time cosmetic milestone — does NOT stop play or scoring.
+    if (WIN_SCORE > 0 && !milestoneShown && score >= WIN_SCORE) { milestoneShown = true; showToast('Milestone!'); }
+    if (lives <= 0) endGame();
   }
 
   function draw() {
@@ -233,6 +307,15 @@
       ctx.lineTo(e.x + e.w, e.y);
       ctx.lineTo(e.x + e.w/2, e.y + e.h);
       ctx.closePath(); ctx.fill();
+    }
+
+    // optional milestone toast
+    if (toastText && performance.now() < toastUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.9; ctx.fillStyle = SECONDARY;
+      ctx.font = 'bold 26px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(toastText, W / 2, H * 0.3);
+      ctx.restore();
     }
   }
 

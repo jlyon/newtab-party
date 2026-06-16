@@ -15,9 +15,9 @@
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 1.765)); height: auto; display: block; }
-  #controls { display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  #controls { display: none; gap: 10px; align-items: center; justify-content: space-between;
     max-width: 95vw; padding: 4px 0; }
-  @media (pointer: fine) { #controls { display: none; } }
+  body.touch #controls { display: flex; }
   @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 1.765)); } }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
@@ -94,7 +94,12 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); requestAnimationFrame(loop);
   });
@@ -106,7 +111,9 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = '__PLAYER_NAME__';
   const ENEMY_NAME  = '__ENEMY_NAME__';         // e.g. "henchmen", "clones", "zombies"
-  const WIN_SCORE   = 300;                       // score needed to win
+  const WIN_SCORE   = 0;                          // 0 = endless (recommended). A fixed score ceiling that
+                                                  //   everyone reaches hurts leaderboard fairness — prefer
+                                                  //   endless + a cosmetic milestone. Set >0 only for a true win.
   const PLAYER_SPEED = 4;
   const PUNCH_RANGE  = 70;                       // px reach of punch
   const PUNCH_COOLDOWN = 400;                    // ms between punches
@@ -149,7 +156,14 @@
     scoreEl.textContent = 'Score: ' + score;
     livesEl.textContent = 'Lives: ' + '♥'.repeat(lives) + '♡'.repeat(Math.max(0, 3 - lives));
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // Normalize raw score so a strong run posts ~1000 on the shared leaderboard
+  // (mediocre = low hundreds). Tune SCORE_SCALE to your scoring magnitude.
+  const SCORE_SCALE = 1;
+  let _hi = 0;
+  function postHi(n) {
+    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
+    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+  }
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }
@@ -205,7 +219,7 @@
     }
     enemies = enemies.filter(e => !e.dead);
     updateHud();
-    if (score >= WIN_SCORE) { endGame(true); return; }
+    if (WIN_SCORE > 0 && score >= WIN_SCORE) { endGame(true); return; }
   }
 
   function drawChar(x, y, w, h, col, facing, punching) {
@@ -234,11 +248,12 @@
     ctx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
     ctx.globalAlpha = 1;
     ctx.fillStyle = COL1; ctx.fillRect(0, FLOOR_Y, W, 2);
-    // score bar outline
+    // progress bar — fills toward WIN_SCORE, or (endless) toward the next 100-point milestone
     ctx.strokeStyle = COL2; ctx.globalAlpha = 0.3; ctx.lineWidth = 1;
     ctx.strokeRect(10, H - 20, W - 20, 8);
     ctx.fillStyle = COL2; ctx.globalAlpha = 0.5;
-    ctx.fillRect(10, H - 20, Math.min(W - 20, (W - 20) * score / WIN_SCORE), 8);
+    const barT = WIN_SCORE > 0 ? Math.min(1, score / WIN_SCORE) : (score % 100) / 100;
+    ctx.fillRect(10, H - 20, (W - 20) * barT, 8);
     ctx.globalAlpha = 1;
 
     // enemies
@@ -262,7 +277,7 @@
     draw(); requestAnimationFrame(loop);
   }
   addEventListener('keydown', e => { if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click(); });
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
 })();
 </script>
 </body>

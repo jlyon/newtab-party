@@ -15,7 +15,7 @@
   canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
     width: min(900px, 98vw); height: auto; display: block; }
   #controls { display: flex; gap: 6px; align-items: center; width: min(600px, 98vw); flex-wrap: wrap; }
-  @media (pointer: fine) { #controls { display: none; } }
+  body:not(.touch) #controls { display: none; }
   .ctrl-group { display: flex; gap: 5px; }
   .btn { padding: 8px 12px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 6px;
@@ -56,11 +56,15 @@
 </div>
 <script>
 (() => {
+  // SCORE_SCALE tuned so a strong win (~3 shots, high hp) lands near 1000.
+  // raw = 400 (win) + hp*4 (0..400) + shotBonus (fewer shots = more, ~0..250).
+  const SCORE_SCALE = 1;
   let _hi = 0;
   function postHi(n) {
-    n = Math.floor(n) || 0;
+    n = Math.round(n) || 0;
     if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
   }
+  let playerShots = 0;
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -128,6 +132,11 @@
   }
   holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-fire', 'fire');
 
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   const keys = {};
   addEventListener('keydown', e => {
     keys[e.key] = true;
@@ -170,7 +179,7 @@
     makeTerrain();
     wind = (Math.random() * 2 - 1) * WIND_MAX;
     angle = 45; power = 0; charging = false; wpnIdx = 0; phase = 'aim';
-    particles = []; explosions = []; aiThinkTimer = 0;
+    particles = []; explosions = []; aiThinkTimer = 0; playerShots = 0;
     player = { x: 70,     y: 0, hp: 100, maxHp: 100, facing:  1 };
     ai     = { x: W - 70, y: 0, hp: 100, maxHp: 100, facing: -1 };
     settleTanks();
@@ -187,6 +196,7 @@
   function fire(tank, ang, pwr) {
     // accept either 'aim' (player) or 'ai-think' (AI takes its shot)
     if (phase !== 'aim' && phase !== 'ai-think') return;
+    if (tank === player) playerShots++;
     const rad = ang * Math.PI / 180;
     const facing = tank === player ? 1 : -1;
     const spd = pwr * 0.12;
@@ -240,7 +250,14 @@
     phase = 'gameover';
     overTitle.textContent = playerWon ? 'BRAVO wins!' : 'TANGO wins!';
     overMsg.textContent = playerWon ? WIN_MSG_P : WIN_MSG_AI;
-    postHi(player.hp);
+    // Continuous skill score (only on a win): base + hp remaining + speed/cleanliness bonus.
+    // Losing posts nothing (0). A flawless 1-shot win tops out ~1050; a sloppy win ~450.
+    if (playerWon) {
+      const hpBonus = player.hp * 4;                       // 0..400
+      const shotBonus = Math.max(0, 250 - (playerShots - 1) * 35); // fewer shots = more
+      const raw = 400 + hpBonus + shotBonus;
+      postHi(raw * SCORE_SCALE);
+    }
     overlay.style.display = 'flex';
   }
 
@@ -388,7 +405,7 @@
   }
 
   function loop() { step(); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { reset(); grabFocus(); });
   reset(); requestAnimationFrame(loop);
 })();
 </script>

@@ -107,6 +107,19 @@
   const overTitle = document.getElementById('overTitle');
   const overMsg = document.getElementById('overMsg');
 
+  // High score reporting.
+  // SCORE_SCALE: skill metric rewards matches earned and clean play (few wasted
+  // moves: a perfect game uses exactly PAIRS moves) and finishing fast. Raw
+  // spread is roughly 0..1800 for an 18-pair board; SCORE_SCALE normalizes so a
+  // near-perfect game lands ≈ 1000 and a sloppy win sits in the low hundreds.
+  // No fixed ceiling everyone ties at. Integer; only-new-best is posted.
+  const SCORE_SCALE = 0.56;  // tuned so a great run ≈ 1000
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
+
   // ===== GAME-SPECIFIC SECTION =====
   // Choose a 4x4 (8 pairs) or 6x6 (18 pairs) grid. The SYMBOLS list must
   // have AT LEAST as many entries as needed pairs. Customize symbols to fit
@@ -192,6 +205,10 @@
   function win() {
     clearInterval(timer);
     const s = Math.floor((Date.now()-startTime)/1000);
+    // misses = moves beyond the minimum (a perfect game uses exactly PAIRS moves)
+    const misses = Math.max(0, moves - PAIRS);
+    const raw = Math.max(0, matches * 100 - misses * 10 - moves * 3);
+    postHi(raw);  // postHi applies SCORE_SCALE
     overTitle.textContent = 'You win!';
     overMsg.textContent = WIN_MSG + ' (' + moves + ' moves, ' + s + 's)';
     overlay.style.display = 'flex';

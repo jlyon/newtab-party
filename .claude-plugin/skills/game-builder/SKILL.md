@@ -53,6 +53,9 @@ Full list of available game types:
 - Canyon shooter — "fly, dodge, blast your way through"
 - Beer pong — "aim, set power, sink the shots"
 - Penalty kicks — "pick your spot, time your shot, score"
+- Tycoon — "drag, build, upgrade, watch the money roll in"
+- Battleship — "hunt the grid, sink the fleet, fewer shots win"
+- Deal or No Deal — "open cases, dodge the banker, hold your nerve"
 
 **2. Game name.** Just: "Name it. Whatever you want. I'm not your editor."
 
@@ -83,6 +86,9 @@ Tailor the deep-dive to the game:
 - **Canyon shooter:** What are they flying? What are they shooting at? Endless or boss fight?
 - **Beer pong:** Setting/theme? How many cups? AI opponent or solo challenge?
 - **Penalty kicks:** Player vs goalie or solo challenge? How many kicks? Theme?
+- **Tycoon:** What's being built (rides, stalls, farms)? Setting? What pulls in customers / generates income? Time limit?
+- **Battleship:** Setting/theme for the fleet? Ship names? How clever should the AI's hunting be?
+- **Deal or No Deal:** Who's the banker (name/personality)? How many cases? Prize-ladder theme (cash, prizes, silly stakes)?
 
 If the user goes off-script and just describes their game freeform, don't force the questions — extract what you need and ask only what's missing.
 
@@ -111,6 +117,9 @@ You have templates in `assets/templates/`:
 - `canyon-shooter.html`
 - `beer-pong.html`
 - `penalty-kicks.html`
+- `tycoon.html` (drag-to-build management)
+- `battleship.html` (grid-hunt naval combat)
+- `deal-or-no-deal.html` (case-opening / banker offers)
 
 Each is a complete, working single-file game. Pick the one that matches the user's choice, **read it**, then customize. Don't rewrite from scratch — these are tuned to work, and reinventing the game loop wastes the user's 10 minutes.
 
@@ -138,6 +147,32 @@ The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block
 - **Enter key.** All templates handle Enter to confirm the game-over overlay / restart. Keep it.
 - **High score postMessage.** Every game calls `window.parent.postMessage({ highScore: <int> }, '*')` when the player achieves a new personal best. Already wired via a `postHi()` helper in every template — do not remove it.
 - **Start screen.** For games with keyboard/directional controls, show a start overlay before the game begins. Display the game name and controls hint. The game loop must NOT start until the player clicks Play. (Templates for these game types already include this pattern.)
+- **Keyboard self-focus.** So keyboard games respond without a mouse click first, the game must grab focus for its own window. Add this near the top of the IIFE and call `grabFocus()` on load and when the start overlay's Play button is clicked:
+  ```js
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  ```
+  (The arcade wrapper also focuses the iframe, but the fresh-Chrome-new-tab case where focus sits in the address bar can't be overridden by script — that's a browser limitation, not a bug.)
+
+### Scoring rubric (mandatory — every game and template must follow this)
+
+Scores are compared across games (the leaderboard's "Previous games" table and the topbar "Best"), so they must be on a **shared scale** and must reward skill **without a ceiling**.
+
+1. **No hard score ceiling.** A game must never *end* at a fixed score that every competent player reaches (the old "win at 300" bug). 
+   - If the game currently ends on hitting a target score (a finish line / "win at N"), **remove that score-based ending.** Let play continue endlessly with the existing difficulty ramp; keep the death / timeout / lose condition. A cosmetic "milestone!" toast at the old threshold is fine — just don't stop play or stop scoring.
+   - If the game is inherently one finite round (one minesweeper board, one battleship match, one card hand, one CYOA story), that round may end — but the **posted score must be a continuous skill metric** (time, accuracy, efficiency, margin, streak) so results spread out instead of everyone tying at the same number.
+2. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
+3. **Monotonic & integer.** Only post a new personal best, always an integer:
+   ```js
+   let _hi = 0;
+   const SCORE_SCALE = 1;   // tune so a great run ≈ 1000
+   function postHi(raw) {
+     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+     if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+   }
+   ```
+4. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
 
 ### Mobile requirements (mandatory — every game must pass these)
 
@@ -202,6 +237,17 @@ canvas { width: min(Xpx, 95vw); height: auto; display: block; }
 where X is the canvas's `width` attribute. All game coordinates stay fixed at the canvas resolution; CSS scaling handles the visual resize. Always scale touch/mouse coordinates from screen space to canvas space: `const x = (clientX - rect.left) * (W / rect.width)`.
 
 **Controls below canvas.** Place mobile buttons BELOW the canvas in a flex row. Minimum touch target: `height: 52px; min-width: 48px`. Style with `user-select: none; -webkit-touch-callout: none` so long-press doesn't select. `.btn:active, .btn.held { background: var(--primary); }` gives clear press feedback.
+
+**On-screen controls appear on touch devices only.** The D-pad / fire / aim buttons are a phone affordance — they must NOT show on desktop, where the keyboard/mouse is used. Hide them by default and reveal them only once touch is detected. This keeps the desktop layout clean while guaranteeing full touch playability.
+```css
+#touch-controls { display: none; }          /* wrap all on-screen buttons in this */
+body.touch #touch-controls { display: flex; }
+```
+```js
+// Reveal touch controls the first time the player touches the screen.
+window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+```
+Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/penalty drag-aim) need no on-screen buttons at all — the canvas/grid taps work on both, so there's nothing to hide.
 
 **Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.
 

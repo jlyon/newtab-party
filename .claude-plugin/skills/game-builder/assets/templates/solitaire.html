@@ -86,6 +86,12 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = '__PLAYER_NAME__';
   const WIN_MSG = PLAYER_NAME + ' beat solitaire. Hall of fame. Probably.';
+  // SCORE_SCALE: the posted score is the in-game points total (continuous skill
+  // metric — +foundation/flip/move points, +500 for a full win, -100 per
+  // recycle). A clean win accumulates ≈ 1000 raw, so SCORE_SCALE is 1.0; lower
+  // it if you raise the per-move point values. No fixed ceiling everyone ties
+  // at; faster, tighter solves score higher. Integer; posted on a new best.
+  const SCORE_SCALE = 1.0;  // tuned so a great run ≈ 1000
   // ==================================
 
   const SUITS = ['♠','♥','♦','♣'];
@@ -104,6 +110,11 @@
   const DOWN_OFFSET = Math.round(ch * 0.17);  // face-down cascade offset
 
   let stock, waste, found, tab, sel, score, hiScore = 0, moves;
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
 
   function makeDeck() {
     const d = SUITS.flatMap(s => RANKS.map(r => ({r,s,red:RED.has(s),faceUp:false})));
@@ -219,7 +230,8 @@
   function checkWin() {
     if (found.every(f => f.length === 13)) {
       score += 500;
-      if (score > hiScore) { hiScore = score; window.parent.postMessage({ highScore: hiScore }, '*'); }
+      if (score > hiScore) hiScore = score;       // raw points for on-screen "Best"
+      postHi(score);                               // RAW; postHi applies SCORE_SCALE (monotonic)
       hiEl.textContent = 'Best: ' + hiScore;
       overTitle.textContent = 'You win!';
       overMsg.textContent = WIN_MSG + ' (' + moves + ' moves, ' + score + ' pts)';

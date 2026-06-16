@@ -14,7 +14,7 @@
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(900px, 95vw, calc((100dvh - 80px) * 2)); height: auto; display: block; }
   #controls { display: flex; gap: 6px; align-items: center; max-width: 95vw; flex-wrap: wrap; }
-  @media (pointer: fine) { #controls { display: none; } }
+  body:not(.touch) #controls { display: none; }
   @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 170px) * 2)); } }
   .ctrl-group { display: flex; gap: 5px; }
   .btn { padding: 8px 12px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
@@ -85,9 +85,25 @@
   const overTitle = document.getElementById('overTitle');
   const overMsg   = document.getElementById('overMsg');
   const startOverlay = document.getElementById('start-overlay');
+
+  // High-score reporting. SCORE_SCALE normalizes a strong win toward ~1000.
+  // raw = 400 (win) + hp*4 (0..400) + shotBonus (fewer shots = more). Tune per theme.
+  const SCORE_SCALE = 1;
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.round(n) || 0;
+    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  }
+  let playerShots = 0;
+
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   document.getElementById('start-btn').addEventListener('click', () => {
     startOverlay.style.display = 'none';
-    reset(); requestAnimationFrame(loop);
+    reset(); grabFocus(); requestAnimationFrame(loop);
   });
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();
@@ -184,7 +200,7 @@
     makeTerrain();
     wind = (Math.random() * 2 - 1) * WIND_MAX;
     angle = 45; power = 0; charging = false; wpnIdx = 0; phase = 'aim';
-    particles = []; explosions = []; aiThinkTimer = 0;
+    particles = []; explosions = []; aiThinkTimer = 0; playerShots = 0;
     player = { x: 70,     y: 0, hp: 100, maxHp: 100, facing:  1 };
     ai     = { x: W - 70, y: 0, hp: 100, maxHp: 100, facing: -1 };
     settleTanks();
@@ -199,7 +215,9 @@
   }
 
   function fire(tank, ang, pwr) {
-    if (phase !== 'aim') return;
+    // accept either 'aim' (player) or 'ai-think' (AI takes its shot)
+    if (phase !== 'aim' && phase !== 'ai-think') return;
+    if (tank === player) playerShots++;
     const rad = ang * Math.PI / 180;
     const facing = tank === player ? 1 : -1;
     const spd = pwr * 0.12;
@@ -254,7 +272,14 @@
     phase = 'gameover';
     overTitle.textContent = playerWon ? 'You win!' : AI_NAME + ' wins!';
     overMsg.textContent = playerWon ? WIN_MSG_P : WIN_MSG_AI;
-    window.parent.postMessage({ highScore: player.hp }, '*');
+    // Continuous skill score (win only): base + hp remaining + fewer-shots bonus.
+    // A flawless quick win ~1050; a sloppy win ~450; a loss posts nothing.
+    if (playerWon) {
+      const hpBonus = player.hp * 4;                                // 0..400
+      const shotBonus = Math.max(0, 250 - (playerShots - 1) * 35);  // fewer shots = more
+      const raw = 400 + hpBonus + shotBonus;
+      postHi(raw * SCORE_SCALE);
+    }
     overlay.style.display = 'flex';
   }
 
@@ -290,35 +315,31 @@
         if (proj.bounces > 0) {
           proj.vy *= -0.55; proj.vx *= 0.8; proj.bounces--; proj.y = terrainY(proj.x) - 2;
         } else {
+          const wasAI = proj.owner === ai;
           applyExplosion(proj, proj.x, proj.y);
           proj = null;
           if (!checkWin()) {
-            if (phase !== 'gameover') {
-              phase = 'settle';
-              setTimeout(() => {
-                if (proj?.owner === player || !proj) {
-                  phase = 'ai-think'; aiThinkTimer = 80;
-                } else { phase = 'aim'; }
-              }, 600);
-            }
+            phase = 'settle';
+            setTimeout(() => {
+              if (phase === 'gameover') return;
+              if (wasAI) { phase = 'aim'; power = 0; charging = false; }
+              else       { phase = 'ai-think'; aiThinkTimer = 80; }
+            }, 600);
           }
         }
       }
       // out of bounds
       if (proj && (proj.x < -10 || proj.x > W + 10 || proj.y > H + 20)) {
+        const wasAI = proj.owner === ai;
         proj = null;
-        phase = 'ai-think'; aiThinkTimer = 60;
+        if (wasAI) { phase = 'aim'; power = 0; charging = false; }
+        else       { phase = 'ai-think'; aiThinkTimer = 60; }
       }
     }
 
     if (phase === 'ai-think') {
       aiThinkTimer--;
       if (aiThinkTimer <= 0) { aiTakeTurn(); }
-    }
-
-    // After AI fires and proj lands, switch back to player
-    if (phase === 'fire' && proj && proj.owner === ai && !proj) {
-      phase = 'aim'; power = 0; charging = false;
     }
 
     // Update particles + explosions
@@ -414,7 +435,7 @@
   }
 
   function loop() { step(); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { reset(); grabFocus(); });
 })();
 </script>
 </body>

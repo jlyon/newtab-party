@@ -18,8 +18,8 @@
   .bpip.charged { background: #aaff00; border-color: #aaff00; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
-  #controls { display: flex; gap: 8px; max-width: 95vw; }
-  @media (pointer: fine) { #controls { display: none; } }
+  #controls { display: none; gap: 8px; max-width: 95vw; }
+  body.touch #controls { display: flex; }
   @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 0.621)); } }
   .btn { height: 56px; font-size: 22px; border: 2px solid #444;
     background: #1e1e1e; color: #ccc; cursor: pointer; border-radius: 8px;
@@ -97,7 +97,12 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); requestAnimationFrame(loop);
   });
@@ -109,7 +114,8 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'The Kart';
   const RIVAL_NAME  = 'jungle racers';
-  const WIN_SCORE   = 5000;                        // race to 5000 = finish line
+  const WIN_SCORE   = 0;                           // 0 = endless road (fixed finish lines hurt leaderboard fairness)
+  const MILESTONE   = 1000;                        // cosmetic milestone interval for the endless progress bar
   const BASE_SPEED  = 2.5;
   const TOP_SPEED   = 7;
   const STEER       = 4.5;
@@ -184,7 +190,13 @@
     boostPips.forEach((p, i) => p.classList.toggle('charged', i < boostCharges));
     document.getElementById('btn-boost').classList.toggle('empty', boostCharges === 0 && !boosting);
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // Normalize raw score so a strong endless run posts ~1000 (raw was ~5000-scale).
+  const SCORE_SCALE = 0.2;
+  let _hi = 0;
+  function postHi(n) {
+    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
+    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+  }
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }
@@ -393,16 +405,14 @@
     ctx.beginPath(); ctx.moveTo(RX+10, 0); ctx.lineTo(RX+10, H); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(RR-10, 0); ctx.lineTo(RR-10, H); ctx.stroke();
 
-    // Progress bar / finish line
+    // Endless milestone bar on right edge — fills toward the next MILESTONE, then resets.
     if (WIN_SCORE > 0) {
+      // (legacy finish-line mode — disabled while WIN_SCORE === 0)
       const t = Math.min(1, score / WIN_SCORE);
-      // Progress bar on right edge
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillRect(W - 8, 0, 6, H);
       ctx.fillStyle = '#aaff00';
       ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
-
-      // Finish line when close
       const fy = (1 - t) * H * 0.3;
       if (fy > 0 && fy < H) {
         ctx.fillStyle = '#f5e6c8';
@@ -412,6 +422,12 @@
         for (let i = 0; i < 8; i++)
           if (i % 2 !== 0) ctx.fillRect(RX+10 + i*(RW-20)/8, fy-4, (RW-20)/8, 8);
       }
+    } else {
+      const t = (score % MILESTONE) / MILESTONE;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(W - 8, 0, 6, H);
+      ctx.fillStyle = '#aaff00';
+      ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
     }
 
     // Particles
@@ -479,7 +495,7 @@
   }
 
   function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
 
   // Tilt support
   let tiltX = 0;

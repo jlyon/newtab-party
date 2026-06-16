@@ -71,7 +71,12 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); started = true; requestAnimationFrame(loop);
   });
@@ -83,7 +88,10 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME  = '__PLAYER_NAME__';
   const OBSTACLE     = '__ENEMY_NAME__';           // obstacle name, e.g. "trees", "yetis", "exes"
-  const WIN_DIST     = 0;                           // 0 = endless; e.g. 5000 for a finish line
+  // 0 = endless (recommended). A fixed finish-line distance that every competent
+  // player reaches caps the leaderboard and is discouraged for fairness; leave at
+  // 0 unless you specifically want a non-competitive finish line.
+  const WIN_DIST     = 0;
   const BASE_SPEED   = 3.5;
   const SPEED_INC    = 0.0004;                      // ramp per frame
   const STEER        = 3.5;                         // px per frame when held
@@ -121,7 +129,13 @@
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() { scoreEl.textContent = 'Dist: ' + score; hiEl.textContent = 'Best: ' + hiScore; }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // SCORE_SCALE normalizes raw distance score (accrues ~floor(spd*0.1)/frame plus
+  // gate bonuses) to a leaderboard magnitude where a strong ~60-90s run posts
+  // ≈ 1000. Tune to your scoring; ~0.3 is a reasonable start for these defaults.
+  // postHi is monotonic + integer; pass it the RAW score.
+  let _hi = 0;
+  const SCORE_SCALE = 0.3;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }

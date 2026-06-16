@@ -158,7 +158,18 @@
     return '<span class="rank-tl">'+c.r+c.s+'</span><span class="pip">'+c.s+'</span><span class="rank-br">'+c.r+c.s+'</span>';
   }
 
-  let _hiBridge = 0;
+  // High score reporting.
+  // Skill metric (RAW) = how few points you collected (lower is better in
+  // Hearts). Raw "headroom" = GAME_OVER_SCORE - your total, spanning 0..100.
+  // SCORE_SCALE (10) normalizes so a flawless game (0 points taken) ≈ 1000 and
+  // a mediocre finish lands in the low hundreds. No fixed ceiling. Integer;
+  // only a new best is posted.
+  const SCORE_SCALE = 10;  // tuned so a great run ≈ 1000
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
   let hands, totalScores, roundScores, trickCards, trickLeader;
   let phase, roundNum, heartsBroken, passSelection, currentPlayer, aiDelay;
 
@@ -341,8 +352,8 @@
     const min = Math.min(...totalScores);
     const winner = totalScores.findIndex(s=>s===min);
     const youWon = winner === 0;
-    const _score = Math.max(0, GAME_OVER_SCORE - totalScores[0]);
-    if (_score > _hiBridge) { _hiBridge = _score; window.parent.postMessage({ highScore: _score }, '*'); }
+    // Pass RAW headroom; postHi applies SCORE_SCALE. On-screen totals unchanged.
+    postHi(Math.max(0, GAME_OVER_SCORE - totalScores[0]));
     overTitle.textContent = youWon ? 'You win!' : nameOf(winner) + ' wins!';
     overMsg.textContent = youWon ? WIN_MSG : LOSE_MSG;
     overScores.textContent = NAMES.map((n,i)=>n+': '+totalScores[i]).join('  ·  ');

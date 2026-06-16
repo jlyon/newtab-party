@@ -1,5 +1,29 @@
 {
   "version": 1,
+  "scheduleEpoch": "2026-06-15",
+  "schedule": [
+    "burnin-glory",
+    "build-the-boardwalk",
+    "sweep-the-strait",
+    "yarrmada",
+    "the-wildcard",
+    "coeur-brise",
+    "oligarchs-dilemma",
+    "fly-by-the-seat-of-your-pants",
+    "penalty-panic",
+    "blouncerroozal",
+    "frosty-freefall",
+    "chop-till-you-drop",
+    "shootin-n-crackin",
+    "tippity-toes",
+    "rack-attack",
+    "stump-grandpa",
+    "rock-em-sock-em-wrecking-ball",
+    "smithereens",
+    "yedric-bombs",
+    "yeti-run",
+    "hognose"
+  ],
   "games": [
     {
       "id": "blouncerroozal",
@@ -144,6 +168,30 @@
       "type": "Soccer",
       "description": "Best of 5 from the spot. Pick your nation, aim your shot, and dive to save. Win it for your country.",
       "controls": "Drag to aim · Hold Space to charge shot · Arrows to choose dive direction when defending"
+    },
+    {
+      "id": "build-the-boardwalk",
+      "name": "Build the Boardwalk",
+      "file": "games/build-the-boardwalk.html",
+      "type": "Tycoon",
+      "description": "Santa Cruz beach tycoon. Drag attractions onto the sand, pull in tourists, and stack up the fattest wallet on the coast before the clock runs out.",
+      "controls": "Drag a ride from the tray onto the sand to build · Tap a ride to upgrade it"
+    },
+    {
+      "id": "sweep-the-strait",
+      "name": "Sweep the Strait",
+      "file": "games/sweep-the-strait.html",
+      "type": "Minesweeper",
+      "description": "Naval minesweeper. Clear every contact mine from the Strait of Hormuz and reopen the shipping lane — one wrong tap and the tankers stay docked.",
+      "controls": "Tap to sweep a tile · Right-click or long-press to drop a ship marker on a suspected mine"
+    },
+    {
+      "id": "yarrmada",
+      "name": "Yarrmada",
+      "file": "games/yarrmada.html",
+      "type": "Battleship",
+      "description": "Pirate-cove battleship. Sink the enemy fleet before they sink yours — fewer shots means a higher score, ye efficient sea-dog.",
+      "controls": "Tap squares in Enemy Waters to fire · Re-roll your fleet or set sail to start"
     }
   ]
 }

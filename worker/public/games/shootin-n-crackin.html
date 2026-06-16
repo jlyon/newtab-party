@@ -20,6 +20,8 @@
   canvas { background: #000; border: 1px solid rgba(59,130,246,0.25); box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-width: min(600px, 95vw); max-height: calc(100dvh - 230px); width: auto; height: auto; display: block; }
   #controls { display: flex; align-items: center; justify-content: space-between; width: min(min(600px, 95vw), calc((100dvh - 230px) * 0.857)); padding: 2px 0; }
   @media (pointer: fine) { #controls { display: none; } canvas { max-height: calc(100dvh - 120px); } }
+  /* On-screen controls are for touch devices only; revealed after first touch. */
+  body:not(.touch) #controls { display: none; }
   .dpad { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .dpad-row { display: flex; gap: 3px; align-items: center; }
   .btn { width: 52px; height: 52px; font-size: 20px; border: 2px solid var(--primary);
@@ -74,12 +76,20 @@
 </div>
 <script>
 (() => {
-  // High score reporting
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // On-screen controls are mobile-only: reveal on first touch.
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
+  // High score reporting.
+  // SCORE_SCALE normalizes raw in-game score to a leaderboard magnitude where a
+  // strong ~60-90s run posts ≈ 1000. Raw great-run score is in the low thousands
+  // (10/enemy, 150/boss), so ~0.5 lands a great run near 1000.
   let _hi = 0;
-  function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
-  }
+  const SCORE_SCALE = 0.5;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -130,6 +140,9 @@
   let player, bullets, enemies, bosses, glitter;
   let score, lives, wave;
   let lastShot, lastSpawn, lastBoss, lastWave, lastTrail, startTime, running;
+  let auditSurvived;
+  let toastText = '', toastUntil = 0;
+  function showToast(msg) { toastText = msg; toastUntil = performance.now() + 1800; }
 
   function reset() {
     player = { x: W/2 - 18, y: H - 70, w: 36, h: 38 };
@@ -138,6 +151,7 @@
     const now = performance.now();
     lastShot = 0; lastSpawn = 0;
     lastBoss = now; lastWave = now; lastTrail = 0; startTime = now;
+    auditSurvived = false; toastText = ''; toastUntil = 0;
     running = true;
     overlay.style.display = 'none';
     updateHud();
@@ -165,16 +179,11 @@
   function rectsHit(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
-  function endGame(won) {
+  function endGame() {
     postHi(score);
     running = false;
-    if (won) {
-      overTitle.textContent = 'refund earned';
-      overMsg.textContent = 'Pizza Slice demolished the IRS. Crusts: golden. Taxes: theoretical.';
-    } else {
-      overTitle.textContent = 'audited';
-      overMsg.textContent = 'The ' + ENEMY_NAME + ' got the slice. Should have filed earlier.';
-    }
+    overTitle.textContent = 'audited';
+    overMsg.textContent = 'The ' + ENEMY_NAME + ' got the slice. Should have filed earlier.';
     overlay.style.display = 'flex';
   }
 
@@ -232,8 +241,11 @@
     bosses  = bosses.filter(b => !b.dead);
 
     updateHud();
-    if (lives <= 0) endGame(false);
-    if (score >= WIN_SCORE) endGame(true);
+    // One-time cosmetic milestone at WIN_SCORE — does NOT stop play or scoring.
+    // (No hard ceiling: a fixed end-score every competent player reaches is bad
+    // for leaderboard fairness, so the game is endless and ends only on death.)
+    if (!auditSurvived && score >= WIN_SCORE) { auditSurvived = true; showToast('Audit survived!'); }
+    if (lives <= 0) endGame();
   }
 
   function drawStars() {
@@ -294,6 +306,13 @@
     ctx.restore();
     for (const e of enemies) drawAuditor(e.x, e.y, e.w, e.h);
     for (const boss of bosses) drawBoss(boss);
+    if (toastText && performance.now() < toastUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.9; ctx.fillStyle = SECONDARY;
+      ctx.font = 'bold 26px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(toastText, W / 2, H * 0.3);
+      ctx.restore();
+    }
   }
 
   function loop(now) {
@@ -301,7 +320,7 @@
     draw();
     requestAnimationFrame(loop);
   }
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
   reset();
   requestAnimationFrame(loop);
 })();

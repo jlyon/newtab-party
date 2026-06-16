@@ -78,6 +78,11 @@
   const LOSE_MSG = 'You stepped on an egg. It cracked. The Easter Bunny saw.';
   // ==================================
 
+  // Score normalization: posted score = round(SCORE_SCALE / (seconds + 1)).
+  // Tuned so a strong 16x16/40 clear (~45s) ≈ 1000, a slow clear = low hundreds.
+  // Faster = higher (continuous, no ceiling). Same scale across all minesweeper games.
+  const SCORE_SCALE = 45000;
+
   let board, flagged, revealed, done, firstClick;
   let timerStart, timerVal, timerTick, hiTime = null;
 
@@ -137,7 +142,7 @@
         if (board[r][c] === -1 && !flagged[r][c]) revealed[r][c] = true;
     render(hitR, hitC);
     if (won) {
-      const score = Math.max(1, Math.round(10000 / (timerVal + 1)));
+      const score = Math.max(1, Math.round(SCORE_SCALE / (timerVal + 1)));
       if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; postHi(score); }
       hiEl.textContent = 'Best: ' + timerVal + 's';
     }

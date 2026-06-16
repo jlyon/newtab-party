@@ -60,9 +60,7 @@
   .btn:active,.btn.held{background:var(--primary);color:#fff;box-shadow:0 2px 0 #3f93c6;transform:translateY(2px);}
   .hidden{display:none!important;}
   #tip{font-size:12px;color:#6b8294;text-align:center;}
-@media (pointer: fine) {
-  #controls { display: none !important; }
-}
+  body:not(.touch) #controls { display: none !important; }
 </style>
 </head>
 <body>
@@ -109,14 +107,19 @@
   const overWins=['Frosty lives! You magnificent mitten.','You built a snowman army. Respect.','Certified blizzard wrangler.','Not bad for someone using one mitten.'];
   // -----------------------------
 
-  let best=0;
-  let mitX,score,lives,parts,fall,timer,speed,running=false,raf=0;
+  // Posted score is continuous: each good catch counts, completed snowmen add a bonus.
+  // SCORE_SCALE tuned so a strong run (~10 snowmen) lands near 1000; mediocre = low hundreds.
+  // raw = catches*10 + snowmen*50.
+  const SCORE_SCALE=1;
+  let best=0;            // best is the posted (scaled) score, monotonic
+  let bestSnowmen=0;     // for the on-screen "Best" readout (snowmen count)
+  let mitX,score,lives,parts,fall,timer,speed,catches,running=false,raf=0;
   const held={left:false,right:false};
   const keys={};
 
   function reset(){
-    mitX=W/2;score=0;lives=3;parts=0;fall=[];timer=0;speed=1;
-    scoreEl.textContent=0;livesEl.textContent=3;bestEl.textContent=best;
+    mitX=W/2;score=0;lives=3;parts=0;fall=[];timer=0;speed=1;catches=0;
+    scoreEl.textContent=0;livesEl.textContent=3;bestEl.textContent=bestSnowmen;
   }
 
   function spawn(){
@@ -185,7 +188,7 @@
   let flash=null,flashT=0;
 
   function gain(){
-    parts++;
+    parts++;catches++;
     if(parts>=6){
       parts=0;score++;scoreEl.textContent=score;
       speed+=0.18; // ramps up each snowman
@@ -248,8 +251,11 @@
 
   function end(){
     running=false;cancelAnimationFrame(raf);
-    if(score>best){best=score;postHi(best);}
-    bestEl.textContent=best;
+    const raw=catches*10+score*50;            // continuous: catches + snowman bonus
+    postHi(raw*SCORE_SCALE);
+    if(score>bestSnowmen)bestSnowmen=score;
+    if(raw*SCORE_SCALE>best)best=Math.round(raw*SCORE_SCALE);
+    bestEl.textContent=bestSnowmen;
     overTitle.textContent=score>0?'Snow much fun!':'Brrr!';
     let msg;
     if(score<=0)msg='Zero snowmen. The hill won this round. Try again?';
@@ -258,7 +264,8 @@
     overScreen.classList.remove('hidden');
   }
 
-  function postHi(v){try{window.parent.postMessage({highScore:Math.round(v)},'*');}catch(e){}}
+  let _hi=0;
+  function postHi(v){v=Math.round(v)||0;if(v>_hi){_hi=v;try{window.parent.postMessage({highScore:v},'*');}catch(e){}}}
 
   // controls
   function holdBtn(id,key){
@@ -302,8 +309,13 @@
   }
   document.addEventListener('touchstart',enableTilt,{once:true});
 
-  document.getElementById('startBtn').addEventListener('click',start);
-  document.getElementById('againBtn').addEventListener('click',start);
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
+  document.getElementById('startBtn').addEventListener('click',()=>{grabFocus();start();});
+  document.getElementById('againBtn').addEventListener('click',()=>{grabFocus();start();});
 
   // idle backdrop
   ctx.clearRect(0,0,W,H);

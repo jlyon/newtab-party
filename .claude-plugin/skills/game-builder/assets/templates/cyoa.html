@@ -65,6 +65,27 @@
   const choicesEl = document.getElementById('choices');
   const metaEl = document.getElementById('meta');
 
+  // High score reporting.
+  // A fixed story has finite nodes, so raw "scenes visited" caps low and ties
+  // everyone. Instead post a CONTINUOUS skill metric on ANY ending (not only
+  // wins) so most plays register and results spread out. The raw metric rewards
+  // EXPLORATION (distinct nodes ever seen this session — replaying to find new
+  // branches climbs the score) plus a big bonus for reaching a WIN ending, minus
+  // a small penalty per restart after a non-win ending (rewards getting there
+  // cleanly). SCORE_SCALE normalizes onto the shared ~1000 scale.
+  //   raw ≈ NODE_POINTS * distinctNodes + (win? WIN_BONUS : 0) - RESTART_PENALTY * restarts
+  // TUNE SCORE_SCALE to your story size: a thorough win that has seen most nodes
+  // should land ≈ 1000. With ~22 nodes: 22*1 + 9 = 31 raw → 31*32 ≈ 992 ≈ 1000.
+  const WIN_BONUS       = 9;   // raw points for landing any win ending
+  const NODE_POINTS     = 1;   // raw per distinct node discovered this session
+  const RESTART_PENALTY = 1;   // raw per restart taken after a non-win ending
+  const SCORE_SCALE     = 32;  // tuned so a thorough win ≈ 1000 (set per node count)
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
+
   // ===== GAME-SPECIFIC SECTION =====
   // Define the story as nodes. Each node has:
   //   text:      the prose shown to the player
@@ -143,19 +164,27 @@
   };
   // ==================================
 
-  let visited = 0;
+  let visited = 0;                 // nodes seen in the current run
+  let restarts = 0;                // restarts after a non-win ending this session
+  const seenNodes = new Set();     // distinct nodes ever discovered this session
   function go(id) {
     const node = story[id];
     if (!node) { sceneEl.textContent = "(missing scene: " + id + ")"; return; }
     visited++;
+    seenNodes.add(id);
     sceneEl.textContent = node.text;
     choicesEl.innerHTML = '';
     choicesEl.classList.toggle('ending', !!node.ending);
     if (node.ending) {
+      // Post on ANY ending so most plays register a (continuous) score.
+      postHi(Math.max(0, NODE_POINTS * seenNodes.size
+        + (node.ending === 'win' ? WIN_BONUS : 0)
+        - RESTART_PENALTY * restarts));
+      const lostRun = node.ending !== 'win';
       const b = document.createElement('button');
       b.className = 'choice';
       b.textContent = '↻ Start over';
-      b.onclick = () => { visited = 0; go('start'); };
+      b.onclick = () => { if (lostRun) restarts++; visited = 0; go('start'); };
       choicesEl.appendChild(b);
       metaEl.textContent = node.ending === 'win'
         ? '✦ Ending: victory ✦'

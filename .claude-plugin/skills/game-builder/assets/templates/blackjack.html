@@ -101,6 +101,12 @@
   const DECKS        = 2;               // number of decks to shuffle together
   const DEALER_STAND = 17;              // dealer stands on this value (soft-17 treated as hit)
   const BLACKJACK_PAY = 1.5;           // payout multiplier for natural blackjack
+  // SCORE_SCALE: posted score = peak bankroll, scaled so a strong session lands
+  // ≈ 1000 (mediocre = low hundreds). No fixed ceiling — chips can grow without
+  // bound, so the metric keeps spreading. e.g. with the default 5x, roughly
+  // doubling your stack to ~$400 ≈ 1000. Tune if START_CHIPS changes. Integer;
+  // posted only on a new peak (monotonic).
+  const SCORE_SCALE = 5;  // tuned so a great run ≈ 1000
   // ==================================
 
   const SUITS = ['♠','♥','♦','♣'];
@@ -120,7 +126,11 @@
   }
 
   let shoe, chips, bet, playerCards, dealerCards, phase;
-  let hiScore = 0;
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
 
   function newShoe() { shoe = shuffle(Array.from({length:DECKS},()=>makeDeck()).flat()); }
   function draw() { if (shoe.length < 10) newShoe(); return shoe.pop(); }
@@ -214,7 +224,7 @@
     };
     msgEl.textContent = msgs[result] || '';
     chipsEl.textContent = '$' + chips;
-    if (chips > hiScore) { hiScore = chips; window.parent.postMessage({ highScore: hiScore }, '*'); }
+    postHi(chips);  // RAW peak bankroll; postHi applies SCORE_SCALE
     setTimeout(() => {
       bet = Math.min(bet, chips);
       phase = 'bet';
@@ -241,6 +251,10 @@
     if (e.key === 'd' || e.key === 'D') dbl();
     if (e.key === 'Enter' && phase === 'bet') deal();
   });
+  // Keyboard-controlled: grab focus so hotkeys work without a manual click.
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
   reset();
 })();
 </script>

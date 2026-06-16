@@ -59,9 +59,7 @@
   .btn:active,.btn.held{background:var(--primary);color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.2);transform:translateY(2px);}
   .hidden{display:none!important;}
   #tip{font-size:12px;color:rgba(0,0,0,.45);text-align:center;}
-@media (pointer: fine) {
-  #controls { display: none !important; }
-}
+  body:not(.touch) #controls { display: none !important; }
 </style>
 </head>
 <body>
@@ -122,6 +120,10 @@
   const ITEMS_PER_ROUND = 1;
   // Points display label (e.g. 'Score', 'Caught', 'Stars')
   const SCORE_LABEL = 'Score';
+  // SCORE_SCALE normalizes the posted high score so a strong run lands near ~1000.
+  // The on-screen score stays raw; only the posted value is scaled. Tune to the
+  // game's typical catch count (e.g. if a great run catches ~60 items, use ~16).
+  const SCORE_SCALE = 16;
   /* ── END GAME-SPECIFIC SECTION ── */
 
   // Update HUD label
@@ -214,8 +216,9 @@
 
   function end(){
     running=false;cancelAnimationFrame(raf);
-    if(score>best){best=score;postHi(best);}
-    bestEl.textContent=best;
+    postHi(score*SCORE_SCALE);     // post scaled score; postHi guards monotonicity
+    if(score>best){best=score;}
+    bestEl.textContent=best;       // on-screen best stays the raw catch count
     overTitle.textContent=score>0?'Nice work!':'Oops!';
     const msg=score<=0
       ? 'Zero caught. Shake it off and try again!'
@@ -269,8 +272,13 @@
   }
   document.addEventListener('touchstart',enableTilt,{once:true});
 
-  document.getElementById('startBtn').addEventListener('click',start);
-  document.getElementById('againBtn').addEventListener('click',start);
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
+  document.getElementById('startBtn').addEventListener('click',()=>{grabFocus();start();});
+  document.getElementById('againBtn').addEventListener('click',()=>{grabFocus();start();});
 
   ctx.clearRect(0,0,W,H);
 })();

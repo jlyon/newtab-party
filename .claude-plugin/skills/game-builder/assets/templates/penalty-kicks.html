@@ -47,9 +47,8 @@
     background:var(--gold); color:#1a1a00; cursor:pointer; }
   .btn-go:disabled { opacity:.4; cursor:default; }
   #overlay { display:none; }
-@media (pointer: fine) {
-  #controls { display: none !important; }
-}
+#controls { display:none; }
+body.touch #controls { display:flex; }
 </style>
 </head>
 <body>
@@ -146,7 +145,16 @@
     refreshGrid();
   }
 
-  let _hiGoals = 0;
+  let _hi = 0;
+  const SCORE_SCALE = 200;   // tuned so a great run ≈ 1000 (5 goals ≈ 1000, sudden-death adds headroom)
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // Reveal the on-screen controls only once the player touches the screen.
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   let teamA, teamB, pGoals, oGoals, pKicks, oKicks, sudden;
   let whose;
   let phase;
@@ -330,7 +338,7 @@
       M.textContent='You beat '+teamB[0]+' '+pGoals+'–'+oGoals+' on penalties. Lift the trophy.'; }
     else { T.textContent=teamB[3]+' '+teamB[0]+' win!';
       M.textContent=teamB[0]+' knocked you out '+oGoals+'–'+pGoals+'. Heartbreak from twelve yards.'; }
-    if (pGoals > _hiGoals) { _hiGoals = pGoals; window.parent.postMessage({ highScore: pGoals }, '*'); }
+    postHi(pGoals);
     document.getElementById('overlay').style.display='flex';
     return true;
   }
@@ -446,7 +454,7 @@
   }
 
   document.getElementById('kickoff').addEventListener('click',()=>{
-    document.getElementById('picker').style.display='none'; reset();
+    document.getElementById('picker').style.display='none'; grabFocus(); reset();
   });
   document.getElementById('restart').addEventListener('click',()=>{
     document.getElementById('overlay').style.display='none';

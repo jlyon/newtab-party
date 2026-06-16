@@ -14,8 +14,8 @@
   #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc(100dvh - 80px)); height: auto; display: block; }
-  #dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
-  @media (pointer: fine) { #dpad { display: none; } }
+  #dpad { display: none; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
+  body.touch #dpad { display: grid; }
   @media (pointer: coarse) { canvas { width: min(95vw, calc(100dvh - 200px)); } }
   .dp { width: 50px; height: 50px; font-size: 22px; border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
@@ -88,7 +88,12 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); started = true; requestAnimationFrame(loop);
   });
@@ -132,7 +137,14 @@
     scoreEl.textContent = 'Score: ' + score;
     hiEl.textContent = 'Best: ' + hiScore;
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // Normalize raw score (caps/food eaten) so a strong run posts ~1000 on the
+  // shared leaderboard. A great snake run eats maybe 20-40 — so SCORE_SCALE ~30.
+  const SCORE_SCALE = 30;
+  let _hi = 0;
+  function postHi(n) {
+    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
+    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+  }
   function endGame(won) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }
@@ -223,7 +235,7 @@
   });
 
   function loop(now) { if (running) step(now); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); started = true; });
 })();
 </script>
 </body>

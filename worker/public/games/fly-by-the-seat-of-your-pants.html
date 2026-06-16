@@ -72,6 +72,8 @@
 @media (pointer: fine) {
   #controls { display: none !important; }
 }
+/* On-screen controls are for touch devices only; revealed after first touch. */
+body:not(.touch) #controls { display: none !important; }
 </style>
 </head>
 <body>
@@ -112,6 +114,13 @@
 
 <script>
 (() => {
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // On-screen controls are mobile-only: reveal on first touch.
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
@@ -185,8 +194,13 @@
   document.addEventListener('touchstart', enableTilt, { once: true });
 
   // high score
+  // SCORE_SCALE normalizes raw score (distance accrues ~scroll*0.1/frame plus
+  // 25/asteroid; a strong ~60-90s run reaches the low thousands) to a leaderboard
+  // magnitude where a great run posts ≈ 1000.
   let best = 0;
-  function postHi(s) { try { window.parent.postMessage({ highScore: Math.floor(s) }, '*'); } catch (e) {} }
+  let _hi = 0;
+  const SCORE_SCALE = 0.35;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
 
   let player, bullets, asteroids, score, lives, lastShot, lastSpawn, running;
   let scroll, columns, gap, frac, invuln, shake;
@@ -433,6 +447,7 @@
   }
 
   document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
     startOverlay.style.display = 'none';
     reset(); last = performance.now(); requestAnimationFrame(loop);
   });

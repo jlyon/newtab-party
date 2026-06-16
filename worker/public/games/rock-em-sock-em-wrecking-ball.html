@@ -15,9 +15,9 @@
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
     width: min(900px, 95vw); height: auto; display: block; background: #0a1733; }
-  #controls { display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  #controls { display: none; gap: 10px; align-items: center; justify-content: space-between;
     width: min(900px, 95vw); padding: 4px 0; }
-  @media (pointer: fine) { #controls { display: none; } }
+  body.touch #controls { display: flex; }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
     padding: 0; width: 60px; height: 52px; font-size: 22px; border: 2px solid var(--primary);
@@ -84,7 +84,7 @@
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'Uncle Earl';
   const ENEMY_NAME  = 'HOA board member';
-  const WIN_SCORE   = 300;
+  const FLIP_MILESTONE = 300;   // cosmetic "table flipped" milestone — endless after this
   const PLAYER_SPEED = 4;
   const PUNCH_RANGE  = 70;
   const PUNCH_COOLDOWN = 380;
@@ -109,11 +109,19 @@
   const keys = {};
   const held = { left: false, right: false, atk: false };
 
+  // Normalize raw in-game score so a strong endless run posts ~1000.
+  // raw is uncapped now (a great run reaches a few hundred KOs * 10pts).
+  const SCORE_SCALE = 4;
   let _hi = 0;
   function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
+    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
   }
+
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
   function holdBtn(id, key) {
     const el = document.getElementById(id);
@@ -131,12 +139,14 @@
   let player, enemies, score, lives, lastPunch, lastSpawn, running, frame;
   let punchTimer = 0;
   let flyingPaper = [];
+  let flipped = false, flipToast = 0;
 
   function reset() {
     player = { x: W / 2 - PW / 2, y: FLOOR_Y - PH, facing: 1, punching: false };
     enemies = []; score = 0; lives = 3; frame = 0;
     lastPunch = 0; lastSpawn = 0;
     running = true; punchTimer = 0; flyingPaper = [];
+    flipped = false; flipToast = 0;
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() {
@@ -145,10 +155,12 @@
   }
   function endGame(won) {
     running = false;
+    const prevHi = _hi;
     postHi(score);
     overTitle.textContent = won ? 'MOTION CARRIED. FISTS PREVAIL.' : 'GAVELED INTO OBLIVION';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
-    overScore.textContent = 'Score: ' + score + (score >= _hi && score > 0 ? ' ★ new best!' : '');
+    const isBest = Math.round(score * SCORE_SCALE) >= _hi && _hi > prevHi;
+    overScore.textContent = 'Score: ' + score + (isBest ? ' ★ new best!' : '');
     updateHud(); overlay.style.display = 'flex';
   }
   function spawnEnemy() {
@@ -221,8 +233,11 @@
     }
     flyingPaper = flyingPaper.filter(p => p.life > 0);
 
+    // Cosmetic milestone — table flip celebration, but play continues (endless).
+    if (!flipped && score >= FLIP_MILESTONE) { flipped = true; flipToast = 120; }
+    if (flipToast > 0) flipToast--;
+
     updateHud();
-    if (score >= WIN_SCORE) { endGame(true); return; }
   }
 
   function drawBoardroom() {
@@ -263,10 +278,11 @@
     ctx.fillRect(495, 138, 24, 6); ctx.fillRect(503, 135, 8, 12);
     ctx.strokeStyle = COL1; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, FLOOR_Y); ctx.lineTo(W, FLOOR_Y); ctx.stroke();
+    // Endless milestone bar — fills toward the next 100-point milestone, then resets.
     ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
     ctx.strokeRect(10, H - 20, W - 20, 8);
     ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.7;
-    ctx.fillRect(10, H - 20, Math.min(W - 20, (W - 20) * score / WIN_SCORE), 8);
+    ctx.fillRect(10, H - 20, (W - 20) * ((score % 100) / 100), 8);
     ctx.globalAlpha = 1;
     ctx.textAlign = 'left';
   }
@@ -360,13 +376,21 @@
       ctx.fillText('POW!', ax, player.y + PH * 0.42 + 5);
       ctx.textAlign = 'left'; ctx.globalAlpha = 1;
     }
+    if (flipToast > 0) {
+      ctx.globalAlpha = Math.min(1, flipToast / 30);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 26px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('TABLE FLIPPED!', W / 2, H * 0.4);
+      ctx.font = '12px system-ui';
+      ctx.fillText('...but the meeting goes on. Keep swinging.', W / 2, H * 0.4 + 20);
+      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+    }
   }
 
   function loop(now) {
     if (running) step(now);
     draw(); requestAnimationFrame(loop);
   }
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
   reset(); requestAnimationFrame(loop);
 })();
 </script>

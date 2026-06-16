@@ -77,6 +77,11 @@
   const LOSE_MSG = PLAYER_NAME + ' found a mine the hard way. Classic.';
   // ==================================
 
+  // Score normalization: posted score = round(SCORE_SCALE / (seconds + 1)).
+  // Tuned so a strong intermediate clear (~45s) ≈ 1000 and a slow clear = low hundreds.
+  // Faster = higher (continuous, no ceiling). Keep the SAME scale across all minesweeper games.
+  const SCORE_SCALE = 45000;
+
   let board, flagged, revealed, done, firstClick;
   let timerStart, timerVal, timerTick, hiTime = null;
 
@@ -136,7 +141,7 @@
         if (board[r][c] === -1 && !flagged[r][c]) revealed[r][c] = true;
     render(hitR, hitC);
     if (won) {
-      const score = Math.max(1, Math.round(10000 / (timerVal + 1)));
+      const score = Math.max(1, Math.round(SCORE_SCALE / (timerVal + 1)));
       if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; postHi(score); }
       hiEl.textContent = 'Record: ' + timerVal + 's';
     }
@@ -215,6 +220,7 @@
   addEventListener('keydown', e => {
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
   });
+  addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
   document.getElementById('restart').addEventListener('click', reset);
   reset();
 })();

@@ -28,7 +28,7 @@ export async function getDailyScores(
 ): Promise<Play[]> {
   const { results } = await db
     .prepare(
-      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 10',
+      'SELECT * FROM plays WHERE game_id = ? AND date(played_at) = ? ORDER BY score DESC LIMIT 20',
     )
     .bind(gameId, date)
     .all<Play>();
@@ -82,6 +82,35 @@ export async function setPlayerName(
       "UPDATE plays SET player_name = ? WHERE id = ? AND date(played_at) = date('now')",
     )
     .bind(name.trim().slice(0, 30), id)
+    .run();
+  return (result.meta.changes as number) > 0;
+}
+
+// Rank a hypothetical score would take on today's board (1 = top), WITHOUT
+// inserting it. Used to decide whether to prompt the player to add their name.
+export async function getDailyRank(
+  db: D1Database,
+  gameId: string,
+  score: number,
+  date: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      'SELECT COUNT(*) as count FROM plays WHERE game_id = ? AND date(played_at) = ? AND score > ?',
+    )
+    .bind(gameId, date, score)
+    .first<{ count: number }>();
+  return (row?.count ?? 0) + 1;
+}
+
+export async function deletePlay(
+  db: D1Database,
+  id: number,
+): Promise<boolean> {
+  // Only today's plays can be removed — past leaderboards are locked.
+  const result = await db
+    .prepare("DELETE FROM plays WHERE id = ? AND date(played_at) = date('now')")
+    .bind(id)
     .run();
   return (result.meta.changes as number) > 0;
 }

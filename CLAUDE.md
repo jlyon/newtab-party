@@ -21,39 +21,42 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 
 ## Daily game algorithm
 
-Both the extension (`newtab.js`) and worker (`index.ts`) use the exact same algorithm — they must stay in sync:
+Both the extension (`newtab.js`) and worker (`index.ts`) use the exact same algorithm — they must stay in sync. The pick is driven by an explicit **`schedule`** array in `games.json` (a list of game ids in air order) anchored at **`scheduleEpoch`** (a `YYYY-MM-DD` date):
 
 ```
-DAY_EPOCH = Date.UTC(2026, 4, 1)   // May 1 2026 UTC
-day       = floor((Date.now() - DAY_EPOCH) / 86_400_000)
-index     = ((day % games.length) + games.length) % games.length
+DAY_EPOCH = Date.UTC(2026, 4, 1)              // fixed reference for day numbers
+dayNumber(date) = floor((Date.UTC(date) - DAY_EPOCH) / 86_400_000)
+offset    = dayNumber(today) - dayNumber(scheduleEpoch)
+id        = schedule[((offset % L) + L) % L]   // L = schedule.length
+game      = games.find(g => g.id === id)
 ```
 
-The double-modulo handles negative days (before epoch) safely. Scores are date-scoped using D1's `date(played_at)` in UTC.
+If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumber % games.length) + games.length) % games.length`.
+
+**Why a schedule instead of `day % games.length`?** With plain modulo, changing the game count re-maps *every* day at once (adding a game reshuffled the whole rotation). Indexing an explicit, append-only `schedule` means appending a game only adds a slot at the end — the days already scheduled for the current cycle never move. The double-modulo still handles negative offsets (pre-epoch replay dates) safely. Scores are date-scoped using D1's `date(played_at)` in UTC.
 
 ## Adding a game
 
 1. Build with the `game-builder` Claude Code skill (`/game-builder`)
 2. Copy `.html` to `worker/public/games/`
-3. Add entry to `worker/games.json` — **append to the end only** (see rotation rules below)
-4. `npm run deploy` from `worker/` — live immediately, no extension update needed
+3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
+4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
+5. `npm run deploy` from `worker/` — live immediately, no extension update needed
 
 Games with `controls` automatically get a pre-game info card in both the web player and extension.
 
 ### Rotation rules — read before touching games.json
 
-Games are served in the order they appear in `games.json`. The index for day D is:
-
-```
-index = ((day % games.length) + games.length) % games.length
-```
+Rotation is driven by the `schedule` array (game ids in air order), anchored at `scheduleEpoch`. The pick for a date is `schedule[(offset % L) + L) % L]` where `offset = dayNumber(date) - dayNumber(scheduleEpoch)`.
 
 **Critical constraints:**
-- **Always append** new games to the end of the `games` array. Never insert in the middle, never reorder, never remove.
-- **Deploy at midnight UTC** when adding games. Because changing `games.length` shifts `day % N` for all days, deploying mid-day would change the current day's game for everyone mid-session.
-- Past leaderboard records are stored in D1 by `game_id` and are unaffected by rotation changes — only the live computed mapping changes.
+- **Append schedule entries to the end only.** Appending adds a future slot, so the current cycle stays frozen — that's the whole point. Inserting/reordering earlier entries WILL shift upcoming days.
+- Every id in `schedule` must exist in the `games` array. A game listed in `games` but absent from `schedule` simply never airs; an id in `schedule` with no matching game falls through to the legacy modulo pick.
+- **Deploy at midnight UTC.** Appending to `schedule` doesn't move the current cycle, but still deploy at the boundary as a habit so nothing changes mid-session.
+- Don't move `scheduleEpoch` — it's the anchor. Changing it shifts everything.
+- Past leaderboard records are stored in D1 by `game_id` and are unaffected — only the computed date→game mapping changes.
 
-If you need to retire a game, keep it in the array (it will cycle back naturally) rather than removing it.
+To retire a game, remove its id from `schedule` (keep the entry in `games` and the file in `public/games/` so past replays/records still resolve).
 
 ### postHi() protocol
 

@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Oligarch's Dilemma</title>
+<title>__GAME_NAME__</title>
 <style>
   :root{
-    --primary:#f5c542;
-    --accent:#b8902a;
-    --bg:#120d04;
+    --primary:__PRIMARY_COLOR__;
+    --accent:__SECONDARY_COLOR__;
+    --bg:__BACKGROUND_COLOR__;
     --panel:#1d1606;
     --good:#6fcf6f;
     --bad:#e05a5a;
@@ -17,8 +17,8 @@
   html,body{touch-action:none;height:100%}
   body{
     background:
-      radial-gradient(circle at 20% -10%, rgba(245,197,66,.10), transparent 40%),
-      radial-gradient(circle at 80% 0%, rgba(184,144,42,.12), transparent 45%),
+      radial-gradient(circle at 20% -10%, rgba(255,255,255,.06), transparent 40%),
+      radial-gradient(circle at 80% 0%, rgba(255,255,255,.05), transparent 45%),
       radial-gradient(circle at 50% 120%, #241a06, var(--bg));
     color:#f3e9cf;
     font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
@@ -27,7 +27,7 @@
   }
   h1{
     font-size:clamp(22px,6.5vw,42px);letter-spacing:2px;color:var(--primary);
-    text-shadow:0 2px 0 #5a4205, 0 0 22px rgba(245,197,66,.55);
+    text-shadow:0 2px 0 #5a4205, 0 0 22px rgba(255,255,255,.25);
     text-align:center;margin:4px 0 2px;text-transform:uppercase;
   }
   .tag{color:var(--accent);font-size:clamp(11px,3vw,14px);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px}
@@ -38,7 +38,7 @@
   #status b{color:var(--primary)}
   .quip{display:inline-block;color:#d8c389;font-style:italic}
   .layout{display:flex;gap:16px;width:100%;max-width:920px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
-  .ladder{display:grid;grid-template-rows:repeat(8,auto);grid-auto-flow:column;gap:3px;align-content:start}
+  .ladder{display:grid;grid-auto-flow:column;gap:3px;align-content:start}
   .rung{
     font-size:clamp(9px,2.3vw,12px);padding:4px 9px;border-radius:6px;
     background:linear-gradient(180deg,#241b08,#181103);border:1px solid #3a2c08;white-space:nowrap;
@@ -64,7 +64,7 @@
     background:linear-gradient(180deg,rgba(255,255,255,.45),transparent);border-radius:11px 11px 40% 40%}
   .case .lbl{position:relative;z-index:2;text-shadow:0 1px 0 rgba(255,255,255,.4)}
   .case:active{transform:translateY(3px);box-shadow:0 1px 0 #4a3705, inset 0 2px 3px rgba(255,255,255,.5)}
-  .case.mine{outline:3px solid var(--primary);box-shadow:0 0 20px rgba(245,197,66,.85), 0 4px 0 #4a3705}
+  .case.mine{outline:3px solid var(--primary);box-shadow:0 0 20px rgba(255,255,255,.55), 0 4px 0 #4a3705}
   .case.mine::after{content:"YOURS";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;letter-spacing:1px;color:#3a2c00;z-index:3}
   .case.opening{animation:pop .45s ease}
   @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.12) rotate(-3deg)}100%{transform:scale(1)}}
@@ -72,7 +72,6 @@
     background:radial-gradient(circle at 50% 30%, #1c150b, #0d0905);color:#8a7338;cursor:default;
     box-shadow:inset 0 0 0 1px #2e2410;font-size:clamp(8px,2.4vw,11px);text-align:center;line-height:1.05;padding:3px;
   }
-  .case.opened svg{width:62%;height:auto;display:block;margin:0 auto 1px}
   .case.opened .num{position:absolute;top:2px;left:4px;font-size:9px;color:#5e4f28;z-index:3}
   .case.opened .v{color:var(--accent);display:block;font-size:clamp(9px,2.6vw,12px);font-weight:bold}
   .controls{display:flex;gap:14px;justify-content:center;margin:16px 0 4px;flex-wrap:wrap}
@@ -84,38 +83,33 @@
   .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   .overlay{position:absolute;inset:0;background:rgba(10,7,1,.93);display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;padding:24px;z-index:20;backdrop-filter:blur(2px)}
-  .overlay h2{color:var(--primary);font-size:clamp(20px,6vw,36px);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 18px rgba(245,197,66,.5)}
+  .overlay h2{color:var(--primary);font-size:clamp(20px,6vw,36px);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 18px rgba(255,255,255,.3)}
   .overlay p{max-width:470px;font-size:clamp(13px,3.6vw,17px);line-height:1.55;margin-bottom:18px;color:#e7dcc0}
   .play{background:linear-gradient(180deg,#ffe487,#dfb13a);color:#2a2000;border:none;border-radius:14px;
     padding:16px 42px;font-size:20px;font-weight:bold;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 5px 0 #7c5e12}
   .play:active{transform:translateY(3px);box-shadow:0 2px 0 #7c5e12}
-  .offer{color:var(--primary);font-size:clamp(26px,8vw,48px);font-weight:bold;text-shadow:0 0 18px rgba(245,197,66,.6);animation:reveal .5s ease}
+  .offer{color:var(--primary);font-size:clamp(26px,8vw,48px);font-weight:bold;text-shadow:0 0 18px rgba(255,255,255,.35);animation:reveal .5s ease}
   @keyframes reveal{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
   .wrap{position:relative;width:100%;max-width:940px;display:flex;flex-direction:column;align-items:center}
   .hint{font-size:11px;color:#8a7842;margin-top:10px;letter-spacing:1px}
 
-  /* Banker bot panel */
+  /* Banker panel */
   .banker{display:flex;align-items:center;gap:10px;justify-content:center;margin:2px auto 4px;min-height:0}
-  .banker svg{width:54px;height:54px;flex:0 0 auto}
   .banker .name{font-size:12px;letter-spacing:2px;color:#9c8a52;text-transform:uppercase}
   .thinking{display:flex;flex-direction:column;align-items:center;gap:10px;animation:reveal .3s ease}
   .thinking .calc{font-size:clamp(15px,4.5vw,22px);color:var(--primary);letter-spacing:1px}
-  .thinking svg{width:96px;height:96px;animation:bob 1s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
   .dots span{animation:blink 1.2s infinite}
   .dots span:nth-child(2){animation-delay:.2s}
   .dots span:nth-child(3){animation-delay:.4s}
   @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
-  .bot-eye{animation:eyeShift 2.4s ease-in-out infinite}
-  @keyframes eyeShift{0%,100%{transform:translateX(0)}50%{transform:translateX(2px)}}
 </style>
 </head>
 <body>
 <div class="wrap" id="wrap">
-  <h1>Oligarch's Dilemma</h1>
-  <div class="tag">16 cases &middot; no mercy</div>
+  <h1>__GAME_NAME__</h1>
+  <div class="tag" id="tag"></div>
   <div class="banker" id="bankerBar"></div>
-  <div id="status">Pick the case you'll carry to the end. Choose wisely, comrade.</div>
+  <div id="status"></div>
   <div class="layout">
     <div class="ladder" id="ladder"></div>
     <div class="board" id="board"></div>
@@ -127,126 +121,147 @@
   <div class="hint">Tap a case &middot; Enter restarts after the game ends</div>
 
   <div class="overlay" id="startOverlay">
-    <h2>Oligarch's Dilemma</h2>
-    <p>16 sealed cases. One holds your fortune &mdash; the rest hold a reflecting pond contract. Pick a case to keep, open the others, and after each round <b>Elon the Banker</b> phones in a lowball offer. Deal, or risk it all. Greed is a strategy.</p>
-    <button class="play" id="playBtn">Open the Vault</button>
+    <h2>__GAME_NAME__</h2>
+    <p id="introText"></p>
+    <button class="play" id="playBtn">Play</button>
   </div>
 </div>
 
 <script>
+(function(){
+"use strict";
+
+// =========================================================================
+// ===== GAME-SPECIFIC SECTION =============================================
+// Everything a builder customizes lives in this block: the case count, the
+// prize-ladder values + labels, the banker's name & personality (offer /
+// taunt / calculating lines), the intro flavor, and the end-screen rank
+// tiers. Change these to re-theme the game; the mechanics below stay generic.
+// =========================================================================
+
+// Banker character — who phones in the offers, and what they say.
+const BANKER_NAME = "__BANKER_NAME__";          // displayed banker name
+const PLAYER_NAME = "__PLAYER_NAME__";           // how the game addresses the player (e.g. "you", "champ")
+
+// How many sealed cases are on the board. The prize ladder below MUST have
+// exactly this many entries (one prize per case). Keep it even for a tidy
+// 4-wide board layout.
+const CASE_COUNT = 16;
+
+// The prize ladder, lowest -> highest. `amt` is the numeric value (also used
+// for scoring); `label` is the flavor text shown on the rung and on reveal.
+// MUST have exactly CASE_COUNT entries.
 const PRIZES = [
-  {label:"Reflecting pond contract", amt:1},
-  {label:"Knockoff caviar tin", amt:50},
-  {label:"Rusty oil drum", amt:500},
-  {label:"Provincial toll booth", amt:5000},
-  {label:"Vodka distillery license", amt:25000},
-  {label:"Black Sea timeshare", amt:75000},
-  {label:"State media airtime", amt:150000},
-  {label:"Oil & gas subsidy", amt:400000},
-  {label:"Pipeline kickback", amt:900000},
-  {label:"Aluminum smelter stake", amt:2000000},
-  {label:"Offshore shell network", amt:5000000},
-  {label:"Pre-owned superyacht", amt:12000000},
-  {label:"Satellite launch contract", amt:35000000},
-  {label:"Central bank \"loan\"", amt:90000000},
-  {label:"Fighter jet contract", amt:250000000},
-  {label:"Controlling stake in the ministry", amt:1000000000}
+  {label:"A handful of pocket lint", amt:1},
+  {label:"A vending-machine snack",  amt:50},
+  {label:"A decent dinner out",      amt:500},
+  {label:"A weekend getaway",        amt:5000},
+  {label:"A used car",               amt:25000},
+  {label:"A fancy new car",          amt:75000},
+  {label:"A down payment",           amt:150000},
+  {label:"A starter home",           amt:400000},
+  {label:"A nice house",             amt:900000},
+  {label:"A small fortune",          amt:2000000},
+  {label:"Generational wealth",      amt:5000000},
+  {label:"A private island",         amt:12000000},
+  {label:"A space ticket",           amt:35000000},
+  {label:"A media empire",           amt:90000000},
+  {label:"A sports franchise",       amt:250000000},
+  {label:"The whole jackpot",        amt:1000000000}
 ];
 
-const ELON_OPEN = [
-  "I'm prepared to make this go away. Take the cash.",
-  "My algorithm says you fold now. The algorithm is me. Deal?",
-  "I could buy this whole game. Here's a number. Don't overthink it.",
-  "You're one bad case from a reflecting pond. I'm being generous.",
-  "Cash now, no drama. I have a rocket launch in twenty minutes."
+// The banker's personality, expressed in three line pools. One is picked at
+// random for the matching beat. Use `${BANKER_NAME}` is NOT interpolated here
+// — these are plain strings, so just write the name inline if you want it.
+const BANKER_OPEN = [   // shown when an offer is revealed
+  "Take the cash. Walk away happy.",
+  "I'm being generous. Don't push your luck.",
+  "Here's a number. Don't overthink it.",
+  "You're one bad case from nothing. Deal?",
+  "Cash now, no drama. Last warning."
 ];
-const ELON_TAUNT = [
+const BANKER_TAUNT = [  // shown when the player rejects an offer
   "Bold. Unprofitable, but bold.",
   "No deal? I respect the chaos. Slightly.",
-  "Doubling down. Love that for you, probably.",
-  "The board does not care about your feelings.",
-  "Adding this to the group chat."
+  "Doubling down. Brave choice.",
+  "The numbers don't care about your feelings.",
+  "We'll see how that works out for you."
 ];
-const CALC_LINES = [
-  "Elon is calculating",
-  "Consulting the algorithm",
-  "Running the numbers (badly)",
+const CALC_LINES = [    // shown during the dramatic "calculating" pause
+  "The banker is calculating",
+  "Crunching the numbers",
+  "Consulting the spreadsheet",
   "Pretending to think"
 ];
 
-// ---- weird cartoon AI robots ----
-const ROBO_COLORS = ["#7fd1e0","#e09ad1","#9ae0a0","#e0c27f","#b39ae0","#e0897f","#7fa6e0","#d6e07f"];
-function robot(seed, scale){
-  const c = ROBO_COLORS[seed % ROBO_COLORS.length];
-  const c2 = ROBO_COLORS[(seed+3) % ROBO_COLORS.length];
-  const eyes = seed % 3;          // 0:two, 1:one big, 2:three
-  const mouth = seed % 4;         // varied mouths
-  const ant = seed % 2;           // antenna style
-  let eyeM = "";
-  if(eyes===0) eyeM = '<circle class="bot-eye" cx="20" cy="30" r="4" fill="#101010"/><circle class="bot-eye" cx="34" cy="30" r="4" fill="#101010"/>';
-  else if(eyes===1) eyeM = '<circle class="bot-eye" cx="27" cy="30" r="7" fill="#101010"/><circle cx="29" cy="28" r="2" fill="#fff"/>';
-  else eyeM = '<circle cx="17" cy="29" r="3" fill="#101010"/><circle class="bot-eye" cx="27" cy="30" r="4" fill="#101010"/><circle cx="37" cy="29" r="3" fill="#101010"/>';
-  let mo = "";
-  if(mouth===0) mo='<rect x="20" y="40" width="14" height="4" rx="2" fill="#101010"/>';
-  else if(mouth===1) mo='<path d="M19 40 q8 8 16 0" stroke="#101010" stroke-width="3" fill="none" stroke-linecap="round"/>';
-  else if(mouth===2) mo='<path d="M19 43 q8 -8 16 0" stroke="#101010" stroke-width="3" fill="none" stroke-linecap="round"/>';
-  else mo='<rect x="22" y="39" width="10" height="6" rx="1" fill="#101010"/><rect x="24" y="39" width="2" height="6" fill="#444"/><rect x="28" y="39" width="2" height="6" fill="#444"/>';
-  const antenna = ant===0
-    ? '<line x1="27" y1="10" x2="27" y2="2" stroke="'+c2+'" stroke-width="2"/><circle cx="27" cy="2" r="3" fill="'+c2+'"/>'
-    : '<line x1="16" y1="11" x2="12" y2="3" stroke="'+c2+'" stroke-width="2"/><circle cx="12" cy="3" r="2.5" fill="'+c2+'"/><line x1="38" y1="11" x2="42" y2="3" stroke="'+c2+'" stroke-width="2"/><circle cx="42" cy="3" r="2.5" fill="'+c2+'"/>';
-  return '<svg viewBox="0 0 54 60" xmlns="http://www.w3.org/2000/svg">'
-    + antenna
-    + '<rect x="9" y="11" width="36" height="34" rx="7" fill="'+c+'" stroke="#101010" stroke-width="2"/>'
-    + '<rect x="13" y="22" width="28" height="16" rx="4" fill="#dff6fb" stroke="#101010" stroke-width="1.5"/>'
-    + eyeM + mo
-    + '<rect x="16" y="46" width="22" height="9" rx="3" fill="'+c2+'" stroke="#101010" stroke-width="2"/>'
-    + '<rect x="5" y="24" width="5" height="12" rx="2" fill="'+c2+'" stroke="#101010" stroke-width="1.5"/>'
-    + '<rect x="44" y="24" width="5" height="12" rx="2" fill="'+c2+'" stroke="#101010" stroke-width="1.5"/>'
-    + '</svg>';
+// Intro / start-overlay flavor and the small tagline under the title.
+const TAGLINE = CASE_COUNT + " cases · no mercy";
+const INTRO_TEXT = CASE_COUNT + " sealed cases. One holds the jackpot — the "
+  + "rest hold next to nothing. Pick a case to keep, open the others, and after "
+  + "each round <b>" + BANKER_NAME + "</b> phones in a lowball offer. Deal, or risk "
+  + "it all. Greed is a strategy.";
+const PLAY_LABEL = "Open the Cases";   // text on the start-overlay Play button
+const PICK_PROMPT = "Pick the case you'll carry to the end. Choose wisely.";
+
+// How many cases the player must open before each banker offer. The board
+// works down this schedule; once exhausted it opens 1 per round. Tune the
+// pace by editing these numbers (they should be feasible for CASE_COUNT).
+const SCHEDULE = [5, 4, 3, 2];
+
+// End-screen rank tiers, evaluated high -> low against the final winnings.
+// First match wins. Edit the thresholds and copy to re-theme the payoff.
+function rankFor(win){
+  if(win >= 100000000) return "You took the whole thing. Legendary.";
+  if(win >=  10000000) return "Seriously rich. Buy something absurd.";
+  if(win >=   1000000) return "A millionaire's cash-out. Not bad at all.";
+  if(win >=    100000) return "Comfortable. Suspiciously comfortable.";
+  return "Could have gone better. There's always next time.";
 }
-// Elon banker bot — bigger, smug, single monocle eye
-function elonBot(scale){
-  return '<svg viewBox="0 0 60 64" xmlns="http://www.w3.org/2000/svg">'
-    + '<line x1="30" y1="9" x2="30" y2="2" stroke="#f5c542" stroke-width="2"/><circle cx="30" cy="2" r="3" fill="#f5c542"/>'
-    + '<rect x="10" y="10" width="40" height="36" rx="8" fill="#3a3f4a" stroke="#f5c542" stroke-width="2"/>'
-    + '<rect x="15" y="20" width="30" height="18" rx="4" fill="#0d1014" stroke="#f5c542" stroke-width="1.5"/>'
-    + '<circle cx="24" cy="29" r="5" fill="#f5c542"/><circle cx="24" cy="29" r="2" fill="#0d1014"/>'
-    + '<circle cx="38" cy="29" r="3" fill="#f5c542"/>'
-    + '<path d="M22 39 q8 5 16 0" stroke="#f5c542" stroke-width="2" fill="none" stroke-linecap="round"/>'
-    + '<rect x="18" y="47" width="24" height="10" rx="3" fill="#23262e" stroke="#f5c542" stroke-width="2"/>'
-    + '<text x="30" y="55" font-size="6" fill="#f5c542" text-anchor="middle" font-family="monospace">$$$</text>'
-    + '</svg>';
-}
+
+// SCORE TUNING (see scoreFor below). Raw winnings span $0..$1B, which is wildly
+// out of band with other games — a LINEAR map of the jackpot to ~1000 would
+// crush normal wins to near-zero. So we post a LOG-COMPRESSED score with NO
+// hard ceiling that stays monotonic in winnings:
+//   LOG_SCALE * log10(1 + win)  ->  $1k~540, $100k~900, $1M~1080, $10M~1260, $1B~1620.
+// A typical good cash-out (~$100k-$1M) lands ~900-1080; a full jackpot ~1620.
+// FLAG FOR REVIEW: the LOG_SCALE multiplier is a judgement call — if a $1B
+// jackpot scoring ~1.6x a typical win feels too flat (or too steep) relative to
+// the other games, retune LOG_SCALE (or swap the log base).
+const LOG_SCALE = 180;
+
+// =========================================================================
+// ===== END GAME-SPECIFIC SECTION =========================================
+// Everything below is generic Deal-or-No-Deal machinery; it should not need
+// editing to re-theme the game.
+// =========================================================================
 
 let board=[], myCase=null, round=0, offer=0, gameOver=false, phase="pick";
 let bestWin=0, toOpenThisRound=0;
-const SCHEDULE=[5,4,3,2];
 
 const $ = id => document.getElementById(id);
 const fmt = n => "$"+n.toLocaleString("en-US");
-// SCORE: raw winnings span $0..$1,000,000,000 — wildly out of band with other
-// games, and a LINEAR scale mapping the $1B jackpot to ~1000 would crush normal
-// wins to near-zero. So we post a LOG-COMPRESSED score that spreads outcomes
-// across roughly 0..1600 with NO hard ceiling and stays monotonic:
-//   180 * log10(1 + win)  →  $1k≈540, $100k≈900, $1M≈1080, $10M≈1260, $1B≈1620.
-// A typical good cash-out (~$100k–$1M) lands ~900–1080; a full jackpot ~1620.
-// FLAG FOR REVIEW: the 180 multiplier and log10 base are a judgement call — if a
-// $1B jackpot scoring ~1.6x a typical win feels too flat (or too steep) relative
-// to the other games, retune LOG_SCALE or swap the log base.
-const LOG_SCALE = 180;
+
+// Continuous, uncapped, log-compressed skill metric -> shared leaderboard band.
 function scoreFor(win){ return Math.round(LOG_SCALE * Math.log10(1 + Math.max(0, win))); }
+
+// Monotonic + integer high-score post, guarded by try/catch.
 let _hi = 0;
 function postHi(v){ v = Math.round(v) || 0; if(v > _hi){ _hi = v; try{ window.parent.postMessage({highScore:_hi}, "*"); }catch(e){} } }
+
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-function setBanker(html){ $("bankerBar").innerHTML = '<span class="name">Elon &middot; The Banker</span>'; }
+function setBanker(){ $("bankerBar").innerHTML = '<span class="name">'+BANKER_NAME+' &middot; The Banker</span>'; }
 
 function buildLadder(){
   const lad=$("ladder"); lad.innerHTML="";
+  const rows = Math.ceil(PRIZES.length/2);
+  lad.style.gridTemplateRows = "repeat("+rows+",auto)";
+  const loCut = Math.floor(PRIZES.length/3);
+  const hiCut = PRIZES.length - Math.floor(PRIZES.length/4);
   PRIZES.forEach((p,i)=>{
     const d=document.createElement("div");
-    d.className="rung "+(i<5?"lo":i>=12?"hi":"");
+    d.className="rung "+(i<loCut?"lo":i>=hiCut?"hi":"");
     d.id="rung"+i;
     d.innerHTML=`<span>${p.label}</span><span class="amt">${fmt(p.amt)}</span>`;
     lad.appendChild(d);
@@ -254,14 +269,14 @@ function buildLadder(){
 }
 
 function newGame(){
-  board = PRIZES.map((p,i)=>({...p, idx:i, opened:false, bot:Math.floor(Math.random()*64)}));
+  board = PRIZES.map((p,i)=>({...p, idx:i, opened:false}));
   shuffle(board);
   myCase=null; round=0; offer=0; gameOver=false; phase="pick";
   buildLadder(); setBanker();
   PRIZES.forEach((_,i)=>$("rung"+i).classList.remove("dead"));
   renderBoard();
   $("controls").style.display="none";
-  $("status").innerHTML="Pick the case you'll carry to the end. Choose wisely, comrade.";
+  $("status").innerHTML=PICK_PROMPT;
 }
 
 function renderBoard(){
@@ -330,10 +345,11 @@ function makeOffer(){
 function revealOffer(){
   const vals = remainingValues();
   const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+  // Offer starts lowball and creeps toward fair value as rounds advance.
   const fairness = 0.35 + 0.55*(round/SCHEDULE.length);
   offer = Math.max(1, Math.round(avg*fairness/100)*100);
-  const quip = pick(ELON_OPEN);
-  $("status").innerHTML = `<div class="offer">${fmt(offer)}</div><span class="quip">Elon: &ldquo;${quip}&rdquo;</span>`;
+  const quip = pick(BANKER_OPEN);
+  $("status").innerHTML = `<div class="offer">${fmt(offer)}</div><span class="quip">${BANKER_NAME}: &ldquo;${quip}&rdquo;</span>`;
   $("controls").style.display="flex";
   phase="offer";
 }
@@ -343,8 +359,8 @@ function acceptDeal(){
   $("controls").style.display="none";
   const mine=board[myCase].amt;
   gameOver=true; phase="done";
-  let verdict = offer>=mine ? "You out-greeded the Banker."
-    : (mine>=offer*3 ? "Oof. Your case was loaded. Elon is laughing." : "A respectable cash-out, comrade.");
+  let verdict = offer>=mine ? "You out-played the Banker."
+    : (mine>=offer*3 ? "Oof. Your case was loaded. The Banker is laughing." : "A respectable cash-out.");
   finish(offer, `<b>DEAL.</b> You pocket <b>${fmt(offer)}</b>. Your case #${myCase+1} held ${fmt(mine)}. ${verdict}`);
 }
 
@@ -355,7 +371,7 @@ function rejectDeal(){
   const closedOthers = board.filter((c,i)=>!c.opened && i!==myCase).length;
   if(closedOthers<=1){ finalRound(); return; }
   phase="open"; startRound();
-  $("status").innerHTML += `<br><span class="quip">Elon: &ldquo;${pick(ELON_TAUNT)}&rdquo;</span>`;
+  $("status").innerHTML += `<br><span class="quip">${BANKER_NAME}: &ldquo;${pick(BANKER_TAUNT)}&rdquo;</span>`;
 }
 
 function finalRound(){
@@ -364,7 +380,7 @@ function finalRound(){
   const mine=board[myCase].amt, other=board[otherPos].amt;
   board[otherPos].opened=true; killRung(other); renderBoard();
   let line=`Two cases left and you held the line. Your case <b>#${myCase+1}</b> contained <b>${fmt(mine)}</b>. The other had ${fmt(other)}. `;
-  line += mine>other ? "You kept the bigger bag. Elon is seething." : "The other one was fatter. Brutal. No notes.";
+  line += mine>other ? "You kept the bigger bag." : "The other one was fatter. Brutal.";
   finish(mine, line);
 }
 
@@ -381,17 +397,16 @@ function finish(win,msg){
 function showEnd(win){
   const ov=document.createElement("div");
   ov.className="overlay"; ov.id="endOverlay";
-  let rank = win>=100000000?"You ARE the ministry now.":
-             win>=10000000?"Certified oligarch. The yacht is fueled.":
-             win>=1000000?"Solidly rich. Buy a small media outlet.":
-             win>=100000?"Comfortable. Suspiciously comfortable.":
-             "The reflecting pond is lovely this time of year.";
-  ov.innerHTML=`<h2>${fmt(win)}</h2><p>${rank}<br><br>Best haul this session: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
+  ov.innerHTML=`<h2>${fmt(win)}</h2><p>${rankFor(win)}<br><br>Best haul this session: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
   $("wrap").appendChild(ov);
   $("againBtn").onclick=restart;
 }
 
 function restart(){ const ov=$("endOverlay"); if(ov) ov.remove(); newGame(); }
+
+$("tag").innerHTML = TAGLINE;
+$("introText").innerHTML = INTRO_TEXT;
+$("playBtn").textContent = PLAY_LABEL;
 
 $("dealBtn").onclick=acceptDeal;
 $("noDealBtn").onclick=rejectDeal;
@@ -405,6 +420,7 @@ document.addEventListener("keydown",e=>{
 });
 
 buildLadder();
+})();
 </script>
 </body>
 </html>

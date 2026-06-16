@@ -6,14 +6,35 @@ import gamesData from '../games.json';
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
 
+// A score qualifies for the name prompt if it lands in the day's top N.
+const LEADERBOARD_SIZE = 20;
+
 function getGames(): Game[] {
   return (gamesData as { games: Game[] }).games ?? [];
 }
 
+// Day number since DAY_EPOCH (May 1 2026 UTC) for a YYYY-MM-DD string.
+function dayNumber(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Math.floor((Date.UTC(y, m - 1, d) - DAY_EPOCH) / 86400000);
+}
+
+// The daily pick. Uses the explicit `schedule` list in games.json (anchored at
+// `scheduleEpoch`) so that APPENDING a game only adds a future slot — the games
+// already scheduled for the current cycle never move. Falls back to a plain
+// modulo over the games array if no schedule is configured. This MUST stay in
+// sync with the same logic in extension/newtab.js.
 function getDailyGame(games: Game[], dateStr: string): Game | null {
   if (!games.length) return null;
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const day = Math.floor((Date.UTC(y, m - 1, d) - DAY_EPOCH) / 86400000);
+  const data = gamesData as { schedule?: string[]; scheduleEpoch?: string };
+  if (data.schedule?.length && data.scheduleEpoch) {
+    const off = dayNumber(dateStr) - dayNumber(data.scheduleEpoch);
+    const L = data.schedule.length;
+    const id = data.schedule[((off % L) + L) % L];
+    const g = games.find((x) => x.id === id);
+    if (g) return g;
+  }
+  const day = dayNumber(dateStr);
   return games[((day % games.length) + games.length) % games.length];
 }
 
@@ -23,7 +44,7 @@ function todayUTC(): string {
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -94,6 +115,20 @@ export default {
       return json(result);
     }
 
+    // Would this score make today's top-N board? (no insert — just a check)
+    if (pathname === '/api/qualify' && method === 'GET') {
+      const gameId = (url.searchParams.get('gameId') || '').trim();
+      const score = Number(url.searchParams.get('score'));
+      if (!gameId || !Number.isFinite(score))
+        return json({ error: 'gameId and numeric score are required' }, 400);
+      const today = todayUTC();
+      const todayGame = getDailyGame(getGames(), today);
+      if (!todayGame || todayGame.id !== gameId)
+        return json({ qualifies: false, rank: 0, size: LEADERBOARD_SIZE });
+      const rank = await db.getDailyRank(env.DB, gameId, Math.floor(score), today);
+      return json({ rank, qualifies: rank <= LEADERBOARD_SIZE, size: LEADERBOARD_SIZE });
+    }
+
     const patchMatch = pathname.match(/^\/api\/plays\/(\d+)$/);
     if (patchMatch && method === 'PATCH') {
       const id = parseInt(patchMatch[1], 10);
@@ -108,6 +143,14 @@ export default {
       const updated = await db.setPlayerName(env.DB, id, playerName);
       if (!updated)
         return json({ error: 'Cannot update — play not found or leaderboard is locked' }, 403);
+      return json({ ok: true });
+    }
+
+    if (patchMatch && method === 'DELETE') {
+      const id = parseInt(patchMatch[1], 10);
+      const deleted = await db.deletePlay(env.DB, id);
+      if (!deleted)
+        return json({ error: 'Cannot delete — play not found or leaderboard is locked' }, 403);
       return json({ ok: true });
     }
 
@@ -174,7 +217,7 @@ export default {
         db.getDailyScores(env.DB, game.id, dateStr),
         db.getDailyCount(env.DB, game.id, dateStr),
       ]);
-      return html(renderReplay(game, dateStr, scores, count));
+      return html(renderReplay(game, dateStr, scores, count, url.searchParams.has('scores')));
     }
 
     return env.ASSETS.fetch(request);

@@ -109,6 +109,15 @@
   const LEMMING_NAME = '__ENEMY_NAME__';     // what to call the lemmings, e.g. "interns", "clones"
   const TOTAL        = 12;                   // lemmings to release
   const MIN_SAVE     = 8;                    // lemmings needed to win
+  // Raw "saved" alone caps at TOTAL and ties everyone who maxes it, so the
+  // posted score is a continuous skill metric: points per lemming saved PLUS an
+  // efficiency bonus per UNUSED supply (saving with fewer skills spent is
+  // harder). A strong run (all TOTAL saved, several supplies left) sums to ≈ 930
+  // raw, so SCORE_SCALE is 1.0; a marginal win sits in the low/mid hundreds.
+  // No fixed ceiling everyone ties at. Integer; posted on a new best.
+  const PER_SAVED       = 70;                // points per lemming saved
+  const PER_UNUSED_SKILL = 15;               // bonus per leftover supply (efficiency)
+  const SCORE_SCALE     = 1.0;               // tuned so a great run ≈ 1000
   const SPAWN_INTERVAL = 90;                 // frames between spawns (lower = faster)
   const WALK_SPEED   = 0.5;                  // cells per frame
   const FALL_SPEED   = 1.0;                  // cells per frame falling
@@ -173,14 +182,19 @@
       if (btn) btn.classList.toggle('empty', count <= 0);
     }
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  let _hi = 0;
+  function postHi(raw) {
+    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+  }
   function endGame() {
     running = false;
     const won = saved >= MIN_SAVE;
     overTitle.textContent = won ? 'You win!' : 'Level failed';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
     overScore.textContent = 'Saved ' + saved + ' of ' + TOTAL + ' ' + LEMMING_NAME + ' (needed ' + MIN_SAVE + ')';
-    postHi(saved);
+    const unusedSkills = Object.values(supplies).reduce((a, b) => a + Math.max(0, b), 0);
+    postHi(saved * PER_SAVED + unusedSkills * PER_UNUSED_SKILL);
     overlay.style.display = 'flex';
   }
   function spawnLemming() {

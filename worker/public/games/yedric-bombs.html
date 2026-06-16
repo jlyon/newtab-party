@@ -40,6 +40,11 @@
 </div>
 <script>
 (() => {
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const scoreEl  = document.getElementById('score');
@@ -55,7 +60,11 @@
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME  = 'Yedric';
-  const WIN_DIST     = 3500;
+  // Endless: a fixed finish-line that caps everyone at the same distance is bad
+  // for leaderboard fairness (every competent player reaches it), so the run is
+  // endless and ends only on a crash. The optional finish-line code below is kept
+  // but inert while WIN_DIST is 0.
+  const WIN_DIST     = 0;
   const BASE_SPEED   = 3.5;
   const SPEED_INC    = 0.0004;
   const STEER        = 3.6;
@@ -133,7 +142,13 @@
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() { scoreEl.textContent = 'Dist: ' + score; hiEl.textContent = 'Best: ' + hiScore; }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // SCORE_SCALE normalizes raw distance score (accrues ~floor(spd*0.4)/frame plus
+  // gate/jump bonuses; a strong ~60-90s endless run reaches several thousand) to a
+  // leaderboard magnitude where a great run posts ≈ 1000.
+  // postHi is monotonic + integer; pass it the RAW score.
+  let _hi = 0;
+  const SCORE_SCALE = 0.12;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
   function endGame(won) {
     running = false;
     let isNewBest = false;

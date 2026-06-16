@@ -42,6 +42,11 @@
 </div>
 <script>
 (() => {
+  // Self-focus so keyboard works without an extra click (keyboard game).
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const scoreEl  = document.getElementById('score');
@@ -54,8 +59,20 @@
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();
   const COL2 = css.getPropertyValue('--secondary').trim();
-  const W = canvas.width, H = canvas.height;
+  // Logical game resolution (all drawing uses these units). The canvas backing
+  // store is sized to the displayed element at full device-pixel resolution and
+  // the context is scaled to match, so rendering stays crisp at any size / DPR.
+  const W = 640, H = 210;
   const GROUND_Y = H - 30;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME  = 'Yedric';
@@ -101,7 +118,12 @@
     started = true;
     if (jumpsLeft > 0) { pvy = JUMP_FORCE; jumpsLeft--; }
   }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  // SCORE_SCALE normalizes raw score (floor(frame*spd*0.04), low thousands for a
+  // strong ~90s run) to a leaderboard magnitude where a great run posts ≈ 1000.
+  // postHi is monotonic + integer; pass it the RAW score.
+  let _hi = 0;
+  const SCORE_SCALE = 0.7;   // tuned so a great run ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
   function endGame(won, killerType) {
     running = false;
     if (score > hiScore) { hiScore = score; postHi(hiScore); }

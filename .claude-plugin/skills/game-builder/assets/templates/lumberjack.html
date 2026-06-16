@@ -29,9 +29,7 @@
   .start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
     background: var(--primary); color: var(--secondary); border: none; cursor: pointer; border-radius: 6px; font-family: inherit; }
   .start-btn:hover { opacity: 0.88; }
-@media (pointer: fine) {
-  #controls { display: none !important; }
-}
+  body:not(.touch) #controls { display: none !important; }
 </style>
 </head>
 <body>
@@ -151,9 +149,13 @@
     hiEl.textContent = 'Best: ' + hiScore;
   }
 
+  // Endless/continuous: score is raw chop count. SCORE_SCALE normalizes the posted
+  // value so a strong run (~60 chops) lands near 1000; mediocre = low hundreds.
+  // On-screen "Chops"/"Best" stay raw counts — only the posted score is scaled.
+  const SCORE_SCALE = 16;
   let _hi = 0;
   function postHi(n) {
-    n = Math.floor(n) || 0;
+    n = Math.round(n * SCORE_SCALE) || 0;
     if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
   }
 
@@ -218,11 +220,18 @@
     else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); press('right', btnR); }
   });
 
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   document.getElementById('start-btn').addEventListener('click', () => {
     startOverlay.style.display = 'none';
+    grabFocus();
     reset(); started = true; last = performance.now();
   });
   document.getElementById('restart').addEventListener('click', () => {
+    grabFocus();
     reset(); started = true; last = performance.now();
   });
 

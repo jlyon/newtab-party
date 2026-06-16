@@ -66,12 +66,16 @@
 </div>
 <script>
 (() => {
-  // High score reporting
+  // High score reporting. Score is raw chips earned (endless: boards refill).
+  // One full board ≈ 1575 chips; a strong multi-board run ≈ 3500 chips.
+  // SCORE_SCALE tuned so a great run ≈ 1000; a typical decent run = low hundreds.
   let _hi = 0;
-  function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
-  }
+  const SCORE_SCALE = 0.28;   // tuned so a great run (~3500 chips) ≈ 1000
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+
+  function grabFocus(){ try{ window.focus(); }catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -258,7 +262,11 @@
       if (lives <= 0) { endGame(false); }
       else { balls = [{ x: paddle.x + paddle.w/2, y: paddle.y - 9, r: 7, vx: 0, vy: 0, stuck: true }]; launched = false; }
     }
-    if (bricks.every(b => !b.alive)) endGame(true);
+    // Endless: when the board is cleared, refill it (keep playing). No score ceiling.
+    if (bricks.every(b => !b.alive)) {
+      bricks = buildBricks();
+      // brief cosmetic flash of progress; ball/paddle continue uninterrupted
+    }
     updateHud();
   }
 
