@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  :root{
+    --primary:__PRIMARY_COLOR__;
+    --secondary:__SECONDARY_COLOR__;
+    --bg:__BACKGROUND_COLOR__;
+    --ink:#22303c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{touch-action:none;margin:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Segoe UI',system-ui,Arial,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100%;user-select:none;-webkit-user-select:none;
+  }
+  #wrap{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;width:100%;}
+  h1{
+    margin:0;font-size:clamp(18px,5.5vw,30px);letter-spacing:1px;
+    color:var(--primary);text-shadow:0 2px 0 rgba(0,0,0,.15);text-align:center;
+  }
+  #hud{
+    display:flex;gap:14px;font-size:clamp(12px,3.4vw,16px);font-weight:700;
+    align-items:center;flex-wrap:wrap;justify-content:center;
+  }
+  #hud .gold{color:var(--secondary);}
+  #hud .lives{color:#ff5e6c;}
+  #stage{position:relative;}
+  canvas{
+    width:min(440px,95vw);height:auto;display:block;
+    border-radius:14px;border:3px solid rgba(255,255,255,.5);
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;gap:14px;
+    background:rgba(0,0,0,.74);border-radius:12px;padding:20px;color:#fff;
+  }
+  .overlay h2{margin:0;font-size:clamp(20px,5.5vw,30px);color:var(--primary);}
+  .overlay p{margin:0;font-size:clamp(13px,3.4vw,16px);max-width:320px;line-height:1.5;color:rgba(255,255,255,.88);}
+  button.play{
+    border:none;background:var(--primary);color:#fff;font-weight:700;
+    font-size:clamp(15px,4vw,19px);padding:12px 28px;border-radius:40px;
+    cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.25);
+  }
+  button.play:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.25);}
+  #picker{display:flex;gap:8px;margin-top:2px;flex-wrap:wrap;justify-content:center;}
+  .towerBtn{
+    border:2px solid rgba(0,0,0,.12);border-radius:12px;background:rgba(255,255,255,.92);
+    color:var(--ink);padding:6px 10px;min-width:78px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;
+    box-shadow:0 3px 0 rgba(0,0,0,.15);font-weight:700;
+  }
+  .towerBtn .ic{font-size:20px;}
+  .towerBtn .nm{font-size:11px;}
+  .towerBtn .cost{font-size:11px;color:var(--secondary);}
+  .towerBtn.sel{border-color:var(--primary);background:var(--primary);color:#fff;}
+  .towerBtn.sel .cost{color:#fff;}
+  .towerBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.15);}
+  .hidden{display:none!important;}
+  #tip{font-size:12px;color:rgba(0,0,0,.5);text-align:center;max-width:440px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>__GAME_NAME__</h1>
+  <div id="hud">
+    <span class="gold">Gold: <span id="gold">0</span></span>
+    <span class="lives">Lives: <span id="lives">0</span></span>
+    <span>Wave: <span id="wave">0</span>/<span id="waveMax">0</span></span>
+    <span>Best: <span id="best">0</span></span>
+  </div>
+  <div id="stage">
+    <canvas id="c" width="440" height="360"></canvas>
+    <div id="startScreen" class="overlay">
+      <h2>__GAME_NAME__</h2>
+      <!-- ── GAME-SPECIFIC SECTION — customize how-to flavor for the theme ── -->
+      <p>Stop the invaders before they reach your base! Tap an empty tile to build a tower, tap a tower to upgrade it. Towers fire on their own. Survive every wave to win.</p>
+      <p style="font-size:12px;color:rgba(255,255,255,.6);">Pick a tower type below, then tap the grid. Each leak costs a life.</p>
+      <!-- ── END GAME-SPECIFIC SECTION ── -->
+      <button class="play" id="startBtn">Play</button>
+    </div>
+    <div id="overScreen" class="overlay hidden">
+      <h2 id="overTitle">Game Over!</h2>
+      <p id="overMsg"></p>
+      <button class="play" id="againBtn">Play again</button>
+    </div>
+  </div>
+  <div id="picker"><!-- tower-type buttons injected by JS --></div>
+  <div id="tip">Tap grid to build &middot; tap a tower to upgrade &middot; Enter to start/restart</div>
+</div>
+<script>
+(function(){
+  // Self-focus so keyboard shortcuts (number keys, Enter) work without a click first.
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const goldEl=document.getElementById('gold'),livesEl=document.getElementById('lives');
+  const waveEl=document.getElementById('wave'),waveMaxEl=document.getElementById('waveMax'),bestEl=document.getElementById('best');
+  const startScreen=document.getElementById('startScreen'),overScreen=document.getElementById('overScreen');
+  const overTitle=document.getElementById('overTitle'),overMsg=document.getElementById('overMsg');
+  const picker=document.getElementById('picker');
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // --- Grid layout (logical units). Canvas is COLS x ROWS cells of CELL px. ---
+  const COLS=11, ROWS=9, CELL=40;            // 11*40=440 wide, 9*40=360 tall — matches canvas W/H
+  // Fixed enemy path as a list of [col,row] waypoints. Enemies walk cell-centers
+  // in order. The first cell is the spawn, the last is your base.
+  const PATH=[
+    [0,1],[3,1],[3,4],[6,4],[6,1],[9,1],[9,7],[2,7],[2,5]
+  ];
+
+  // --- Economy ---
+  const START_GOLD=80;
+  const START_LIVES=20;
+
+  // --- Tower types: id, name, icon, cost, range (px), damage, fireRate (shots/sec),
+  //     projectile color, and per-level upgrade multipliers. ---
+  const TOWERS=[
+    {id:'arrow', name:'Arrow', ic:'🏹', cost:40, range:90,  dmg:8,  rate:1.6, color:'#ffd166'},
+    {id:'cannon',name:'Cannon',ic:'💣', cost:70, range:75,  dmg:22, rate:0.7, color:'#ff7b54'},
+    {id:'frost', name:'Frost', ic:'❄️', cost:55, range:80,  dmg:5,  rate:1.2, color:'#7ad7ff', slow:0.5}
+  ];
+  // Upgrade cost = base cost * (level+1) * UPGRADE_COST_MUL. Each upgrade multiplies
+  // damage and range by UPGRADE_GAIN. Max level cap below.
+  const UPGRADE_COST_MUL=0.8;
+  const UPGRADE_GAIN=1.35;
+  const MAX_LEVEL=3;
+
+  // --- Enemy archetypes: name, icon, baseHp, speed (px/sec), reward (gold), color ---
+  const ENEMIES={
+    grunt: {ic:'👾', hp:30,  speed:46, reward:6,  color:'#9ad94f'},
+    fast:  {ic:'🦗', hp:18,  speed:78, reward:7,  color:'#54d6ff'},
+    tank:  {ic:'🛡️', hp:90,  speed:30, reward:14, color:'#c98bff'},
+    boss:  {ic:'👹', hp:320, speed:26, reward:60, color:'#ff5e6c'}
+  };
+  // --- Waves: each is a list of {type,count,gap(sec)} groups spawned in sequence.
+  //     hpMul scales every enemy's HP for late-game escalation. ---
+  const WAVES=[
+    {hpMul:1.0, groups:[{type:'grunt',count:6, gap:0.9}]},
+    {hpMul:1.1, groups:[{type:'grunt',count:8, gap:0.8}]},
+    {hpMul:1.2, groups:[{type:'fast', count:8, gap:0.6},{type:'grunt',count:4,gap:0.8}]},
+    {hpMul:1.3, groups:[{type:'tank', count:3, gap:1.4},{type:'grunt',count:8,gap:0.7}]},
+    {hpMul:1.5, groups:[{type:'fast', count:12,gap:0.5}]},
+    {hpMul:1.7, groups:[{type:'tank', count:5, gap:1.2},{type:'fast',count:8,gap:0.5}]},
+    {hpMul:2.0, groups:[{type:'grunt',count:14,gap:0.6},{type:'tank',count:4,gap:1.0}]},
+    {hpMul:2.5, groups:[{type:'boss', count:1, gap:1.0},{type:'fast',count:10,gap:0.5}]}
+  ];
+  const TIME_BETWEEN_WAVES=2.5;  // seconds of breather after a wave clears
+
+  // --- Flavor / messages ---
+  const WIN_TITLE='Base Defended!';
+  const LOSE_TITLE='Base Overrun!';
+
+  // SCORE_SCALE normalizes the posted high score so a strong run lands near ~1000.
+  // Raw score = wavesSurvived*WAVE_POINTS + enemiesKilled + (WIN_BONUS on full clear).
+  // A full clear of all 8 waves killing ~80 enemies ≈ 8*40 + 80 + 200 = 600 raw,
+  // and a great run with the win bonus tops out higher — so SCALE ~1.6 lands a
+  // strong/winning run near 1000. Tune if you change wave count or rewards.
+  const WAVE_POINTS=40;
+  const WIN_BONUS=200;
+  const SCORE_SCALE=1.6;
+  // ===== END GAME-SPECIFIC SECTION =====
+
+  waveMaxEl.textContent=WAVES.length;
+
+  // ---- Derived path geometry (cell centers in px) ----
+  function cellCenter(col,row){return {x:col*CELL+CELL/2, y:row*CELL+CELL/2};}
+  const PATH_PX=PATH.map(p=>cellCenter(p[0],p[1]));
+  // Mark path cells un-buildable.
+  const onPath={};
+  for(let i=0;i<PATH.length-1;i++){
+    let [c0,r0]=PATH[i],[c1,r1]=PATH[i+1];
+    const dc=Math.sign(c1-c0),dr=Math.sign(r1-r0);
+    let c=c0,r=r0;
+    onPath[c+','+r]=true;
+    while(c!==c1||r!==r1){c+=dc;r+=dr;onPath[c+','+r]=true;}
+  }
+
+  let best=0;
+  // ---- Mutable game state ----
+  let gold,lives,waveIdx,enemies,towers,shots,selType,running=false,won=false;
+  let spawnQueue,spawnTimer,interWaveTimer,waveActive,enemiesKilled,wavesSurvived,last;
+  let raf=0;
+
+  function reset(){
+    gold=START_GOLD;lives=START_LIVES;waveIdx=0;
+    enemies=[];towers=[];shots=[];spawnQueue=[];
+    spawnTimer=0;interWaveTimer=TIME_BETWEEN_WAVES;waveActive=false;
+    enemiesKilled=0;wavesSurvived=0;won=false;selType=0;
+    syncHUD();renderPicker();
+  }
+  function syncHUD(){
+    goldEl.textContent=gold;livesEl.textContent=lives;
+    waveEl.textContent=Math.min(waveIdx+1,WAVES.length);
+    bestEl.textContent=best;
+    renderPicker();
+  }
+
+  function renderPicker(){
+    picker.innerHTML='';
+    TOWERS.forEach((t,i)=>{
+      const b=document.createElement('button');
+      b.className='towerBtn'+(i===selType?' sel':'');
+      b.disabled=false;
+      b.innerHTML='<span class="ic">'+t.ic+'</span><span class="nm">'+t.name+'</span><span class="cost">'+t.cost+'g</span>';
+      if(typeof gold==='number'&&gold<t.cost)b.style.opacity='0.5';
+      b.addEventListener('click',()=>{selType=i;renderPicker();});
+      picker.appendChild(b);
+    });
+  }
+  renderPicker();
+
+  // ---- Build queue from waves ----
+  function loadWave(idx){
+    const w=WAVES[idx];spawnQueue=[];
+    w.groups.forEach(g=>{
+      for(let k=0;k<g.count;k++)spawnQueue.push({type:g.type,delay:g.gap,hpMul:w.hpMul});
+    });
+    spawnTimer=0;waveActive=true;
+  }
+
+  function spawnEnemy(type,hpMul){
+    const def=ENEMIES[type];
+    const start=PATH_PX[0];
+    enemies.push({
+      x:start.x,y:start.y,seg:0,t:0,
+      hp:def.hp*hpMul,maxHp:def.hp*hpMul,
+      speed:def.speed,reward:def.reward,ic:def.ic,color:def.color,
+      slowT:0
+    });
+  }
+
+  // ---- Tower placement / upgrade ----
+  function towerAt(col,row){return towers.find(t=>t.col===col&&t.row===row);}
+  function tryPlaceOrUpgrade(col,row){
+    if(!running)return;
+    if(col<0||col>=COLS||row<0||row>=ROWS)return;
+    const existing=towerAt(col,row);
+    if(existing){
+      const up=Math.round(TOWERS[existing.type].cost*(existing.level+1)*UPGRADE_COST_MUL);
+      if(existing.level>=MAX_LEVEL)return;
+      if(gold>=up){
+        gold-=up;existing.level++;
+        existing.dmg*=UPGRADE_GAIN;existing.range*=UPGRADE_GAIN;
+        syncHUD();
+      }
+      return;
+    }
+    if(onPath[col+','+row])return;            // can't build on the path
+    const def=TOWERS[selType];
+    if(gold<def.cost)return;
+    gold-=def.cost;
+    const cc=cellCenter(col,row);
+    towers.push({type:selType,col,row,x:cc.x,y:cc.y,level:0,
+      range:def.range,dmg:def.dmg,rate:def.rate,cool:0});
+    syncHUD();
+  }
+
+  // ---- Update loop ----
+  function update(dt){
+    // spawn pacing
+    if(waveActive){
+      if(spawnQueue.length){
+        spawnTimer-=dt;
+        if(spawnTimer<=0){
+          const e=spawnQueue.shift();
+          spawnEnemy(e.type,e.hpMul);
+          spawnTimer=spawnQueue.length?spawnQueue[0].delay:0;
+        }
+      }else if(enemies.length===0){
+        // wave fully cleared
+        waveActive=false;wavesSurvived++;
+        gold+=20+waveIdx*5;                   // wave-clear bounty
+        waveIdx++;
+        if(waveIdx>=WAVES.length){end(true);return;}
+        interWaveTimer=TIME_BETWEEN_WAVES;
+        syncHUD();
+      }
+    }else{
+      interWaveTimer-=dt;
+      if(interWaveTimer<=0&&waveIdx<WAVES.length){loadWave(waveIdx);syncHUD();}
+    }
+
+    // enemies move along path
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      let spd=e.speed*(e.slowT>0?0.5:1);
+      if(e.slowT>0)e.slowT-=dt;
+      let move=spd*dt;
+      while(move>0&&e.seg<PATH_PX.length-1){
+        const a=PATH_PX[e.seg],b=PATH_PX[e.seg+1];
+        const dx=b.x-e.x,dy=b.y-e.y,d=Math.hypot(dx,dy);
+        if(d<=move){e.x=b.x;e.y=b.y;e.seg++;move-=d;}
+        else{e.x+=dx/d*move;e.y+=dy/d*move;move=0;}
+      }
+      if(e.seg>=PATH_PX.length-1){
+        // reached base — costs a life
+        enemies.splice(i,1);
+        lives--;syncHUD();
+        if(lives<=0){end(false);return;}
+      }
+    }
+
+    // towers target & fire
+    towers.forEach(t=>{
+      t.cool-=dt;
+      if(t.cool>0)return;
+      // target the enemy furthest along the path within range
+      let best=null,bestSeg=-1;
+      enemies.forEach(e=>{
+        const d=Math.hypot(e.x-t.x,e.y-t.y);
+        if(d<=t.range&&e.seg>bestSeg){bestSeg=e.seg;best=e;}
+      });
+      if(best){
+        t.cool=1/t.rate;
+        const def=TOWERS[t.type];
+        shots.push({x:t.x,y:t.y,tx:best,dmg:t.dmg,color:def.color,slow:def.slow||0,life:0.5});
+      }
+    });
+
+    // projectiles
+    for(let i=shots.length-1;i>=0;i--){
+      const s=shots[i];s.life-=dt;
+      const e=s.tx;
+      if(!e||enemies.indexOf(e)<0||s.life<=0){shots.splice(i,1);continue;}
+      const dx=e.x-s.x,dy=e.y-s.y,d=Math.hypot(dx,dy);
+      const step=520*dt;
+      if(d<=step){
+        // hit
+        e.hp-=s.dmg;
+        if(s.slow)e.slowT=1.2;
+        shots.splice(i,1);
+        if(e.hp<=0){
+          const idx=enemies.indexOf(e);
+          if(idx>=0){enemies.splice(idx,1);gold+=e.reward;enemiesKilled++;syncHUD();}
+        }
+      }else{s.x+=dx/d*step;s.y+=dy/d*step;}
+    }
+  }
+
+  // ---- Render ----
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // grid background
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      ctx.fillStyle=onPath[c+','+r]?'rgba(0,0,0,.18)':'rgba(255,255,255,.06)';
+      ctx.fillRect(c*CELL+1,r*CELL+1,CELL-2,CELL-2);
+    }
+    // path line
+    ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=CELL*0.55;ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();PATH_PX.forEach((p,i)=>{i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);});ctx.stroke();
+    // base marker (last cell)
+    const base=PATH_PX[PATH_PX.length-1];
+    ctx.font='26px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('🏰',base.x,base.y);
+
+    // towers
+    towers.forEach(t=>{
+      const def=TOWERS[t.type];
+      ctx.font='22px serif';ctx.fillText(def.ic,t.x,t.y-2);
+      // level pips
+      for(let l=0;l<t.level;l++){
+        ctx.fillStyle=getCss('--primary');
+        ctx.beginPath();ctx.arc(t.x-8+l*8,t.y+13,2.5,0,7);ctx.fill();
+      }
+    });
+
+    // enemies + hp bars
+    enemies.forEach(e=>{
+      ctx.font='20px serif';ctx.fillText(e.ic,e.x,e.y);
+      const w=22,h=4,frac=Math.max(0,e.hp/e.maxHp);
+      ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(e.x-w/2,e.y-16,w,h);
+      ctx.fillStyle=frac>0.4?'#6bd66b':'#ff7b54';ctx.fillRect(e.x-w/2,e.y-16,w*frac,h);
+      if(e.slowT>0){ctx.strokeStyle='#7ad7ff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(e.x,e.y,13,0,7);ctx.stroke();}
+    });
+
+    // projectiles
+    shots.forEach(s=>{ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x,s.y,3.5,0,7);ctx.fill();});
+
+    // selected tower preview range follows nothing until tap — show range rings on towers faintly
+    // (kept minimal for clarity)
+  }
+  function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v)||'#fff';}
+
+  function loop(ts){
+    if(!running)return;
+    raf=requestAnimationFrame(loop);
+    if(!last)last=ts;
+    let dt=(ts-last)/1000;last=ts;
+    if(dt>0.05)dt=0.05;                       // clamp big frame gaps
+    update(dt);
+    draw();
+  }
+
+  function start(){
+    grabFocus();
+    reset();
+    startScreen.classList.add('hidden');
+    overScreen.classList.add('hidden');
+    running=true;last=0;
+    cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
+  }
+
+  function end(win){
+    if(!running)return;
+    running=false;won=win;cancelAnimationFrame(raf);
+    // RAW score: progress is the score — posted on BOTH win and loss.
+    let raw=wavesSurvived*WAVE_POINTS+enemiesKilled+(win?WIN_BONUS:0);
+    postHi(raw);                              // pass RAW; postHi scales once
+    const scaled=Math.round(raw*SCORE_SCALE);
+    if(scaled>best)best=scaled;
+    bestEl.textContent=best;
+    overTitle.textContent=win?WIN_TITLE:LOSE_TITLE;
+    overMsg.textContent=(win
+      ? 'You cleared all '+WAVES.length+' waves! '
+      : 'The base fell at wave '+Math.min(wavesSurvived+1,WAVES.length)+'. ')
+      +'Enemies defeated: '+enemiesKilled+'. Score: '+scaled+'.';
+    overScreen.classList.remove('hidden');
+    draw();
+  }
+
+  // ---- Scoring (rubric): monotonic + integer postHi, scaled so a strong run ≈ 1000 ----
+  let _hi=0;
+  function postHi(raw){
+    const n=Math.round((Number(raw)||0)*SCORE_SCALE);
+    if(n>_hi){_hi=n;try{window.parent.postMessage({highScore:n},'*');}catch(e){}}
+  }
+
+  // ---- Input: tap grid (place/upgrade) ----
+  function toLogical(clientX,clientY){
+    const r=cv.getBoundingClientRect();
+    return {x:(clientX-r.left)*(W/r.width), y:(clientY-r.top)*(H/r.height)};
+  }
+  function handleTap(clientX,clientY){
+    const p=toLogical(clientX,clientY);
+    const col=Math.floor(p.x/CELL),row=Math.floor(p.y/CELL);
+    tryPlaceOrUpgrade(col,row);
+  }
+  cv.addEventListener('click',e=>handleTap(e.clientX,e.clientY));
+  cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];handleTap(t.clientX,t.clientY);},{passive:false});
+
+  // ---- Keyboard: Enter to start / restart ----
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){
+      if(!running&&!startScreen.classList.contains('hidden'))start();
+      else if(!running&&!overScreen.classList.contains('hidden'))start();
+    }
+    // number keys 1..N pick tower type
+    const n=parseInt(e.key,10);
+    if(n>=1&&n<=TOWERS.length){selType=n-1;renderPicker();}
+  });
+
+  document.getElementById('startBtn').addEventListener('click',start);
+  document.getElementById('againBtn').addEventListener('click',start);
+
+  // ---- Responsive crisp canvas ----
+  function fitCanvas(){
+    const dpr=Math.min(window.devicePixelRatio||1,3);
+    const cssW=cv.getBoundingClientRect().width||W;
+    cv.width=Math.round(cssW*dpr);
+    cv.height=Math.round(cssW*(H/W)*dpr);
+    ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+    if(!running)draw();
+  }
+  // draw an idle board behind the start overlay
+  reset();
+  fitCanvas();
+  addEventListener('resize',fitCanvas);
+})();
+</script>
+</body>
+</html>

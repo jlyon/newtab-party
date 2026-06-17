@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --primary: __PRIMARY_COLOR__;
+    --secondary: __SECONDARY_COLOR__;
+    --bg: __BACKGROUND_COLOR__;
+  }
+  html,body{ touch-action:manipulation; }
+  html,body{
+    width:100%; height:100%;
+    background:var(--bg);
+    color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    overflow:hidden;
+  }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100%;
+  }
+  #game{
+    width:100%; max-width:520px;
+    padding:16px;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  /* HUD */
+  #hud{
+    width:100%; display:flex; justify-content:space-between; align-items:center;
+    font-size:clamp(13px,4vw,17px); font-weight:700;
+  }
+  .hud-box{
+    background:rgba(255,255,255,0.08); border-radius:10px;
+    padding:8px 12px; min-width:74px; text-align:center;
+  }
+  .hud-label{ display:block; font-size:0.65em; opacity:0.7; font-weight:600; letter-spacing:0.05em; }
+  .hud-val{ display:block; font-size:1.25em; color:var(--secondary); }
+  #timeBox.low .hud-val{ color:#ff5d5d; }
+
+  /* time bar */
+  #timeBarWrap{ width:100%; height:8px; background:rgba(255,255,255,0.12); border-radius:6px; overflow:hidden; }
+  #timeBar{ height:100%; width:100%; background:var(--secondary); transition:width 0.2s linear; }
+  #timeBar.low{ background:#ff5d5d; }
+
+  #hint{
+    width:100%; text-align:center; min-height:1.4em;
+    font-size:clamp(13px,3.6vw,16px); opacity:0.85; font-style:italic;
+  }
+
+  /* answer slots */
+  #answer{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    min-height:56px; width:100%;
+    padding:8px; border-radius:12px;
+    background:rgba(255,255,255,0.05);
+  }
+  #answer.shake{ animation:shake 0.4s; }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); }
+    20%,60%{ transform:translateX(-8px); }
+    40%,80%{ transform:translateX(8px); }
+  }
+  #answer.correct .slot.filled{ background:var(--secondary); border-color:var(--secondary); color:#101010; }
+
+  /* scramble row */
+  #scramble{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    min-height:56px; width:100%;
+  }
+
+  .tile{
+    width:clamp(38px,11vw,52px); height:clamp(44px,12vw,58px);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(20px,6vw,28px); font-weight:800; text-transform:uppercase;
+    cursor:pointer; transition:transform 0.1s, background 0.1s, opacity 0.1s;
+  }
+  .tile:active{ transform:scale(0.92); }
+  /* scramble tiles */
+  #scramble .tile{
+    background:var(--primary); color:#fff;
+    box-shadow:0 3px 0 rgba(0,0,0,0.25);
+  }
+  #scramble .tile.used{ visibility:hidden; }
+
+  /* answer slots: empty + filled */
+  .slot{
+    width:clamp(38px,11vw,52px); height:clamp(44px,12vw,58px);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(20px,6vw,28px); font-weight:800; text-transform:uppercase;
+    border:2px dashed rgba(255,255,255,0.25);
+    cursor:pointer; transition:transform 0.1s, background 0.1s;
+  }
+  .slot.filled{
+    border:2px solid var(--primary);
+    background:rgba(255,255,255,0.14);
+    color:#fff;
+  }
+  .slot.filled:active{ transform:scale(0.92); }
+
+  /* buttons */
+  #controls{ display:flex; gap:12px; width:100%; }
+  button.btn{
+    flex:1; padding:14px; border:none; border-radius:12px;
+    font-size:clamp(15px,4.4vw,18px); font-weight:800; cursor:pointer;
+    color:#fff; background:rgba(255,255,255,0.12);
+    transition:transform 0.08s, opacity 0.1s;
+  }
+  button.btn:active{ transform:scale(0.96); }
+  #submitBtn{ background:var(--primary); }
+  #submitBtn:disabled{ opacity:0.4; }
+
+  /* overlays */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.85);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:24px; z-index:10;
+  }
+  .overlay.hidden{ display:none; }
+  .panel{ max-width:380px; }
+  .panel h1{ font-size:clamp(26px,8vw,40px); margin-bottom:12px; color:var(--secondary); }
+  .panel p{ font-size:clamp(14px,4vw,17px); line-height:1.5; margin-bottom:18px; opacity:0.9; }
+  .panel .big{ font-size:clamp(20px,6vw,28px); font-weight:800; color:#fff; margin-bottom:6px; }
+  .play{
+    padding:16px 40px; border:none; border-radius:14px;
+    font-size:clamp(18px,5vw,22px); font-weight:800; cursor:pointer;
+    background:var(--primary); color:#fff;
+  }
+  .play:active{ transform:scale(0.96); }
+</style>
+</head>
+<body>
+  <div id="game">
+    <div id="hud">
+      <div class="hud-box"><span class="hud-label">SCORE</span><span class="hud-val" id="scoreVal">0</span></div>
+      <div class="hud-box"><span class="hud-label">STREAK</span><span class="hud-val" id="streakVal">0</span></div>
+      <div class="hud-box" id="timeBox"><span class="hud-label">TIME</span><span class="hud-val" id="timeVal">60</span></div>
+    </div>
+    <div id="timeBarWrap"><div id="timeBar"></div></div>
+    <div id="hint">&nbsp;</div>
+    <div id="answer"></div>
+    <div id="scramble"></div>
+    <div id="controls">
+      <button class="btn" id="shuffleBtn">Shuffle</button>
+      <button class="btn" id="submitBtn">Submit</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <h1>__GAME_NAME__</h1>
+      <p>Unscramble as many words as you can before time runs out!<br><br>
+         Tap letters to build the word, tap a placed letter to send it back.
+         You can also type on a keyboard and press Backspace. Hit Submit (or Enter) to check.</p>
+      <button class="play" id="startBtn">Play</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overOverlay">
+    <div class="panel">
+      <h1>Time's Up!</h1>
+      <div class="big" id="finalWords">0 words</div>
+      <p>Final Score: <span id="finalScore">0</span></p>
+      <button class="play" id="restartBtn">Play Again</button>
+    </div>
+  </div>
+
+<script>
+// ===== GAME-SPECIFIC SECTION =====
+// Word list. Each entry: { word, hint }. Hints are optional flavor (set to "" for none).
+// ~30 words so they don't repeat immediately.
+const WORDS = [
+  { word: "planet",   hint: "Orbits a star" },
+  { word: "guitar",   hint: "Six strings" },
+  { word: "rocket",   hint: "Blasts into space" },
+  { word: "puzzle",   hint: "You solve it" },
+  { word: "garden",   hint: "Flowers grow here" },
+  { word: "castle",   hint: "Where royalty lives" },
+  { word: "dragon",   hint: "Breathes fire" },
+  { word: "wizard",   hint: "Casts spells" },
+  { word: "island",   hint: "Surrounded by water" },
+  { word: "forest",   hint: "Full of trees" },
+  { word: "camera",   hint: "Takes photos" },
+  { word: "pirate",   hint: "Sails for treasure" },
+  { word: "bridge",   hint: "Crosses a river" },
+  { word: "candle",   hint: "Burns with a flame" },
+  { word: "jungle",   hint: "Dense tropical forest" },
+  { word: "market",   hint: "You buy things here" },
+  { word: "pencil",   hint: "Write and erase" },
+  { word: "rabbit",   hint: "Hops and has long ears" },
+  { word: "silver",   hint: "A shiny metal" },
+  { word: "tunnel",   hint: "Goes through a mountain" },
+  { word: "violin",   hint: "Played with a bow" },
+  { word: "winter",   hint: "The coldest season" },
+  { word: "yellow",   hint: "Color of the sun" },
+  { word: "anchor",   hint: "Keeps a ship in place" },
+  { word: "bottle",   hint: "Holds liquid" },
+  { word: "cactus",   hint: "Prickly desert plant" },
+  { word: "engine",   hint: "Powers a vehicle" },
+  { word: "flower",   hint: "Blooms in spring" },
+  { word: "helmet",   hint: "Protects your head" },
+  { word: "monkey",   hint: "Swings in trees" },
+  { word: "orange",   hint: "A citrus fruit" },
+  { word: "turtle",   hint: "Slow shelled reptile" }
+];
+
+const TIME_LIMIT = 60;        // seconds per game
+const WRONG_PENALTY = 2;      // seconds lost on a wrong submit
+const FLAVOR = "Unscramble as many words as you can!";
+// ===== END GAME-SPECIFIC SECTION =====
+
+// ---- Scoring ----
+// A STRONG 60s run: ~12 words solved. Each word ~ 10 base + length + streak/speed bonus.
+// Rough strong raw ~ 12*(10 + 2 + 5) ≈ 200+. Scale so a strong run ≈ 1000.
+const SCORE_SCALE = 5;
+let _hi = 0;
+function postHi(raw){
+  const n = Math.round((Number(raw)||0) * SCORE_SCALE);
+  if(n > _hi){ _hi = n; try{ window.parent.postMessage({highScore:n},'*'); }catch(e){} }
+}
+
+// ---- Keyboard self-focus ----
+function grabFocus(){ try{ window.focus(); }catch(e){} }
+window.addEventListener('load', grabFocus);
+window.addEventListener('pointerdown', grabFocus);
+
+// ---- Elements ----
+const scrambleEl = document.getElementById('scramble');
+const answerEl   = document.getElementById('answer');
+const hintEl     = document.getElementById('hint');
+const scoreValEl = document.getElementById('scoreVal');
+const streakValEl= document.getElementById('streakVal');
+const timeValEl  = document.getElementById('timeVal');
+const timeBox    = document.getElementById('timeBox');
+const timeBar    = document.getElementById('timeBar');
+const submitBtn  = document.getElementById('submitBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const startOverlay = document.getElementById('startOverlay');
+const overOverlay  = document.getElementById('overOverlay');
+const startBtn   = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const finalScoreEl = document.getElementById('finalScore');
+const finalWordsEl = document.getElementById('finalWords');
+
+// ---- State ----
+let rawScore = 0;
+let wordsSolved = 0;
+let streak = 0;
+let timeLeft = TIME_LIMIT;
+let running = false;
+let timerId = null;
+let deck = [];          // shuffled queue of word indices
+let current = null;     // { word, hint, letters:[{ch,id}] }
+let scrambleTiles = []; // [{ch, id, used}]
+let answerSlots = [];   // [{ch, id} | null]
+let wordStart = 0;      // timestamp word began (for speed bonus)
+
+function shuffleArray(a){
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function buildDeck(){
+  deck = shuffleArray(WORDS.map((_,i)=>i));
+}
+
+function nextWordIndex(){
+  if(deck.length === 0) buildDeck();
+  return deck.pop();
+}
+
+function scramble(word){
+  const chars = word.split('');
+  let out;
+  let tries = 0;
+  do{
+    out = shuffleArray(chars.slice());
+    tries++;
+  } while(out.join('') === word && tries < 20 && word.length > 1);
+  return out;
+}
+
+function loadWord(){
+  const idx = nextWordIndex();
+  const entry = WORDS[idx];
+  const w = entry.word.toLowerCase();
+  const scrambled = scramble(w);
+
+  current = { word: w, hint: entry.hint || "" };
+  scrambleTiles = scrambled.map((ch, i) => ({ ch, id: i, used:false }));
+  answerSlots = new Array(w.length).fill(null);
+  wordStart = Date.now();
+
+  hintEl.textContent = current.hint ? current.hint : ' ';
+  answerEl.classList.remove('correct','shake');
+  render();
+}
+
+function render(){
+  // answer slots
+  answerEl.innerHTML = '';
+  answerSlots.forEach((slot, pos) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (slot ? ' filled' : '');
+    el.textContent = slot ? slot.ch : '';
+    el.addEventListener('click', () => removeFromSlot(pos));
+    answerEl.appendChild(el);
+  });
+  // scramble tiles
+  scrambleEl.innerHTML = '';
+  scrambleTiles.forEach((t) => {
+    const el = document.createElement('div');
+    el.className = 'tile' + (t.used ? ' used' : '');
+    el.textContent = t.ch;
+    el.addEventListener('click', () => placeTile(t.id));
+    scrambleEl.appendChild(el);
+  });
+  submitBtn.disabled = answerSlots.some(s => s === null);
+}
+
+function placeTile(id){
+  if(!running) return;
+  const tile = scrambleTiles.find(t => t.id === id);
+  if(!tile || tile.used) return;
+  const pos = answerSlots.indexOf(null);
+  if(pos === -1) return;
+  answerSlots[pos] = { ch: tile.ch, id: tile.id };
+  tile.used = true;
+  render();
+}
+
+function removeFromSlot(pos){
+  if(!running) return;
+  const slot = answerSlots[pos];
+  if(!slot) return;
+  const tile = scrambleTiles.find(t => t.id === slot.id);
+  if(tile) tile.used = false;
+  answerSlots[pos] = null;
+  render();
+}
+
+// type a letter -> fill next unused matching scramble tile
+function typeLetter(ch){
+  if(!running) return;
+  ch = ch.toLowerCase();
+  const pos = answerSlots.indexOf(null);
+  if(pos === -1) return;
+  const tile = scrambleTiles.find(t => !t.used && t.ch === ch);
+  if(!tile) return;
+  answerSlots[pos] = { ch: tile.ch, id: tile.id };
+  tile.used = true;
+  render();
+}
+
+function backspace(){
+  if(!running) return;
+  for(let i = answerSlots.length - 1; i >= 0; i--){
+    if(answerSlots[i]){ removeFromSlot(i); return; }
+  }
+}
+
+function doShuffle(){
+  if(!running) return;
+  // reshuffle only the still-available tiles' display order; keep ids/used
+  shuffleArray(scrambleTiles);
+  // ensure not accidentally fully ordered to spelled word (cosmetic)
+  render();
+}
+
+function submit(){
+  if(!running) return;
+  if(answerSlots.some(s => s === null)) return;
+  const guess = answerSlots.map(s => s.ch).join('');
+  if(guess === current.word){
+    // correct
+    const len = current.word.length;
+    const elapsed = (Date.now() - wordStart) / 1000;
+    const speedBonus = Math.max(0, Math.round(8 - elapsed)); // fast solve bonus
+    const streakBonus = streak; // grows with consecutive solves
+    const gain = 10 + len + speedBonus + streakBonus;
+    rawScore += gain;
+    wordsSolved++;
+    streak++;
+    updateHud();
+    answerEl.classList.add('correct');
+    setTimeout(() => { if(running) loadWord(); }, 350);
+  } else {
+    // wrong
+    streak = 0;
+    updateHud();
+    answerEl.classList.remove('shake');
+    void answerEl.offsetWidth; // reflow to restart animation
+    answerEl.classList.add('shake');
+    timeLeft = Math.max(0, timeLeft - WRONG_PENALTY);
+    updateTime();
+  }
+}
+
+function updateHud(){
+  scoreValEl.textContent = rawScore;
+  streakValEl.textContent = streak;
+}
+
+function updateTime(){
+  timeValEl.textContent = Math.ceil(timeLeft);
+  const pct = Math.max(0, timeLeft / TIME_LIMIT) * 100;
+  timeBar.style.width = pct + '%';
+  const low = timeLeft <= 10;
+  timeBox.classList.toggle('low', low);
+  timeBar.classList.toggle('low', low);
+}
+
+function tick(){
+  timeLeft -= 0.1;
+  if(timeLeft <= 0){
+    timeLeft = 0;
+    updateTime();
+    endGame();
+    return;
+  }
+  updateTime();
+}
+
+function startGame(){
+  rawScore = 0; wordsSolved = 0; streak = 0;
+  timeLeft = TIME_LIMIT;
+  running = true;
+  buildDeck();
+  updateHud();
+  updateTime();
+  startOverlay.classList.add('hidden');
+  overOverlay.classList.add('hidden');
+  loadWord();
+  grabFocus();
+  if(timerId) clearInterval(timerId);
+  timerId = setInterval(tick, 100);
+}
+
+function endGame(){
+  running = false;
+  if(timerId){ clearInterval(timerId); timerId = null; }
+  postHi(rawScore); // always posts; 0 words => 0
+  finalScoreEl.textContent = rawScore;
+  finalWordsEl.textContent = wordsSolved + (wordsSolved === 1 ? ' word' : ' words');
+  overOverlay.classList.remove('hidden');
+}
+
+// ---- Events ----
+submitBtn.addEventListener('click', submit);
+shuffleBtn.addEventListener('click', doShuffle);
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
+window.addEventListener('keydown', (e) => {
+  // start / restart with Enter when not running
+  if(!running){
+    if(e.key === 'Enter'){
+      if(!startOverlay.classList.contains('hidden') || !overOverlay.classList.contains('hidden')){
+        e.preventDefault();
+        startGame();
+      }
+    }
+    return;
+  }
+  if(e.key === 'Enter'){ e.preventDefault(); submit(); return; }
+  if(e.key === 'Backspace'){ e.preventDefault(); backspace(); return; }
+  if(/^[a-zA-Z]$/.test(e.key)){ e.preventDefault(); typeLetter(e.key); }
+});
+
+// initial paint
+updateTime();
+</script>
+</body>
+</html>

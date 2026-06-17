@@ -56,6 +56,11 @@ Full list of available game types:
 - Tycoon — "drag, build, upgrade, watch the money roll in"
 - Battleship — "hunt the grid, sink the fleet, fewer shots win"
 - Deal or No Deal — "open cases, dodge the banker, hold your nerve"
+- Match-3 — "swap, match three, chase the cascade"
+- Tower Defense — "place towers, hold the line, survive the waves"
+- Falling blocks — "rotate, drop, clear the line, don't top out"
+- Word Unscramble — "the letters are all there. mostly."
+- Maze Muncher — "gobble the dots, dodge the chasers"
 
 **2. Game name.** Just: "Name it. Whatever you want. I'm not your editor."
 
@@ -89,6 +94,11 @@ Tailor the deep-dive to the game:
 - **Tycoon:** What's being built (rides, stalls, farms)? Setting? What pulls in customers / generates income? Time limit?
 - **Battleship:** Setting/theme for the fleet? Ship names? How clever should the AI's hunting be?
 - **Deal or No Deal:** Who's the banker (name/personality)? How many cases? Prize-ladder theme (cash, prizes, silly stakes)?
+- **Match-3:** Tile theme (gems, emoji, fruit, faces)? Grid size? Move-limited or timed?
+- **Tower Defense:** Setting? What are the towers and the enemies? How many waves, how brutal?
+- **Falling blocks:** Theme/colors for the pieces? Any twist on the classic stack?
+- **Word Unscramble:** Word theme/category? Time limit? Hints on or off?
+- **Maze Muncher:** Who's the muncher, who are the chasers, and what's the maze theme?
 
 If the user goes off-script and just describes their game freeform, don't force the questions — extract what you need and ask only what's missing.
 
@@ -120,6 +130,11 @@ You have templates in `assets/templates/`:
 - `tycoon.html` (drag-to-build management)
 - `battleship.html` (grid-hunt naval combat)
 - `deal-or-no-deal.html` (case-opening / banker offers)
+- `match-3.html` (gem-swap, cascading clears)
+- `tower-defense.html` (place towers, survive waves)
+- `falling-block.html` (tetromino line-stacker)
+- `word-unscramble.html` (timed anagram solving)
+- `maze-muncher.html` (pac-style dot muncher)
 
 Each is a complete, working single-file game. Pick the one that matches the user's choice, **read it**, then customize. Don't rewrite from scratch — these are tuned to work, and reinventing the game loop wastes the user's 10 minutes.
 
