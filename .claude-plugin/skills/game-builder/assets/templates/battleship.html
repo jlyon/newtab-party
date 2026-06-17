@@ -435,6 +435,10 @@
       score = Math.round(SCORE_SCALE * shipCells / Math.max(playerShots, shipCells));
       if(score>getBest()){ setBest(score); }
       postHi(score);
+    } else {
+      const enemyCells = enemy.ships.reduce((s, sh) => s + sh.size, 0) || 1;
+      const enemyHits  = enemy.ships.reduce((s, sh) => s + sh.hits.size, 0);
+      postHi(Math.round(enemyHits / enemyCells * 700)); // progress toward sinking their fleet
     }
     document.getElementById('overTitle').textContent = won?WIN_TITLE:LOSE_TITLE;
     document.getElementById('overMsg').textContent = won

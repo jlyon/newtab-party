@@ -257,6 +257,9 @@
       const shotBonus = Math.max(0, 250 - (playerShots - 1) * 35); // fewer shots = more
       const raw = 400 + hpBonus + shotBonus;
       postHi(raw * SCORE_SCALE);
+    } else {
+      const dmg = Math.max(0, ai.maxHp - ai.hp);  // 0..100 — how far you wore TANGO down
+      postHi(dmg * 4 * SCORE_SCALE);              // 0..400; a near-kill loss ≈ 400, an early loss low
     }
     overlay.style.display = 'flex';
   }

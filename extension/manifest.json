@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "newtab.party",
   "version": "1.2.0",
-  "description": "A new arcade game every day. Built by AI. Played by humans. Judged by the leaderboard. Every new tab in Chrome becomes a perfectly justifiable distraction.",
+  "description": "A new arcade game every day. Built by AI, played by humans, judged by the leaderboard. Every new tab, a justifiable distraction.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

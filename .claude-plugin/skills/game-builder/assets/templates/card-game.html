@@ -202,15 +202,30 @@
       }
     }
   }
+  // Shared RAW skill metric for both outcomes: rewards matches earned and clean
+  // play. On a loss matches < PAIRS, so the score is naturally lower than a win.
+  // misses = moves beyond the minimum (a perfect game uses exactly PAIRS moves).
+  function scoreRaw() {
+    const misses = Math.max(0, moves - PAIRS);
+    return Math.max(0, matches * 100 - misses * 10 - moves * 3);
+  }
+
   function win() {
     clearInterval(timer);
     const s = Math.floor((Date.now()-startTime)/1000);
-    // misses = moves beyond the minimum (a perfect game uses exactly PAIRS moves)
-    const misses = Math.max(0, moves - PAIRS);
-    const raw = Math.max(0, matches * 100 - misses * 10 - moves * 3);
-    postHi(raw);  // postHi applies SCORE_SCALE
+    postHi(scoreRaw());  // postHi applies SCORE_SCALE
     overTitle.textContent = 'You win!';
     overMsg.textContent = WIN_MSG + ' (' + moves + ' moves, ' + s + 's)';
+    overlay.style.display = 'flex';
+  }
+
+  // Loss path (e.g. a timer/patience runs out). Posts the same progress metric
+  // as win() so partial progress still scores. Wire a loss trigger to call this.
+  function lose() {
+    clearInterval(timer);
+    postHi(scoreRaw());  // same metric; matches < PAIRS so the score is lower
+    overTitle.textContent = 'Out of time!';
+    overMsg.textContent = 'Matched ' + matches + ' / ' + PAIRS + '.';
     overlay.style.display = 'flex';
   }
 

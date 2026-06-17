@@ -239,7 +239,8 @@
 
   function getBest(){ try{ return parseInt(localStorage.getItem('yarrmada_best')||'0',10)||0; }catch(e){ return 0; } }
   function setBest(v){ try{ localStorage.setItem('yarrmada_best', String(v)); }catch(e){} }
-  function postHi(score){ try{ window.parent.postMessage({ highScore: score|0 }, '*'); }catch(e){} }
+  let _hi = 0;
+  function postHi(score){ const n = Math.round(Number(score)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
 
   function makeBoard(){
     return {
@@ -469,6 +470,10 @@
       score = Math.round(SCORE_SCALE * shipCells / Math.max(playerShots, shipCells));
       if(score>getBest()){ setBest(score); }
       postHi(score);
+    } else {
+      const enemyCells = enemy.ships.reduce((s, sh) => s + sh.size, 0) || 1;
+      const enemyHits  = enemy.ships.reduce((s, sh) => s + sh.hits.size, 0);
+      postHi(Math.round(enemyHits / enemyCells * 700)); // progress toward sinking their fleet
     }
     document.getElementById('overTitle').textContent = won?'VICTORY!':'SUNK!';
     document.getElementById('overMsg').textContent = won

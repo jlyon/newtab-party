@@ -162,8 +162,9 @@ Scores are compared across games (the leaderboard's "Previous games" table and t
 1. **No hard score ceiling.** A game must never *end* at a fixed score that every competent player reaches (the old "win at 300" bug). 
    - If the game currently ends on hitting a target score (a finish line / "win at N"), **remove that score-based ending.** Let play continue endlessly with the existing difficulty ramp; keep the death / timeout / lose condition. A cosmetic "milestone!" toast at the old threshold is fine — just don't stop play or stop scoring.
    - If the game is inherently one finite round (one minesweeper board, one battleship match, one card hand, one CYOA story), that round may end — but the **posted score must be a continuous skill metric** (time, accuracy, efficiency, margin, streak) so results spread out instead of everyone tying at the same number.
-2. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
-3. **Monotonic & integer.** Only post a new personal best, always an integer:
+2. **Report a score on loss too — "progress IS the score."** For games with a defined complete state (a clear win AND lose — minesweeper, battleship, memory match, artillery duel, etc.), `postHi` must fire on **every** game end, not only on a win. Base the score on **how far the player got** — the natural progress metric (safe tiles cleared, enemy cells hit, damage dealt, matches made, …). Winning yields the max (plus an optional small completion/speed/efficiency bonus that only applies on a win, so a clean win still edges out a near-miss loss); losing yields proportionally less. Never leave a loss un-scored.
+3. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
+4. **Monotonic & integer.** Only post a new personal best, always an integer:
    ```js
    let _hi = 0;
    const SCORE_SCALE = 1;   // tune so a great run ≈ 1000
@@ -172,7 +173,7 @@ Scores are compared across games (the leaderboard's "Previous games" table and t
      if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
    }
    ```
-4. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
+5. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
 
 ### Mobile requirements (mandatory — every game must pass these)
 

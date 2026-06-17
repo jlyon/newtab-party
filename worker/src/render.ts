@@ -193,13 +193,25 @@ ${FAVICON}
 
 <script>
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
-let games = [], currentGame = null, sessionHighScore = 0;
+let games = [], schedule = [], scheduleEpoch = null, currentGame = null, sessionHighScore = 0;
 let sessionPlayId = null;
 let lastEvaluatedScore = -1;
 
+function dayNumber(ms) { return Math.floor((ms - DAY_EPOCH) / 86400000); }
+function dayNumberFromStr(s) { const [y, m, d] = s.split('-').map(Number); return dayNumber(Date.UTC(y, m - 1, d)); }
+// Daily pick — uses the explicit append-only schedule from games.json (anchored
+// at scheduleEpoch); falls back to plain modulo. MUST match worker/src/index.ts
+// getDailyGame and extension/newtab.js.
 function dailyGame(gs) {
   if (!gs.length) return null;
-  const day = Math.floor((Date.now() - DAY_EPOCH) / 86400000);
+  if (schedule.length && scheduleEpoch) {
+    const off = dayNumber(Date.now()) - dayNumberFromStr(scheduleEpoch);
+    const L = schedule.length;
+    const id = schedule[((off % L) + L) % L];
+    const g = gs.find(x => x.id === id);
+    if (g) return g;
+  }
+  const day = dayNumber(Date.now());
   return gs[((day % gs.length) + gs.length) % gs.length];
 }
 function todayLabel() {
@@ -213,6 +225,8 @@ function fmtDate(s) {
 async function init() {
   const data = await fetch('/games.json').then(r => r.json());
   games = data.games || [];
+  schedule = data.schedule || [];
+  scheduleEpoch = data.scheduleEpoch || null;
   loadGame(dailyGame(games));
   loadRecentGames();
   window.addEventListener('message', handleMessage);

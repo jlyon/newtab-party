@@ -77,10 +77,9 @@
   const LOSE_MSG = PLAYER_NAME + ' found a mine the hard way. Classic.';
   // ==================================
 
-  // Score normalization: posted score = round(SCORE_SCALE / (seconds + 1)).
-  // Tuned so a strong intermediate clear (~45s) ≈ 1000 and a slow clear = low hundreds.
-  // Faster = higher (continuous, no ceiling). Keep the SAME scale across all minesweeper games.
-  const SCORE_SCALE = 45000;
+  // Scoring: progress IS the score — round(safeRevealed/totalSafe * 700), posted on
+  // BOTH win and loss (how far you cleared). A win adds a speed bonus so a clean fast
+  // clear ≈ 1000; a loss posts proportional progress.
 
   let board, flagged, revealed, done, firstClick;
   let timerStart, timerVal, timerTick, hiTime = null;
@@ -129,7 +128,10 @@
     if (board[r][c] === 0) adj(r, c).forEach(([nr, nc]) => flood(nr, nc));
   }
 
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  let _hi = 0;
+  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+
+  function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
 
   function endGame(won, hitR, hitC) {
     if (done) return;
@@ -140,9 +142,13 @@
       for (let c = 0; c < COLS; c++)
         if (board[r][c] === -1 && !flagged[r][c]) revealed[r][c] = true;
     render(hitR, hitC);
+    const totalSafe = ROWS*COLS - MINES;
+    const frac = totalSafe ? safeRevealed()/totalSafe : 0;
+    let outScore = Math.round(frac * 700);                          // progress: how far you got (≈700 at full clear)
+    if (won) outScore += Math.round(300 * 60 / (timerVal + 60));    // speed bonus on a clean clear → win ≈ 750..1000
+    postHi(outScore);
     if (won) {
-      const score = Math.max(1, Math.round(SCORE_SCALE / (timerVal + 1)));
-      if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; postHi(score); }
+      if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; }
       hiEl.textContent = 'Record: ' + timerVal + 's';
     }
     overTitle.textContent = won ? '🎉 Clear!' : '💥 Boom.';

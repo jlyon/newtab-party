@@ -284,6 +284,10 @@
   function grandpaWins() {
     ended = true;
     clearInterval(timer);
+    // Same RAW skill metric as win(): rewards progress (matches made before
+    // patience ran out). matches < PAIRS here so a loss scores naturally lower.
+    const raw = Math.max(0, matches * 100 + Math.round(patience) - moves * 3 - misses * 10);
+    postHi(raw);
     overTitle.textContent = 'GRANDPA WINS';
     overMsg.innerHTML = pick(GRANDPA_WINS) + '<br><br>' +
       '<span class="badge">' + matches + ' / ' + PAIRS + ' matched</span> ' +
