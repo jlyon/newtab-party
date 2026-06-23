@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Tippity Toes</title>
 <style>
   :root { --primary: #FF7AAE; --secondary: #8FE0BB; --bg: #FFF1B0; }
@@ -34,6 +34,13 @@
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700; }
   #overlay button:hover { background: #FF5C9A; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 241, 176, 0.96); flex-direction: column; text-align: center; padding: 20px; z-index: 30; }
+  #start-overlay h2 { color: #B23A6F; font-size: clamp(26px, 7vw, 42px); margin: 0 0 10px; }
+  #start-overlay p { color: #B23A6F; margin: 0 0 22px; font-size: clamp(12px, 3vw, 16px); max-width: 420px; line-height: 1.5; }
+  #start-overlay button { padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700; }
+  #start-overlay button:hover { background: #FF5C9A; }
 </style>
 </head>
 <body>
@@ -47,6 +54,11 @@
   </div>
   <div id="grid"></div>
   <div id="hint">Tap to tiptoe · Long-press (or right-click) to mark a 🐰</div>
+</div>
+<div id="start-overlay">
+  <h2>🐰 Tippity Toes 🐣</h2>
+  <p>Tap a tile to tiptoe across the basket. Long-press (or right-click) to mark a 🐰 over a suspected egg. Clear every safe tile without cracking one of the 40 eggs.</p>
+  <button id="start-btn">🐣 Start hopping</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Cracked.</h2>
@@ -82,7 +94,7 @@
   // BOTH win and loss (how far you cleared). A win adds a speed bonus so a clean fast
   // clear ≈ 1000; a loss posts proportional progress.
 
-  let board, flagged, revealed, done, firstClick;
+  let board, flagged, revealed, done, firstClick, started = false;
   let timerStart, timerVal, timerTick, hiTime = null;
 
   function reset() {
@@ -130,7 +142,7 @@
   }
 
   let _hi = 0;
-  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
 
@@ -159,7 +171,7 @@
   }
 
   function onReveal(r, c) {
-    if (done || revealed[r][c] || flagged[r][c]) return;
+    if (!started || done || revealed[r][c] || flagged[r][c]) return;
     if (firstClick) {
       firstClick = false;
       placeMines(r, c);
@@ -177,7 +189,7 @@
   }
 
   function onFlag(r, c) {
-    if (done || revealed[r][c]) return;
+    if (!started || done || revealed[r][c]) return;
     flagged[r][c] = !flagged[r][c];
     minesEl.textContent = EGG + ' ' + (MINES - flagged.flat().filter(Boolean).length);
     render();
@@ -229,6 +241,11 @@
   });
   addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    started = true;
+    reset();
+  });
   reset();
 })();
 </script>

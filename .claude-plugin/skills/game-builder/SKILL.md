@@ -160,8 +160,8 @@ The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block
 - **Test it mentally before delivering.** Walk through the win condition, lose condition, and one full play loop. If it can't be played, fix it.
 - **Keep it small.** A 200–500 line game is great. A 2000-line game is a way to miss the 10-minute target.
 - **Enter key.** All templates handle Enter to confirm the game-over overlay / restart. Keep it.
-- **High score postMessage.** Every game calls `window.parent.postMessage({ highScore: <int> }, '*')` when the player achieves a new personal best. Already wired via a `postHi()` helper in every template — do not remove it.
-- **Start screen.** For games with keyboard/directional controls, show a start overlay before the game begins. Display the game name and controls hint. The game loop must NOT start until the player clicks Play. (Templates for these game types already include this pattern.)
+- **High score postMessage.** Every game calls `window.parent.postMessage({ highScore: <int> }, '*')` on every game over via the `postHi()` helper (see the scoring rubric below — it always posts the run's score so the arcade can offer the leaderboard on any global-top-10 score, not just a new local best). Already wired in every template — do not remove it.
+- **Title screen with instructions (every game).** Every game must open on a start/title screen that shows the game name AND a one- or two-line instructions/controls hint, with a Play button. The game loop must NOT start (no spawning, no timer, no input) until the player clicks Play. This is mandatory for **all** game types — keyboard, click, drag, and card games alike — so the player always knows how to play before anything happens. For inherently narrative games (CYOA) the opening screen serves as the title screen; make sure it still states how to play (e.g. "Click a choice to continue"). Templates already include this pattern — keep it and fill in the real instructions.
 - **Keyboard self-focus.** So keyboard games respond without a mouse click first, the game must grab focus for its own window. Add this near the top of the IIFE and call `grabFocus()` on load and when the start overlay's Play button is clicked:
   ```js
   function grabFocus() { try { window.focus(); } catch (e) {} }
@@ -179,15 +179,20 @@ Scores are compared across games (the leaderboard's "Previous games" table and t
    - If the game is inherently one finite round (one minesweeper board, one battleship match, one card hand, one CYOA story), that round may end — but the **posted score must be a continuous skill metric** (time, accuracy, efficiency, margin, streak) so results spread out instead of everyone tying at the same number.
 2. **Report a score on loss too — "progress IS the score."** For games with a defined complete state (a clear win AND lose — minesweeper, battleship, memory match, artillery duel, etc.), `postHi` must fire on **every** game end, not only on a win. Base the score on **how far the player got** — the natural progress metric (safe tiles cleared, enemy cells hit, damage dealt, matches made, …). Winning yields the max (plus an optional small completion/speed/efficiency bonus that only applies on a win, so a clean win still edges out a near-miss loss); losing yields proportionally less. Never leave a loss un-scored.
 3. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
-4. **Monotonic & integer.** Only post a new personal best, always an integer:
+4. **Report every game over — not just new bests.** The arcade offers the leaderboard whenever a score lands in the day's **global top 10** (across everyone's plays today), so the game must report the run's final score on **every** game over, even when it's lower than a previous run this page-load. Do NOT gate the `postMessage` on a local "new best" check — that's the old bug where a game only prompted on the highest score of the current page load. Keep `_hi` only for the game's own on-screen "best" display; always post the run's score:
    ```js
    let _hi = 0;
    const SCORE_SCALE = 1;   // tune so a great run ≈ 1000
+   // Call once per game over with the run's final score. Always posts so the
+   // arcade can offer the leaderboard on any global-top-10 score, not just a
+   // new local best. _hi is kept only for an in-game "best" readout.
    function postHi(raw) {
      const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-     if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+     if (n > _hi) _hi = n;
+     window.parent.postMessage({ highScore: n }, '*');
    }
    ```
+   Call `postHi(runScore)` unconditionally at game over — never wrap it in `if (runScore > best)`. Post **only at game over**, never per-frame during play (the arcade would pop the name prompt mid-game and flood the qualify check). The arcade de-dupes identical scores and decides whether to prompt.
 5. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
 
 ### Mobile requirements (mandatory — every game must pass these)
@@ -241,9 +246,9 @@ document.addEventListener('touchstart', enableTilt, { once: true });
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { touch-action: none; }
 ```
-Viewport meta must include `user-scalable=no`:
+Viewport meta must disable pinch- and double-tap-zoom on every game and screen — include both `maximum-scale=1` and `user-scalable=no`:
 ```html
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 ```
 
 **Responsive canvas.** Canvas must scale down to fit phones in portrait. Use:
@@ -254,15 +259,16 @@ where X is the canvas's `width` attribute. All game coordinates stay fixed at th
 
 **Controls below canvas.** Place mobile buttons BELOW the canvas in a flex row. Minimum touch target: `height: 52px; min-width: 48px`. Style with `user-select: none; -webkit-touch-callout: none` so long-press doesn't select. `.btn:active, .btn.held { background: var(--primary); }` gives clear press feedback.
 
-**On-screen controls appear on touch devices only.** The D-pad / fire / aim buttons are a phone affordance — they must NOT show on desktop, where the keyboard/mouse is used. Hide them by default and reveal them only once touch is detected. This keeps the desktop layout clean while guaranteeing full touch playability.
+**On-screen controls appear on touch devices only (mandatory).** The D-pad / fire / aim buttons are a phone affordance — they MUST NOT show on desktop, where the keyboard/mouse is used. They appear ONLY on mobile/touch. Hide them by default and reveal them only once touch is detected — never toggle them visible from gameplay JS without a touch gate, and never leave them visible by default. This keeps the desktop layout clean while guaranteeing full touch playability.
 ```css
-#touch-controls { display: none; }          /* wrap all on-screen buttons in this */
-body.touch #touch-controls { display: flex; }
+#touch-controls { display: none; }          /* wrap all on-screen buttons in this; hidden by default */
+body.touch #touch-controls { display: flex; } /* shown only after touch is detected */
 ```
 ```js
 // Reveal touch controls the first time the player touches the screen.
 window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 ```
+The default-hidden + `body.touch` reveal is the canonical form. If you instead default to visible and hide with `body:not(.touch)`, the result must be identical (hidden on desktop) — but prefer the default-hidden form.
 Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/penalty drag-aim) need no on-screen buttons at all — the canvas/grid taps work on both, so there's nothing to hide.
 
 **Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.

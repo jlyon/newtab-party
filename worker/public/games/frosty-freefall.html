@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Frosty Freefall</title>
 <style>
   :root{
@@ -265,7 +265,7 @@
   }
 
   let _hi=0;
-  function postHi(v){v=Math.round(v)||0;if(v>_hi){_hi=v;try{window.parent.postMessage({highScore:v},'*');}catch(e){}}}
+  function postHi(v){v=Math.round(v)||0;if(v>_hi)_hi=v;try{window.parent.postMessage({highScore:v},'*');}catch(e){}}
 
   // controls
   function holdBtn(id,key){

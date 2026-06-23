@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -31,6 +31,15 @@
   #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--secondary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: var(--primary); font-size: 13px; line-height: 1.6; margin: 0 0 28px; opacity: 0.85; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px;
+    font-family: inherit; transition: opacity 0.15s; }
+  #start-btn:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -43,6 +52,13 @@
   </div>
   <div id="board"></div>
   <div id="hint">Tap a gem then an adjacent one — or swipe — to swap. Line up 3+ to clear.</div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Tap a gem then an adjacent one — or swipe — to swap two gems.<br>Line up 3+ of a kind to clear them and rack up cascades before you run out of moves.</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Out of moves!</h2>
@@ -77,11 +93,15 @@
   // run (~6000 raw) to ≈1000 posted. Pass the RAW running score; never double-scale.
   const SCORE_SCALE = 1 / 6;
   let _hi = 0;
+  // Always posts the run's score (only at game over) so the arcade can offer the
+  // leaderboard on any global-top-10 score, not just a new local best.
   function postHi(raw){ const n = Math.round((Number(raw)||0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
 
+  const startOverlay = document.getElementById('start-overlay');
   let grid;            // grid[r][c] = tile type index, or -1 = empty
-  let movesLeft, rawScore, busy, done;
+  let movesLeft, rawScore, busy, done, started;
   let sel = null;      // selected {r,c}
 
   function cellSize(){ return Math.min(46, Math.floor((Math.min(window.innerWidth - 24, 400)) / SIZE)); }
@@ -183,9 +203,8 @@
     movesLeft--;
     movesEl.textContent = movesLeft;
     await resolve();
-    postHi(rawScore);
     busy = false;
-    if (movesLeft <= 0) endGame();
+    if (movesLeft <= 0) endGame();   // postHi fires once, at game over (in endGame)
   }
 
   // ---- pointer handling: tap-then-tap and swipe-to-swap ----
@@ -200,7 +219,7 @@
   let downCell = null, downX = 0, downY = 0, swiped = false;
 
   function onDown(e){
-    if (busy || done) return;
+    if (!started || busy || done) return;
     const p = e.touches ? e.touches[0] : e;
     const cell = cellAt(p.clientX, p.clientY);
     if (!cell) return;
@@ -293,6 +312,7 @@
 
   function reset(){
     movesLeft = MOVE_LIMIT; rawScore = 0; busy = false; done = false; sel = null;
+    started = true;
     movesEl.textContent = movesLeft;
     scoreEl.textContent = '0';
     hiEl.textContent = _hi > 0 ? _hi : '—';
@@ -303,10 +323,17 @@
 
   addEventListener('resize', () => { if (!busy) build(); });
   addEventListener('keydown', e => {
+    if (e.key === 'Enter' && startOverlay.style.display !== 'none') { document.getElementById('start-btn').click(); return; }
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
   });
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset();
+  });
+  // Prime the board behind the start overlay; gameplay input is gated until Play.
   reset();
+  started = false;
 })();
 </script>
 </body>

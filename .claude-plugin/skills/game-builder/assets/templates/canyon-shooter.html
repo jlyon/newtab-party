@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root {
@@ -212,7 +212,7 @@ body:not(.touch) #controls { display: none !important; }
   let best = 0;
   let _hi = 0;
   const SCORE_SCALE = 0.35;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi) _hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   let player, bullets, obstacles, score, lives, lastShot, lastSpawn, running;
   let scroll, columns, gap, frac, invuln, shake;
@@ -286,7 +286,8 @@ body:not(.touch) #controls { display: none !important; }
     running = false;
     overTitle.textContent = title || CRASH_TITLES[Math.floor(Math.random()*CRASH_TITLES.length)];
     overMsg.textContent = 'You flew ' + Math.floor(score) + ' ' + DIST_UNIT + ' before the canyon won.';
-    if (score > best) { best = Math.floor(score); postHi(best); bestMsg.textContent = 'New personal best! ' + best + ' ' + DIST_UNIT; }
+    postHi(Math.floor(score));   // always post this run's score
+    if (score > best) { best = Math.floor(score); bestMsg.textContent = 'New personal best! ' + best + ' ' + DIST_UNIT; }
     else { bestMsg.textContent = 'Best: ' + best + ' ' + DIST_UNIT; }
     overlay.style.display = 'flex';
   }

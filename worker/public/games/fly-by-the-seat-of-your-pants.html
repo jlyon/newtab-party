@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Fly by the Seat of Your Pants</title>
 <style>
   :root {
@@ -200,7 +200,7 @@ body:not(.touch) #controls { display: none !important; }
   let best = 0;
   let _hi = 0;
   const SCORE_SCALE = 0.35;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   let player, bullets, asteroids, score, lives, lastShot, lastSpawn, running;
   let scroll, columns, gap, frac, invuln, shake;
@@ -277,7 +277,9 @@ body:not(.touch) #controls { display: none !important; }
     running = false;
     overTitle.textContent = title || crashTitles[Math.floor(Math.random()*crashTitles.length)];
     overMsg.textContent = 'You flew ' + Math.floor(score) + ' clicks before the galaxy won.';
-    if (score > best) { best = Math.floor(score); postHi(best); bestMsg.textContent = 'New personal best! ' + best; }
+    const finalScore = Math.floor(score);
+    postHi(finalScore);
+    if (finalScore > best) { best = finalScore; bestMsg.textContent = 'New personal best! ' + best; }
     else { bestMsg.textContent = 'Best: ' + best; }
     overlay.style.display = 'flex';
   }

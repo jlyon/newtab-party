@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root{
@@ -228,9 +228,13 @@
   }
 
   let _hi=0;
+  // Always post the run's final score so the arcade can offer the leaderboard on
+  // any global-top-10 score, not just a new local best. _hi is kept only for the
+  // in-game "best" readout.
   function postHi(n){
     n=Math.floor(n)||0;
-    if(n>_hi){_hi=n;window.parent.postMessage({highScore:n},'*');}
+    if(n>_hi){_hi=n;}
+    try{window.parent.postMessage({highScore:n},'*');}catch(e){}
   }
 
   function holdBtn(id,key){

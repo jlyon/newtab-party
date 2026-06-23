@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -222,7 +222,6 @@
       level = 1 + Math.floor(lines / 10);
       dropMs = Math.max(80, 800 - (level - 1) * 70);  // ramp speed by level
       updateHud();
-      postHi(score);
     }
   }
 
@@ -247,9 +246,13 @@
   // STRONG game near ~1000 on the shared leaderboard. Pass RAW; never re-scale.
   const SCORE_SCALE = 0.25;
   let _hi = 0;
+  // Always post the run's final score so the arcade can offer the leaderboard on
+  // any global-top-10 score, not just a new local best. _hi is kept only for the
+  // in-game "best" readout. Call once per game over, never per-frame.
   function postHi(raw){
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   function updateHud(){

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Smithereens</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>"/>
 <style>
@@ -27,11 +27,12 @@
   .wpn-btn.active { background: var(--secondary); color: var(--bg); border-color: var(--secondary); }
   #power-bar-wrap { flex: 1; height: 16px; border: 2px solid var(--primary); border-radius: 4px; min-width: 60px; }
   #power-bar { height: 100%; width: 0%; background: var(--secondary); border-radius: 2px; transition: background 0.1s; }
-  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  #overlay, #start-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; }
-  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
-  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+  #start-overlay { display: flex; }
+  #overlay h2, #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
+  #overlay button, #start-overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
 </style>
 </head>
@@ -49,6 +50,12 @@
     <div class="ctrl-group" id="wpn-group"></div>
   </div>
 </div>
+<div id="start-overlay">
+  <h2>SMITHEREENS</h2>
+  <p>BRAVO vs TANGO — a backyard artillery duel.</p>
+  <p>← / → (or A/D) to aim &nbsp;·&nbsp; hold FIRE / Space to charge, release to launch &nbsp;·&nbsp; 1-4 to switch weapons. Blast TANGO to bits.</p>
+  <button id="start-btn">Play</button>
+</div>
 <div id="overlay">
   <h2 id="overTitle">Victory!</h2>
   <p id="overMsg"></p>
@@ -62,7 +69,8 @@
   let _hi = 0;
   function postHi(n) {
     n = Math.round(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
   let playerShots = 0;
 
@@ -409,7 +417,12 @@
 
   function loop() { step(); draw(); requestAnimationFrame(loop); }
   document.getElementById('restart').addEventListener('click', () => { reset(); grabFocus(); });
-  reset(); requestAnimationFrame(loop);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    reset(); grabFocus();   // reset sets phase='aim' so play begins now
+  });
+  // Set up the battlefield but gate all input/AI behind the title screen.
+  reset(); phase = 'start'; requestAnimationFrame(loop);
 })();
 </script>
 </body>

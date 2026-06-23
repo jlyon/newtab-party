@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Rock Em Sock Em Wrecking Ball</title>
 <style>
   :root { --primary: silver; --secondary: black; --bg: navy; }
@@ -29,12 +29,13 @@
   #btn-atk { width: 72px; border-color: #fff; color: #fff; font-size: 26px;
     background: rgba(0,0,0,0.6); }
   #btn-atk:active, #btn-atk.held { background: #fff; color: var(--bg); }
-  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  #overlay, #start-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; }
-  #overlay h2 { color: #fff; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px;
+  #start-overlay { display: flex; }
+  #overlay h2, #start-overlay h2 { color: #fff; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px;
     text-shadow: 0 0 12px var(--primary); }
-  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+  #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
+  #overlay button, #start-overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer;
     border-radius: 4px; letter-spacing: 1px; font-weight: bold; }
 </style>
@@ -55,6 +56,12 @@
     </div>
     <button class="btn" id="btn-atk">🥊</button>
   </div>
+</div>
+<div id="start-overlay">
+  <h2>ROCK EM SOCK EM WRECKING BALL</h2>
+  <p>You're Uncle Earl, brawling the HOA board.</p>
+  <p>← → (or A/D) to move &nbsp;·&nbsp; Space / Z / X (or 🥊) to punch. Survive the suits.</p>
+  <button id="start-btn">Start the brawl</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">KO!</h2>
@@ -115,7 +122,8 @@
   let _hi = 0;
   function postHi(n) {
     const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+    if (v > _hi) _hi = v;
+    try { window.parent.postMessage({ highScore: v }, '*'); } catch (e) {}
   }
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
@@ -156,10 +164,10 @@
   function endGame(won) {
     running = false;
     const prevHi = _hi;
-    postHi(score);
+    postHi(score);   // always report this run's score
     overTitle.textContent = won ? 'MOTION CARRIED. FISTS PREVAIL.' : 'GAVELED INTO OBLIVION';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
-    const isBest = Math.round(score * SCORE_SCALE) >= _hi && _hi > prevHi;
+    const isBest = Math.round(score * SCORE_SCALE) > prevHi;
     overScore.textContent = 'Score: ' + score + (isBest ? ' ★ new best!' : '');
     updateHud(); overlay.style.display = 'flex';
   }
@@ -391,7 +399,13 @@
     draw(); requestAnimationFrame(loop);
   }
   document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
-  reset(); requestAnimationFrame(loop);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    grabFocus();
+    reset();
+  });
+  // Set up a static initial frame but DO NOT start the game loop / spawning until Play.
+  reset(); running = false; requestAnimationFrame(loop);
 })();
 </script>
 </body>

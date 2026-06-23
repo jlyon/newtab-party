@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Chop Till You Drop</title>
 <style>
   :root { --primary: #DC4405; --secondary: #000000; --bg: #1c1714; }
@@ -14,7 +14,8 @@
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 150px) * 0.667)); height: auto; display: block; background: #2a221c; }
-  #controls { display: flex; gap: 12px; margin-top: 4px; }
+  #controls { display: none; gap: 12px; margin-top: 4px; }
+  body.touch #controls { display: flex; }
   .btn { height: 56px; min-width: 120px; font-size: 18px; font-weight: 700; letter-spacing: 1px;
     background: var(--secondary); color: var(--primary); border: 2px solid var(--primary);
     border-radius: 8px; cursor: pointer; font-family: inherit; user-select: none; -webkit-touch-callout: none; }
@@ -29,7 +30,6 @@
   .start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
     background: var(--primary); color: var(--secondary); border: none; cursor: pointer; border-radius: 6px; font-family: inherit; }
   .start-btn:hover { opacity: 0.88; }
-  body:not(.touch) #controls { display: none !important; }
 </style>
 </head>
 <body>
@@ -151,12 +151,14 @@
   let _hi = 0;
   function postHi(s) {
     const n = Math.round(s * SCORE_SCALE) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   function endGame(reason) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = reason === 'slow' ? 'Out of gas!' : 'Timber!';
     overMsg.textContent = reason === 'slow'
       ? PLAYER_NAME + ' stopped to catch his breath. Beavers do not rest.'

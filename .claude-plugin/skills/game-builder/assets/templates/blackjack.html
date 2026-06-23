@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -51,9 +51,32 @@
   }
   #deal-btn:active { background: var(--secondary); color: var(--bg); }
   #deal-btn:disabled { opacity: 0.3; cursor: default; }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.9); flex-direction: column; text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--secondary); font-size: clamp(24px,7vw,40px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.7; margin: 0 0 24px; }
+  #start-btn {
+    padding: 13px 38px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer;
+    border-radius: 6px; font-family: inherit;
+  }
+  #start-btn:hover { opacity: 0.88; }
 </style>
 </head>
 <body>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <!-- ── GAME-SPECIFIC SECTION — customize start screen text ── -->
+    <p>__PLAYER_NAME__, beat the dealer without busting past 21.<br><br>
+       Tap chips to set your bet, then Deal · Hit (H) for a card · Stand (S) to hold · Double (D) to double down. Blackjack pays 3:2.</p>
+    <!-- ── END GAME-SPECIFIC SECTION ── -->
+    <button id="start-btn">▶ Play</button>
+  </div>
+</div>
 <div id="wrap">
   <h1>__GAME_NAME__</h1>
   <div id="chips-row">__PLAYER_NAME__ · <span id="chips">$200</span> · Bet: $<span id="bet-disp">0</span></div>
@@ -129,7 +152,8 @@
   let _hi = 0;
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   function newShoe() { shoe = shuffle(Array.from({length:DECKS},()=>makeDeck()).flat()); }
@@ -245,7 +269,10 @@
   document.getElementById('btn-hit').addEventListener('click', hit);
   document.getElementById('btn-stand').addEventListener('click', stand);
   document.getElementById('btn-double').addEventListener('click', dbl);
+  const startOverlay = document.getElementById('start-overlay');
+  let started = false;
   addEventListener('keydown', e => {
+    if (!started) { if (e.key === 'Enter') document.getElementById('start-btn').click(); return; }
     if (e.key === 'h' || e.key === 'H') hit();
     if (e.key === 's' || e.key === 'S') stand();
     if (e.key === 'd' || e.key === 'D') dbl();
@@ -255,7 +282,12 @@
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
-  reset();
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    grabFocus();
+    started = true;
+    reset();
+  });
 })();
 </script>
 </body>

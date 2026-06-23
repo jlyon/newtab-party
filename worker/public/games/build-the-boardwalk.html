@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Build the Boardwalk</title>
 <style>
   :root {
@@ -432,7 +432,7 @@
     const score = Math.round(cash * SCORE_SCALE);
     if (score > hiScore) hiScore = score;
     if (cash > bestCash) bestCash = cash;
-    postHi(hiScore);
+    postHi(score);
     document.getElementById('endCash').textContent = fmt(cash);
     document.getElementById('endMsg').textContent =
       endLines[Math.floor(Math.random()*endLines.length)] + `  (Best: ${fmt(bestCash)})`;

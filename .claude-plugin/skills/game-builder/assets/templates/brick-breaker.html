@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root {
@@ -109,7 +109,7 @@
   // your brick layout (here ~600 chips per board, great run ~1500).
   let _hi = 0;
   const SCORE_SCALE = 0.66;   // tuned so a great run (~1500) ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi) _hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   // Keyboard self-focus so arrow keys / Space work without a manual click.
   function grabFocus(){ try{ window.focus(); }catch(e){} }

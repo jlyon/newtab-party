@@ -6,8 +6,9 @@ import gamesData from '../games.json';
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
 
-// A score qualifies for the name prompt if it lands in the day's top N.
-const LEADERBOARD_SIZE = 20;
+// A score qualifies for the name prompt if it lands in the day's top N
+// (global, across all of today's plays for the game).
+const LEADERBOARD_SIZE = 10;
 
 function getGames(): Game[] {
   return (gamesData as { games: Game[] }).games ?? [];

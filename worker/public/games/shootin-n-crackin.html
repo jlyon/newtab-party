@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>shootin n crackin</title>
 <style>
   :root { --primary: #3b82f6; --secondary: #ff3d8b; --bg: #000; }
@@ -32,16 +32,17 @@
   .dpad-gap { width: 52px; }
   .btn-fire { width: 80px; height: 80px; font-size: 28px; border-color: var(--secondary); color: var(--secondary); border-radius: 50%; }
   .btn-fire:active, .btn-fire.held { background: var(--secondary); color: #000; }
-  #overlay {
+  #overlay, #start-overlay {
     position: fixed; inset: 0; display: none;
     align-items: center; justify-content: center;
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px;
   }
-  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 38px); margin: 0 0 10px; letter-spacing: 2px; }
-  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay .small { opacity: 0.7; font-size: clamp(11px, 2.5vw, 12px); }
-  #overlay button { margin-top: 18px; padding: 10px 22px; font-size: clamp(14px, 4vw, 16px); background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold; }
-  #overlay button:hover { background: var(--secondary); }
+  #start-overlay { display: flex; }
+  #overlay h2, #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 38px); margin: 0 0 10px; letter-spacing: 2px; }
+  #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay .small, #start-overlay .small { opacity: 0.7; font-size: clamp(11px, 2.5vw, 12px); }
+  #overlay button, #start-overlay button { margin-top: 18px; padding: 10px 22px; font-size: clamp(14px, 4vw, 16px); background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold; }
+  #overlay button:hover, #start-overlay button:hover { background: var(--secondary); }
 </style>
 </head>
 <body>
@@ -67,6 +68,13 @@
     <button class="btn btn-fire" id="btn-fire">⚡</button>
   </div>
 </div>
+<div id="start-overlay">
+  <h2>shootin n crackin</h2>
+  <p>You're a Pizza Slice dodging IRS auditors.</p>
+  <p>Arrow keys / WASD to move &nbsp;·&nbsp; Space (or ⚡) to shoot</p>
+  <p class="small">Lasers BOUNCE off walls. Bosses every 30s. Stay greasy.</p>
+  <button id="start-btn">Play</button>
+</div>
 <div id="overlay">
   <h2 id="overTitle">audited</h2>
   <p id="overMsg">The IRS auditors got the slice. Tragic.</p>
@@ -89,7 +97,7 @@
   // (10/enemy, 150/boss), so ~0.5 lands a great run near 1000.
   let _hi = 0;
   const SCORE_SCALE = 0.5;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -321,7 +329,13 @@
     requestAnimationFrame(loop);
   }
   document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
-  reset();
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    grabFocus();
+    reset();
+  });
+  // Set up initial state but DO NOT start gameplay (spawns/timers) until Play.
+  reset(); running = false;
   requestAnimationFrame(loop);
 })();
 </script>

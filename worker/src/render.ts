@@ -623,7 +623,7 @@ ${FAVICON}
   .empty-row { font-size: 13px; color: rgba(255,255,255,0.25); padding: 20px 0; text-align: center; }
   .footer-note { font-size: 12px; color: rgba(255,255,255,0.25); padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
   .locked-note { font-size: 11px; color: rgba(255,200,0,0.35); margin-top: 6px; }
-  @media (max-width: 600px) { #game-date { display: none; } #high-score { display: none; } .btn-install { padding: 4px 8px; font-size: 10px; letter-spacing: 0.5px; } }
+  @media (max-width: 600px) { #game-date { display: none; } #high-score { display: none; } .btn-install { display: none; } }
 </style>
 </head>
 <body>
