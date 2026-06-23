@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -33,6 +33,15 @@
   #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: var(--primary); font-size: 13px; line-height: 1.6; margin: 0 0 28px; opacity: 0.85; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px;
+    font-family: inherit; transition: opacity 0.15s; }
+  #start-btn:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -46,6 +55,13 @@
   </div>
   <div id="grid"></div>
   <div id="hint">Click/tap to reveal · Right-click or long-press to flag 🚩</div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Click or tap a cell to reveal it — numbers show how many mines are adjacent.<br>Right-click or long-press to flag 🚩. Clear every safe cell without hitting a mine.</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Boom.</h2>
@@ -63,6 +79,8 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const gridEl = document.getElementById('grid');
+  const startOverlay = document.getElementById('start-overlay');
+  let started = false;
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = '__PLAYER_NAME__';
@@ -88,7 +106,7 @@
     board    = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     flagged  = Array.from({length: ROWS}, () => Array(COLS).fill(false));
     revealed = Array.from({length: ROWS}, () => Array(COLS).fill(false));
-    done = false; firstClick = true;
+    done = false; firstClick = true; started = true;
     clearInterval(timerTick); timerVal = 0;
     timerEl.textContent = '⏱ 0s';
     minesEl.textContent = '💣 ' + MINES;
@@ -129,7 +147,9 @@
   }
 
   let _hi = 0;
-  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+  // Always posts (only at game over) so the arcade can offer the leaderboard on any
+  // global-top-10 score, not just a new local best. _hi kept only for display.
+  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
 
@@ -158,7 +178,7 @@
   }
 
   function onReveal(r, c) {
-    if (done || revealed[r][c] || flagged[r][c]) return;
+    if (!started || done || revealed[r][c] || flagged[r][c]) return;
     if (firstClick) {
       firstClick = false;
       placeMines(r, c);
@@ -176,7 +196,7 @@
   }
 
   function onFlag(r, c) {
-    if (done || revealed[r][c]) return;
+    if (!started || done || revealed[r][c]) return;
     flagged[r][c] = !flagged[r][c];
     minesEl.textContent = '💣 ' + (MINES - flagged.flat().filter(Boolean).length);
     render();
@@ -224,11 +244,18 @@
   }
 
   addEventListener('keydown', e => {
+    if (e.key === 'Enter' && startOverlay.style.display !== 'none') { document.getElementById('start-btn').click(); return; }
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
   });
   addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset();
+  });
+  // Prime the board behind the start overlay; input is gated until Play.
   reset();
+  started = false;
 })();
 </script>
 </body>

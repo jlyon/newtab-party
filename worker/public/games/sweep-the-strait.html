@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Sweep the Strait</title>
 <style>
   :root { --primary: #d9a441; --secondary: #1fa2a6; --bg: #0a2530; }
@@ -44,6 +44,13 @@
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; font-weight: 700; }
   #overlay button:hover { filter: brightness(1.08); }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(4,16,22,0.95); flex-direction: column; text-align: center; padding: 20px; z-index: 30; }
+  #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 10px; letter-spacing: 1px; }
+  #start-overlay p { color: var(--primary); margin: 0 0 22px; font-size: clamp(12px, 3vw, 15px); max-width: 420px; line-height: 1.5; }
+  #start-overlay button { padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; font-weight: 700; }
+  #start-overlay button:hover { filter: brightness(1.08); }
 </style>
 </head>
 <body>
@@ -135,6 +142,11 @@
   <div id="grid"></div>
   <div id="hint">Tap a tile to sweep it &middot; right-click or long-press to drop a ship marker over a suspected mine. Clear every safe tile without detonating a mine.</div>
 </div>
+<div id="start-overlay">
+  <h2>Sweep the Strait</h2>
+  <p>Tap a tile to sweep it. Right-click or long-press to drop a ship marker on a suspected mine. Clear every safe tile without detonating one of the 40 mines.</p>
+  <button id="start-btn">&#9875; Set sail</button>
+</div>
 <div id="overlay">
   <h2 id="overTitle">Mine hit.</h2>
   <p id="overMsg"></p>
@@ -186,7 +198,7 @@
   // BOTH win and loss (how far you cleared). A win adds a speed bonus so a clean fast
   // clear ≈ 1000; a loss posts proportional progress.
 
-  let board, flagged, revealed, done, firstClick;
+  let board, flagged, revealed, done, firstClick, started = false;
   let timerStart, timerVal, timerTick, hiTime = null;
 
   function minesHud(n) {
@@ -243,7 +255,7 @@
   }
 
   let _hi = 0;
-  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
 
@@ -271,7 +283,7 @@
   }
 
   function onReveal(r, c) {
-    if (done || revealed[r][c] || flagged[r][c]) return;
+    if (!started || done || revealed[r][c] || flagged[r][c]) return;
     if (firstClick) {
       firstClick = false;
       placeMines(r, c);
@@ -289,7 +301,7 @@
   }
 
   function onFlag(r, c) {
-    if (done || revealed[r][c]) return;
+    if (!started || done || revealed[r][c]) return;
     flagged[r][c] = !flagged[r][c];
     minesHud(MINES - flagged.flat().filter(Boolean).length);
     render();
@@ -341,6 +353,11 @@
   });
   addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    started = true;
+    reset();
+  });
   reset();
 })();
 </script>

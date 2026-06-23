@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -46,6 +46,15 @@
   #pay-table { display: grid; grid-template-columns: auto auto; gap: 2px 14px;
     font-size: clamp(10px, 2.5vw, 12px); opacity: 0.6; }
   .pay-row.hit { opacity: 1; color: var(--secondary); font-weight: 700; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--secondary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: var(--primary); font-size: 13px; line-height: 1.6; margin: 0 0 28px; opacity: 0.85; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px;
+    font-family: inherit; transition: opacity 0.15s; }
+  #start-btn:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -61,6 +70,13 @@
     <button id="draw-btn">Deal ▶</button>
   </div>
   <div id="pay-table"></div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Pick your bet, then Deal. Click or tap cards to HOLD the ones you want to keep.<br>Hit Draw to replace the rest — land Jacks-or-Better to win. (Keys 1–5 hold, Enter deals.)</p>
+    <button id="start-btn">▶ Play</button>
+  </div>
 </div>
 <script>
 (() => {
@@ -126,11 +142,17 @@
     return null;
   }
 
+  const startOverlay = document.getElementById('start-overlay');
+  let started = false;
   let deck, hand, held, credits, bet, phase;
   let _hi = 0;
+  // Always posts the run's score so the arcade can offer the leaderboard on any
+  // global-top-10 score, not just a new local best. _hi kept only for display.
+  // Called once per completed draw (a discrete round), never per animation frame.
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   function reset() { credits = START_CREDITS; bet = 1; phase = 'deal'; renderPayTable(null); newHand(); }
@@ -147,6 +169,7 @@
   }
 
   function draw() {
+    if (!started) return;
     if (phase === 'hold') {
       credits -= bet; creditsEl.textContent = credits;
       for (let i = 0; i < 5; i++) if (!held[i]) hand[i] = deck.pop();
@@ -166,7 +189,7 @@
   }
 
   function toggleHold(i) {
-    if (phase !== 'hold') return;
+    if (!started || phase !== 'hold') return;
     held[i] = !held[i];
     renderHand();
   }
@@ -204,6 +227,10 @@
   });
   drawBtn.addEventListener('click', draw);
   addEventListener('keydown', e => {
+    if (!started) {
+      if (e.key === 'Enter') document.getElementById('start-btn').click();
+      return;
+    }
     if (e.key >= '1' && e.key <= '5') toggleHold(+e.key - 1);
     if (e.key === 'Enter' || e.key === 'd' || e.key === 'D') draw();
   });
@@ -211,6 +238,12 @@
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    started = true;
+    grabFocus();
+  });
+  // Prime the table behind the start overlay; play is gated until Play is clicked.
   reset();
 })();
 </script>

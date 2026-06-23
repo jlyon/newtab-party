@@ -47,10 +47,12 @@ ${FAVICON}
   html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
-  #game-title-wrap { position: relative; line-height: normal; }
-  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; cursor: help; }
+  #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  #game-title-wrap.has-tip { cursor: help; }
+  #game-brand { font-size: 13px; flex-shrink: 0; }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; }
   #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
-  #game-title-wrap.has-tip:hover #game-tooltip { display: block; }
+  #game-title-wrap.has-tip:hover #game-tooltip, #game-title-wrap.has-tip.show #game-tooltip { display: block; }
   #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
   #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; flex: 1; }
@@ -63,8 +65,8 @@ ${FAVICON}
   .btn-install { background: rgba(255,215,0,0.14); border: 1px solid rgba(255,215,0,0.38); color: #ffd700; font-size: 11px; font-weight: 700; cursor: pointer; padding: 5px 11px; border-radius: 5px; letter-spacing: 1px; transition: background 0.12s, transform 0.12s; text-decoration: none; text-transform: uppercase; font-family: inherit; white-space: nowrap; }
   .btn-install:hover { background: rgba(255,215,0,0.26); transform: translateY(-1px); }
   @media (max-width: 600px) {
-    #game-title-wrap { flex: 1; min-width: 0; overflow: hidden; }
-    #game-title { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    #game-title-wrap { flex: 1; min-width: 0; }
+    #game-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     #game-date { display: none; }
     #high-score { display: none; }
     .btn-install { display: none; }
@@ -73,15 +75,6 @@ ${FAVICON}
   #game-frame { width: 100%; height: 100%; border: none; display: block; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #080810; color: rgba(255,255,255,0.25); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; transition: opacity 0.3s; }
   #loading.hidden { opacity: 0; pointer-events: none; }
-  #how-panel { position: absolute; top: 10px; left: 10px; z-index: 5; max-width: 280px; background: rgba(8,8,16,0.88); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 14px 16px; backdrop-filter: blur(4px); }
-  #how-panel.hidden { display: none; }
-  #how-close { position: absolute; top: 6px; right: 8px; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.12s; line-height: 1; font-family: inherit; }
-  #how-close:hover { color: rgba(255,255,255,0.7); }
-  #how-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.55; margin-bottom: 10px; }
-  #how-how { font-size: 9px; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
-  #how-controls { font-size: 12px; color: rgba(255,255,255,0.3); margin-bottom: 14px; }
-  #how-play { background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); font-size: 13px; font-family: inherit; padding: 7px 20px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; transition: background 0.12s; }
-  #how-play:hover { background: rgba(255,255,255,0.16); }
   #about-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
   #about-overlay.open { display: flex; }
   #about-modal { background: #111118; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; max-width: 700px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 44px 48px 40px; position: relative; }
@@ -125,8 +118,8 @@ ${FAVICON}
 <body>
 <div id="app">
   <div id="topbar">
-    <span>🥳 </span>
-    <div id="game-title-wrap">
+    <div id="game-title-wrap" role="button" tabindex="0" aria-label="Show how to play">
+      <span id="game-brand">🥳</span>
       <span id="game-title"></span>
       <div id="game-tooltip">
         <div id="game-tooltip-desc"></div>
@@ -143,13 +136,6 @@ ${FAVICON}
   </div>
   <div id="game-frame-wrap">
     <div id="loading">Loading…</div>
-    <div id="how-panel" class="hidden">
-      <button id="how-close">×</button>
-      <div id="how-desc"></div>
-      <div id="how-how">Okay, but how???</div>
-      <div id="how-controls"></div>
-      <button id="how-play">▶ Play</button>
-    </div>
     <iframe id="game-frame" title="Game" tabindex="0"></iframe>
   </div>
 </div>
@@ -237,7 +223,7 @@ async function init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) focusGame(); });
   document.addEventListener('pointerdown', () => { setTimeout(focusGame, 0); });
   document.addEventListener('keydown', e => {
-    if (e.key==='Escape') { closeAbout(); skipName(); return; }
+    if (e.key==='Escape') { closeAbout(); skipName(); document.getElementById('game-title-wrap').classList.remove('show'); return; }
     const anyModalOpen = document.getElementById('about-overlay').classList.contains('open') ||
       document.getElementById('name-overlay').classList.contains('open');
     if (anyModalOpen) return;
@@ -257,13 +243,15 @@ async function init() {
   document.getElementById('about-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeAbout(); });
   document.getElementById('name-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) skipName(); });
   document.getElementById('name-input').addEventListener('keydown', e => { if (e.key==='Enter') submitName(); if (e.key==='Escape') skipName(); });
-  document.getElementById('how-close').addEventListener('click', () => {
-    document.getElementById('how-panel').classList.add('hidden');
+  // Tapping the title/icon toggles the how-to-play tooltip (for touch devices,
+  // where there's no hover). Desktop still gets it on hover via CSS.
+  const titleWrap = document.getElementById('game-title-wrap');
+  titleWrap.addEventListener('click', e => {
+    if (!titleWrap.classList.contains('has-tip')) return;
+    e.stopPropagation();
+    titleWrap.classList.toggle('show');
   });
-  document.getElementById('how-play').addEventListener('click', () => {
-    document.getElementById('how-panel').classList.add('hidden');
-    focusGame();
-  });
+  document.addEventListener('click', () => titleWrap.classList.remove('show'));
 }
 
 async function loadRecentGames() {
@@ -311,6 +299,7 @@ function loadGame(game) {
   document.getElementById('high-score').textContent = '';
   document.getElementById('high-score').classList.remove('new-best');
   const wrap = document.getElementById('game-title-wrap');
+  wrap.classList.remove('show');
   if (game.description || game.controls) {
     document.getElementById('game-tooltip-desc').textContent = game.description || '';
     document.getElementById('game-tooltip-controls').textContent = game.controls || '';
@@ -318,21 +307,13 @@ function loadGame(game) {
   } else {
     wrap.classList.remove('has-tip');
   }
+  // Games carry their own title screen with instructions now, so just load the
+  // frame behind the loading shimmer — no pre-game how-to overlay here.
   const frame = document.getElementById('game-frame');
   const loading = document.getElementById('loading');
-  if (game.controls) {
-    document.getElementById('how-desc').textContent = game.description || '';
-    document.getElementById('how-controls').textContent = game.controls;
-    document.getElementById('how-panel').classList.remove('hidden');
-    loading.classList.add('hidden');
-    frame.onload = () => { focusGame(); };
-    frame.src = '/' + game.file;
-  } else {
-    document.getElementById('how-panel').classList.add('hidden');
-    loading.classList.remove('hidden'); loading.textContent = 'Loading…';
-    frame.onload = () => { loading.classList.add('hidden'); focusGame(); };
-    frame.src = '/' + game.file;
-  }
+  loading.classList.remove('hidden'); loading.textContent = 'Loading…';
+  frame.onload = () => { loading.classList.add('hidden'); focusGame(); };
+  frame.src = '/' + game.file;
 }
 
 function handleMessage(event) {
@@ -578,10 +559,12 @@ ${FAVICON}
   html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
-  #game-title-wrap { position: relative; line-height: normal; }
-  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; cursor: help; }
+  #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  #game-title-wrap.has-tip { cursor: help; }
+  #game-brand { font-size: 13px; flex-shrink: 0; }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; }
   #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
-  #game-title-wrap.has-tip:hover #game-tooltip { display: block; }
+  #game-title-wrap.has-tip:hover #game-tooltip, #game-title-wrap.has-tip.show #game-tooltip { display: block; }
   #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
   #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
@@ -623,14 +606,14 @@ ${FAVICON}
   .empty-row { font-size: 13px; color: rgba(255,255,255,0.25); padding: 20px 0; text-align: center; }
   .footer-note { font-size: 12px; color: rgba(255,255,255,0.25); padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
   .locked-note { font-size: 11px; color: rgba(255,200,0,0.35); margin-top: 6px; }
-  @media (max-width: 600px) { #game-date { display: none; } #high-score { display: none; } .btn-install { padding: 4px 8px; font-size: 10px; letter-spacing: 0.5px; } }
+  @media (max-width: 600px) { #game-title-wrap { flex: 1; min-width: 0; } #game-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } #game-date { display: none; } #high-score { display: none; } .btn-install { display: none; } }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="topbar">
-    <span>🥳 </span>
-    <div id="game-title-wrap"${game.description || game.controls ? ' class="has-tip"' : ''}>
+    <div id="game-title-wrap"${game.description || game.controls ? ' class="has-tip" role="button" tabindex="0" aria-label="Show how to play"' : ''}>
+      <span id="game-brand">🥳</span>
       <span id="game-title">${esc(game.name)}</span>
       ${game.description || game.controls ? `<div id="game-tooltip">
         <div id="game-tooltip-desc">${esc(game.description || '')}</div>
@@ -690,6 +673,17 @@ function loadGameFrame() {
   loadingEl.classList.remove('hidden');
   frame.onload = () => loadingEl.classList.add('hidden');
   frame.src = '/${game.file}';
+}
+// Tapping the title/icon toggles the how-to-play tooltip on touch devices
+// (desktop gets it on hover via CSS).
+const titleWrap = document.getElementById('game-title-wrap');
+if (titleWrap) {
+  titleWrap.addEventListener('click', e => {
+    if (!titleWrap.classList.contains('has-tip')) return;
+    e.stopPropagation();
+    titleWrap.classList.toggle('show');
+  });
+  document.addEventListener('click', () => titleWrap.classList.remove('show'));
 }
 const scoresOverlay = document.getElementById('scores-overlay');
 function closeScores() { scoresOverlay.classList.remove('open'); loadGameFrame(); }

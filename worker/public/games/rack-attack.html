@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Rack Attack</title>
 <style>
   :root { --primary: #e23b3b; --secondary: #ffd400; --bg: #16110d; --ball: #f5f5f5; }
@@ -103,7 +103,7 @@ body.touch #controls { display: flex; }
 
   let _hi = 0;
   const SCORE_SCALE = 100;   // tuned so a great run ≈ 1000 (full 10-cup clear)
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
@@ -226,7 +226,7 @@ body.touch #controls { display: flex; }
     const sunk = 10 - alive('ai').length;
     overTitle.textContent = won ? 'You win!' : 'Chad wins';
     overMsg.textContent = won ? WIN_MSG : LOSE_MSG;
-    postHi(sunk);
+    postHi(sunk);   // always report this run's score (cups sunk)
     overlay.style.display = 'flex';
   }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -51,6 +51,14 @@
     cursor: pointer; border-radius: 6px; user-select: none; }
   .act-btn:disabled { opacity: 0.3; cursor: default; }
   .act-btn:active:not(:disabled) { background: var(--primary); color: var(--bg); }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.9); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 14px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6; margin: 0 0 26px; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; font-family: inherit; }
+  #start-btn:hover { opacity: 0.88; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; }
   #overlay h2 { color: var(--secondary); font-size: clamp(20px, 5vw, 32px); margin: 0 0 8px; }
@@ -83,6 +91,13 @@
   <div id="player-hand"></div>
   <div id="action-area">
     <button class="act-btn" id="pass-btn" style="display:none">Pass 3 cards →</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Click a card to play it &middot; follow suit when you can. Avoid hearts and the Queen of Spades &mdash; lowest score wins.</p>
+    <button id="start-btn">▶ Play</button>
   </div>
 </div>
 <div id="overlay">
@@ -134,9 +149,13 @@
   let hands, totalScores, roundScores, trickCards, trickLeader;
   let phase, roundNum, heartsBroken, passSelection, currentPlayer, aiDelay;
   let _hi = 0;
+  // Always post the run's final score so the arcade can offer the leaderboard on
+  // any global-top-10 score, not just a new local best. _hi is kept only for the
+  // game's own internal best tracking.
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   const NAMES = [PLAYER_NAME, ...AI_NAMES];
@@ -392,11 +411,18 @@
   }
 
   passBtn.addEventListener('click', doPass);
+  const startOverlay = document.getElementById('start-overlay');
   addEventListener('keydown', e => {
-    if (e.key==='Enter' && overlay.style.display!=='none') document.getElementById('restart').click();
+    if (e.key!=='Enter') return;
+    if (startOverlay.style.display!=='none') document.getElementById('start-btn').click();
+    else if (overlay.style.display!=='none') document.getElementById('restart').click();
   });
   document.getElementById('restart').addEventListener('click', reset);
-  reset();
+  // Game loop / dealing must NOT start until the player clicks Play.
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset();
+  });
 })();
 </script>
 </body>

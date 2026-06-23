@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -75,6 +75,7 @@
   function grabFocus(){ try { window.focus(); } catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   document.getElementById('start-btn').addEventListener('click', () => {
     grabFocus();
     startOverlay.style.display = 'none';
@@ -135,10 +136,11 @@
   // postHi is monotonic + integer; pass it the RAW score.
   let _hi = 0;
   const SCORE_SCALE = 0.3;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
   function endGame(won) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = won ? 'You win!' : 'Wipeout!';
     overMsg.textContent = won ? WIN_MSG : CRASH_MSG;
     overScore.textContent = 'Distance: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);

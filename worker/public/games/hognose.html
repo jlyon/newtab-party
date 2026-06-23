@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Hognose</title>
 <style>
   :root { --primary: #d4a373; --secondary: #ff6b9d; --bg: #1f1611; }
@@ -25,11 +25,13 @@
   #dp-left  { grid-column: 1; grid-row: 2; }
   #dp-down  { grid-column: 2; grid-row: 2; }
   #dp-right { grid-column: 3; grid-row: 2; }
-  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  .overlay { position: fixed; inset: 0; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
-  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
-  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+  #overlay { display: none; }
+  #start-overlay { display: flex; }
+  .overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
+  .overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  .overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
 </style>
 </head>
@@ -49,7 +51,13 @@
     <button class="dp" id="dp-right">▶</button>
   </div>
 </div>
-<div id="overlay">
+<div id="start-overlay" class="overlay">
+  <h2>HOGNOSE</h2>
+  <p>Slither, eat graduation caps, and grow. Don't hit the walls or your own tail.</p>
+  <p>Arrows / WASD &middot; swipe &middot; or D-pad to steer.</p>
+  <button id="startBtn">Play</button>
+</div>
+<div id="overlay" class="overlay">
   <h2 id="overTitle">Oops.</h2>
   <p id="overMsg"></p>
   <p id="overScore"></p>
@@ -87,6 +95,8 @@
   const OPP  = { up:'down', down:'up', left:'right', right:'left' };
 
   let snake, food, dir, next, score, hiScore = 0, running, started, lastStep, hitWall;
+  let playing = false;   // false until the player clicks Play on the title screen
+  const startOverlay = document.getElementById('start-overlay');
 
   function randFree() {
     const free = [];
@@ -111,18 +121,20 @@
   let _hi = 0;
   function postHi(n) {
     const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+    if (v > _hi) _hi = v;
+    try { window.parent.postMessage({ highScore: v }, '*'); } catch (e) {}
   }
   function endGame(won) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = won ? 'GRADUATED.' : 'Playing dead.';
     overMsg.textContent = won ? WIN_MSG : (hitWall ? DIE_WALL_MSG : DIE_SELF_MSG);
     overScore.textContent = 'Caps: ' + score + (score >= hiScore && score > 0 ? ' · new best!' : '  ·  Best: ' + hiScore);
     updateHud(); overlay.style.display = 'flex';
   }
   function setDir(d) {
-    if (!running) return;
+    if (!playing || !running) return;
     if (!started) started = true;
     if (d !== OPP[dir]) next = d;
   }
@@ -230,7 +242,10 @@
     const map = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
                   w:'up', s:'down', a:'left', d:'right' };
     if (map[e.key]) { e.preventDefault(); setDir(map[e.key]); }
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+    if (e.key === 'Enter') {
+      if (startOverlay.style.display !== 'none') { document.getElementById('startBtn').click(); return; }
+      if (overlay.style.display !== 'none') document.getElementById('restart').click();
+    }
   });
   ['up','down','left','right'].forEach(d => {
     const el = document.getElementById('dp-' + d);
@@ -254,8 +269,11 @@
   window.addEventListener('pointerdown', grabFocus);
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
-  function loop(now) { if (running) step(now); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); started = true; });
+  function loop(now) { if (playing && running) step(now); draw(); requestAnimationFrame(loop); }
+  document.getElementById('startBtn').addEventListener('click', () => {
+    grabFocus(); startOverlay.style.display = 'none'; reset(); playing = true;
+  });
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); playing = true; });
   reset();
   requestAnimationFrame(loop);
 })();

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   *{ margin:0; padding:0; box-sizing:border-box; }
@@ -222,7 +222,8 @@ const SCORE_SCALE = 5;
 let _hi = 0;
 function postHi(raw){
   const n = Math.round((Number(raw)||0) * SCORE_SCALE);
-  if(n > _hi){ _hi = n; try{ window.parent.postMessage({highScore:n},'*'); }catch(e){} }
+  if(n > _hi){ _hi = n; }
+  try{ window.parent.postMessage({highScore:n},'*'); }catch(e){}
 }
 
 // ---- Keyboard self-focus ----

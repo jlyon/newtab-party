@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Yedric Bombs</title>
 <style>
   :root { --primary: #5eead4; --secondary: #2563eb; --bg: #fbcfe8; }
@@ -20,6 +20,12 @@
   #overlay p { color: #fff; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: #0b3a44; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 600; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
+  #start-overlay h2 { color: var(--primary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 10px; letter-spacing: 1px; }
+  #start-overlay p { color: #fff; margin: 0 0 22px; font-size: clamp(12px, 3vw, 15px); max-width: 420px; line-height: 1.5; }
+  #start-overlay button { padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: #0b3a44; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -31,6 +37,11 @@
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="360" height="540"></canvas>
+</div>
+<div id="start-overlay">
+  <h2>YEDRIC BOMBS</h2>
+  <p>Tilt, swipe, or use &larr; / &rarr; to steer Yedric downhill. Dodge trees, boulders &amp; robot impostors, hit ramps to jump, and thread the gates for bonus points. Endless &mdash; go as far as you can.</p>
+  <button id="start-btn">&#9971; Drop in</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Wipeout!</h2>
@@ -107,7 +118,7 @@
 
   // Swipe support on canvas
   let ts = null;
-  canvas.addEventListener('touchstart', e => { ts = e.touches[0].clientX; started = true; }, { passive: true });
+  canvas.addEventListener('touchstart', e => { ts = e.touches[0].clientX; if (canStart) started = true; }, { passive: true });
   canvas.addEventListener('touchmove', e => {
     if (ts === null) return;
     const dx = e.touches[0].clientX - ts;
@@ -135,6 +146,7 @@
   document.addEventListener('touchstart', enableTilt, { once: true });
 
   let px, obstacles, score, hiScore = 0, spd, frame, running, started, airborne, crashKind, finishSpawned;
+  let canStart = false;   // true once the title-screen Play button is clicked
 
   function reset() {
     px = W / 2; obstacles = []; score = 0; spd = BASE_SPEED; frame = 0;
@@ -148,11 +160,12 @@
   // postHi is monotonic + integer; pass it the RAW score.
   let _hi = 0;
   const SCORE_SCALE = 0.12;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
   function endGame(won) {
     running = false;
     let isNewBest = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); isNewBest = true; }
+    if (score > hiScore) { hiScore = score; isNewBest = true; }
+    postHi(score);
     overTitle.textContent = won ? 'You win!' : 'Wipeout!';
     overMsg.textContent = won ? WIN_MSG : (CRASH_MSGS[crashKind] || CRASH_MSGS.tree);
     overScore.textContent = 'Distance: ' + score + (isNewBest ? ' ★ new best!' : '  ·  Best: ' + hiScore);
@@ -465,10 +478,16 @@
   }
 
   function loop() {
-    if (!started && (keys['ArrowLeft'] || keys['ArrowRight'] || keys['a'] || keys['d'] || tiltX !== 0)) started = true;
+    if (canStart && !started && (keys['ArrowLeft'] || keys['ArrowRight'] || keys['a'] || keys['d'] || tiltX !== 0)) started = true;
     if (running) step(); draw(); requestAnimationFrame(loop);
   }
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    canStart = true;
+    grabFocus();
+    reset();
+  });
   reset(); requestAnimationFrame(loop);
 })();
 </script>

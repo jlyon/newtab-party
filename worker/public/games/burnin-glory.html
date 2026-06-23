@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Burnin' Glory</title>
 <style>
   :root { --primary: #0a1628; --secondary: #aaff00; --bg: #f5e6c8; }
@@ -195,11 +195,13 @@
   let _hi = 0;
   function postHi(n) {
     const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+    if (v > _hi) _hi = v;
+    window.parent.postMessage({ highScore: v }, '*');
   }
   function endGame(won) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = won ? '🏆 GLORY!' : 'WRECKED!';
     overMsg.textContent = won ? WIN_MSG : CRASH_MSG;
     overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);

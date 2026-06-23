@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Oligarch's Dilemma</title>
 <style>
   :root{
@@ -236,7 +236,7 @@ const fmt = n => "$"+n.toLocaleString("en-US");
 const LOG_SCALE = 180;
 function scoreFor(win){ return Math.round(LOG_SCALE * Math.log10(1 + Math.max(0, win))); }
 let _hi = 0;
-function postHi(v){ v = Math.round(v) || 0; if(v > _hi){ _hi = v; try{ window.parent.postMessage({highScore:_hi}, "*"); }catch(e){} } }
+function postHi(v){ v = Math.round(v) || 0; if(v > _hi) _hi = v; try{ window.parent.postMessage({highScore:v}, "*"); }catch(e){} }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 

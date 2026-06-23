@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Yeti Run</title>
 <style>
   :root { --primary: #4FC3F7; --secondary: #FF6FB5; --bg: #0a1428; }
@@ -21,6 +21,12 @@
   #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
+  #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 10px; letter-spacing: 1px; }
+  #start-overlay p { color: var(--primary); margin: 0 0 22px; font-size: clamp(12px, 3vw, 15px); max-width: 420px; line-height: 1.5; }
+  #start-overlay button { padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
 </style>
 </head>
 <body>
@@ -33,6 +39,11 @@
   </div>
   <canvas id="game" width="640" height="210"></canvas>
   <div id="hint">Space · ↑ to jump &nbsp;|&nbsp; Double-jump allowed</div>
+</div>
+<div id="start-overlay">
+  <h2>YETI RUN</h2>
+  <p>Tap, or press Space / &uarr; to jump &mdash; tap again mid-air to double-jump. Dodge the snowmen, skiers &amp; avalanche boulders. Endless run; go as far as you can.</p>
+  <button id="start-btn">&#10052; Start running</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Splat.</h2>
@@ -98,6 +109,7 @@
   const EYE = '#2A1F4A';
   let py, pvy, jumpsLeft, obsts, frame, spd, score, hiScore = 0, running, started;
   let snowflakes = [];
+  let canStart = false;   // true once the title-screen Play button is clicked
 
   function reset() {
     py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2;
@@ -114,7 +126,7 @@
     hiEl.textContent = 'Best: ' + hiScore;
   }
   function jump() {
-    if (!running) return;
+    if (!canStart || !running) return;
     started = true;
     if (jumpsLeft > 0) { pvy = JUMP_FORCE; jumpsLeft--; }
   }
@@ -123,10 +135,11 @@
   // postHi is monotonic + integer; pass it the RAW score.
   let _hi = 0;
   const SCORE_SCALE = 0.7;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
   function endGame(won, killerType) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = won ? 'You win!' : 'Yedric down.';
     if (won) {
       overMsg.textContent = WIN_MSG;
@@ -327,6 +340,12 @@
   canvas.addEventListener('click', jump);
   document.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
   document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    canStart = true;
+    grabFocus();
+    reset();
+  });
 
   function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
   reset();

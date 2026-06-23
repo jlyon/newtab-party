@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>the wildcard</title>
 <style>
   :root { --primary: #d896ff; --secondary: #ff6ec7; --bg: #150421; }
@@ -41,7 +41,7 @@
 <div id="sparkles"></div>
 <div id="wrap">
   <h1>the wildcard</h1>
-  <div class="sub">A bachelorette party CYOA. You're the wild card. Try not to ruin everything. (You will.)</div>
+  <div class="sub">A bachelorette party CYOA. You're the wild card. Try not to ruin everything. (You will.) &mdash; Click a choice to continue.</div>
   <div id="scene"></div>
   <div id="choices" class="choices"></div>
   <div class="meta" id="meta"></div>
@@ -65,7 +65,8 @@
   let _hi = 0;
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   const sparkleLayer = document.getElementById('sparkles');

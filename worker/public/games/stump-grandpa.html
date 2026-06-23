@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Stump Grandpa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,12 +56,13 @@
   .card.wrong .inner { animation: shake 0.4s ease; }
   @keyframes matchPulse { 0%, 100% { transform: rotateY(180deg) scale(1); } 50% { transform: rotateY(180deg) scale(1.08); } }
   @keyframes shake { 0%, 100% { transform: rotateY(180deg) translateX(0); } 25% { transform: rotateY(180deg) translateX(-4px); } 75% { transform: rotateY(180deg) translateX(4px); } }
-  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(58,31,14,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 10; color: var(--bg); }
+  #overlay, #start-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(58,31,14,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 10; color: var(--bg); }
   #overlay.show { display: flex; }
-  #overlay h2 { font-family: 'IM Fell English SC', serif; color: var(--aged); font-size: 44px; margin: 0 0 10px; letter-spacing: 4px; }
-  #overlay p { max-width: 480px; font-size: 16px; }
-  #overlay button { margin-top: 22px; padding: 12px 26px; font-size: 15px; font-family: 'Special Elite', monospace; background: var(--aged); color: var(--ink); border: 2px solid var(--bg); cursor: pointer; letter-spacing: 2px; text-transform: uppercase; }
-  #overlay button:hover { background: var(--bg); }
+  #start-overlay { display: flex; }
+  #overlay h2, #start-overlay h2 { font-family: 'IM Fell English SC', serif; color: var(--aged); font-size: 44px; margin: 0 0 10px; letter-spacing: 4px; }
+  #overlay p, #start-overlay p { max-width: 480px; font-size: 16px; }
+  #overlay button, #start-overlay button { margin-top: 22px; padding: 12px 26px; font-size: 15px; font-family: 'Special Elite', monospace; background: var(--aged); color: var(--ink); border: 2px solid var(--bg); cursor: pointer; letter-spacing: 2px; text-transform: uppercase; }
+  #overlay button:hover, #start-overlay button:hover { background: var(--bg); }
   .badge { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; font-size: 12px; letter-spacing: 2px; }
 </style>
 </head>
@@ -82,6 +83,12 @@
   <div id="heckle">&nbsp;</div>
   <div id="board"></div>
 </div>
+<div id="start-overlay">
+  <h2>Stump Grandpa</h2>
+  <p>A memory match against an elderly menace.</p>
+  <p>Tap cards to flip and match all 18 pairs before Grandpa&rsquo;s patience runs out.</p>
+  <button id="start-btn">Begin</button>
+</div>
 <div id="overlay">
   <h2 id="overTitle">You did it!</h2>
   <p id="overMsg">All matched. Iconic.</p>
@@ -99,7 +106,8 @@
   let _hi = 0;
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   const board = document.getElementById('board');
@@ -296,11 +304,16 @@
   }
 
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-overlay').style.display = 'none';
+    reset();   // build the board and start the patience timer only now
+  });
   window.addEventListener('resize', () => {
     const maxBoard = Math.min(window.innerWidth - 32, 600);
     board.style.maxWidth = maxBoard + 'px';
   });
-  reset();
+  // Do NOT reset() on load — the game (timer, patience drain, flips) starts only
+  // when the player clicks Begin on the title screen.
 })();
 </script>
 </body>

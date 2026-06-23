@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -143,11 +143,13 @@
   let _hi = 0;
   function postHi(n) {
     const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) { _hi = v; window.parent.postMessage({ highScore: v }, '*'); }
+    if (v > _hi) _hi = v;
+    try { window.parent.postMessage({ highScore: v }, '*'); } catch (e) {}
   }
   function endGame(won) {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    postHi(score);
     overTitle.textContent = won ? 'You win!' : 'Game over';
     overMsg.textContent = won ? WIN_MSG : (hitWall ? DIE_WALL_MSG : DIE_SELF_MSG);
     overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);

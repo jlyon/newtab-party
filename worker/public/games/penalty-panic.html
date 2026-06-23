@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Penalty Panic</title>
 <style>
   :root { --bg:#16803d; --gold:#ffd23f; }
@@ -151,7 +151,7 @@ body.touch #controls { display:flex; }
   // ---------- Match state ----------
   let _hi = 0;
   const SCORE_SCALE = 200;   // tuned so a great run ≈ 1000 (5 goals ≈ 1000, sudden-death adds headroom)
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);

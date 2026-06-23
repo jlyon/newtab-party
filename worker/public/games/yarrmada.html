@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Yarrmada</title>
 <style>
   :root{
@@ -240,7 +240,7 @@
   function getBest(){ try{ return parseInt(localStorage.getItem('yarrmada_best')||'0',10)||0; }catch(e){ return 0; } }
   function setBest(v){ try{ localStorage.setItem('yarrmada_best', String(v)); }catch(e){} }
   let _hi = 0;
-  function postHi(score){ const n = Math.round(Number(score)||0); if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} } }
+  function postHi(score){ const n = Math.round(Number(score)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
 
   function makeBoard(){
     return {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>BLOUNCERROOZAL</title>
 <style>
   :root { --primary: #FFD700; --secondary: #C0C0C0; --bg: #000000; }
@@ -45,6 +45,20 @@
     box-shadow: 0 0 16px var(--primary);
   }
   #overlay button:hover { background: var(--secondary); box-shadow: 0 0 16px var(--secondary); }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 40px); margin: 0 0 10px; letter-spacing: 3px; text-shadow: 0 0 10px var(--secondary); }
+  #start-overlay p { color: var(--primary); margin: 6px 0; max-width: 520px; font-size: clamp(12px, 3.5vw, 15px); }
+  #start-overlay button {
+    margin-top: 18px; padding: 12px 26px; font-size: clamp(14px, 4vw, 16px);
+    background: var(--primary); color: var(--bg); border: none;
+    cursor: pointer; letter-spacing: 2px; font-weight: bold;
+    box-shadow: 0 0 16px var(--primary);
+  }
+  #start-overlay button:hover { background: var(--secondary); box-shadow: 0 0 16px var(--secondary); }
 </style>
 </head>
 <body>
@@ -57,6 +71,12 @@
     <span id="speed">Speed: x1.0</span>
   </div>
   <canvas id="game" width="560" height="640"></canvas>
+</div>
+<div id="start-overlay">
+  <h2>BLOUNCERROOZAL</h2>
+  <p>Smash the casino chips with the ball.</p>
+  <p class="sub">Drag or mouse to move the paddle · Tap/click or Space to launch · Catch falling chips for multiball</p>
+  <button id="start-btn">▶ Place your bets</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">House wins</h2>
@@ -71,7 +91,7 @@
   // SCORE_SCALE tuned so a great run ≈ 1000; a typical decent run = low hundreds.
   let _hi = 0;
   const SCORE_SCALE = 0.28;   // tuned so a great run (~3500 chips) ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi){_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){}} }
+  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi) _hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
@@ -84,6 +104,7 @@
   const livesEl = document.getElementById('lives');
   const speedEl = document.getElementById('speed');
   const overlay = document.getElementById('overlay');
+  const startOverlay = document.getElementById('start-overlay');
   const overTitle = document.getElementById('overTitle');
   const overMsg = document.getElementById('overMsg');
   const css = getComputedStyle(document.documentElement);
@@ -316,7 +337,14 @@
     requestAnimationFrame(loop);
   }
   document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    grabFocus();
+    reset();
+  });
+  // boot: render an idle frame behind the start overlay; do not run until Play
   reset();
+  running = false;
   requestAnimationFrame(loop);
 })();
 </script>

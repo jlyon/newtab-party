@@ -73,7 +73,6 @@ const PROMO_GAME_IDS = [
 const START_SELECTORS = [
   '#start-btn', '#startBtn', '#playBtn', '#kickoff', '#setsail',
   '#start', '#play', 'button.btn-go', 'button.primary',
-  '#how-play', // arcade home "how to play" card play button
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

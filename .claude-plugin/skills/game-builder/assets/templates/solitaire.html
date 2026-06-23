@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>__GAME_NAME__</title>
 <style>
   :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
@@ -35,6 +35,15 @@
   .card.red { color: #cc0000; }
   .card.back { background: var(--primary); cursor: default; }
   .card.sel { outline: 3px solid var(--secondary); outline-offset: 2px; z-index: 100; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--secondary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.6; margin: 0 0 28px; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px;
+    font-family: inherit; transition: opacity 0.15s; }
+  #start-btn:hover { opacity: 0.85; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; }
   #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
@@ -68,6 +77,13 @@
     <div class="tab-col" id="t4"></div>
     <div class="tab-col" id="t5"></div>
     <div class="tab-col" id="t6"></div>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>__GAME_NAME__</h2>
+    <p id="controls-hint">Klondike solitaire · Tap a card to pick it up, tap a pile to drop · Click the stock to deal · Build the four foundations A→K</p>
+    <button id="start-btn">▶ Play</button>
   </div>
 </div>
 <div id="overlay">
@@ -113,7 +129,8 @@
   let _hi = 0;
   function postHi(raw) {
     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
-    if (n > _hi) { _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {} }
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   function makeDeck() {
@@ -306,6 +323,15 @@
     if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
   });
   document.getElementById('restart').addEventListener('click', reset);
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // Title screen: the board is dealt behind the overlay, but the overlay blocks
+  // all interaction until the player taps Play — nothing is playable before then.
+  document.getElementById('start-btn').addEventListener('click', () => {
+    grabFocus();
+    document.getElementById('start-overlay').style.display = 'none';
+  });
   reset();
 })();
 </script>
