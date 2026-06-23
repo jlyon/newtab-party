@@ -14,7 +14,7 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/public/games/*.html` | Self-contained game files. Served as Cloudflare edge assets at `/games/*`. |
 | `worker/src/index.ts` | Fetch handler + all routes. Intercepts `/games/*` to strip `X-Frame-Options`. |
 | `worker/src/db.ts` | All D1 query logic (async). |
-| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()` — server-rendered HTML. Start screen overlay, topbar tooltip, name prompt, recent-games about section. |
+| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()` — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
@@ -43,7 +43,7 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
 5. `npm run deploy` from `worker/` — live immediately, no extension update needed
 
-Games with `controls` automatically get a pre-game info card in both the web player and extension.
+Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
 
 ### Rotation rules — read before touching games.json
 

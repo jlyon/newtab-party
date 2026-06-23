@@ -90,12 +90,12 @@ async function init() {
       closeAbout();
       closeLeaderboard();
       skipName();
+      document.getElementById("game-title-wrap").classList.remove("show");
     } else {
       const anyModalOpen =
         document.getElementById("lb-overlay").classList.contains("open") ||
         document.getElementById("about-overlay").classList.contains("open") ||
-        document.getElementById("name-overlay").classList.contains("open") ||
-        !document.getElementById("how-panel").classList.contains("hidden");
+        document.getElementById("name-overlay").classList.contains("open");
       if (!anyModalOpen) focusGame();
     }
   });
@@ -138,14 +138,15 @@ async function init() {
     if (e.key === "Escape") skipName();
   });
 
-  // How-to panel
-  document.getElementById("how-close").addEventListener("click", () => {
-    document.getElementById("how-panel").classList.add("hidden");
+  // How-to-play tooltip: tapping the title/icon toggles it on touch devices
+  // (desktop gets it on hover via CSS).
+  const titleWrap = document.getElementById("game-title-wrap");
+  titleWrap.addEventListener("click", (e) => {
+    if (!titleWrap.classList.contains("has-tip")) return;
+    e.stopPropagation();
+    titleWrap.classList.toggle("show");
   });
-  document.getElementById("how-play").addEventListener("click", () => {
-    document.getElementById("how-panel").classList.add("hidden");
-    focusGame();
-  });
+  document.addEventListener("click", () => titleWrap.classList.remove("show"));
 }
 
 // Focus the game frame (and its inner window, for the cross-origin iframe) so
@@ -221,6 +222,7 @@ function loadGame(game) {
   document.getElementById("high-score").classList.remove("new-best");
 
   const wrap = document.getElementById("game-title-wrap");
+  wrap.classList.remove("show");
   if (game.description || game.controls) {
     document.getElementById("game-tooltip-desc").textContent =
       game.description || "";
@@ -231,22 +233,14 @@ function loadGame(game) {
     wrap.classList.remove("has-tip");
   }
 
+  // Games carry their own title screen with instructions now, so just load the
+  // frame behind the loading shimmer — no pre-game how-to overlay here.
   const frame = document.getElementById("game-frame");
   const loading = document.getElementById("loading");
-  if (game.controls) {
-    document.getElementById("how-desc").textContent = game.description || "";
-    document.getElementById("how-controls").textContent = game.controls;
-    document.getElementById("how-panel").classList.remove("hidden");
-    loading.classList.add("hidden");
-    frame.onload = () => { focusGame(); };
-    frame.src = `${SERVER_URL}/${game.file}`;
-  } else {
-    document.getElementById("how-panel").classList.add("hidden");
-    loading.classList.remove("hidden");
-    loading.textContent = "Loading…";
-    frame.onload = () => { loading.classList.add("hidden"); focusGame(); };
-    frame.src = `${SERVER_URL}/${game.file}`;
-  }
+  loading.classList.remove("hidden");
+  loading.textContent = "Loading…";
+  frame.onload = () => { loading.classList.add("hidden"); focusGame(); };
+  frame.src = `${SERVER_URL}/${game.file}`;
 }
 
 function handleMessage(event) {
