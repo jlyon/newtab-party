@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Señor Frog's: Conga Chaos</title>
+<style>
+  :root { --primary: #34d63a; --secondary: #ff1f8e; --accent: #ffd400; --bg: #160026; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; color: var(--primary);
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(255,31,142,0.22), transparent 45%),
+      radial-gradient(circle at 80% 0%, rgba(52,214,58,0.20), transparent 45%),
+      radial-gradient(circle at 50% 120%, rgba(255,212,0,0.18), transparent 55%),
+      linear-gradient(160deg, #1d0033 0%, #160026 55%, #0c0016 100%); }
+  /* sweeping club spotlights */
+  body::before { content: ''; position: fixed; inset: -50%; z-index: 0; pointer-events: none;
+    background:
+      conic-gradient(from 0deg at 50% -10%, transparent 0deg, rgba(52,214,58,0.10) 18deg, transparent 36deg,
+        rgba(255,31,142,0.10) 60deg, transparent 80deg, rgba(255,212,0,0.10) 110deg, transparent 130deg);
+    animation: sweep 14s linear infinite; }
+  /* drifting disco dots */
+  body::after { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5;
+    background-image:
+      radial-gradient(2px 2px at 12% 22%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(2px 2px at 67% 14%, rgba(52,214,58,0.6), transparent),
+      radial-gradient(3px 3px at 33% 71%, rgba(255,31,142,0.6), transparent),
+      radial-gradient(2px 2px at 84% 63%, rgba(255,212,0,0.6), transparent),
+      radial-gradient(2px 2px at 49% 41%, rgba(255,255,255,0.4), transparent);
+    background-size: cover; animation: twinkle 3.5s ease-in-out infinite alternate; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  @keyframes twinkle { from { opacity: 0.25; } to { opacity: 0.7; } }
+  #wrap { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+  .marquee { display: flex; align-items: center; gap: 10px; }
+  .bulbs { font-size: clamp(10px,3vw,16px); letter-spacing: -2px; animation: chase 1s steps(1) infinite; }
+  @keyframes chase { 0%{ filter: hue-rotate(0deg);} 100%{ filter: hue-rotate(60deg);} }
+  h1 { margin: 0; font-size: clamp(16px, 4.6vw, 26px); letter-spacing: 2px; font-weight: 900;
+    color: #fff;
+    text-shadow:
+      0 0 4px #fff, 0 0 10px var(--secondary), 0 0 20px var(--secondary),
+      0 0 38px var(--secondary), 0 0 60px var(--primary);
+    animation: flicker 4.5s infinite; }
+  @keyframes flicker {
+    0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.55; } }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.95;
+    background: rgba(0,0,0,0.35); padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); }
+  #hud #hi { color: var(--accent); }
+  canvas { border: 2px solid var(--secondary);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 0 22px var(--secondary), 0 0 48px rgba(52,214,58,0.35), 0 10px 40px rgba(0,0,0,0.7);
+    width: min(95vw, calc(100dvh - 80px)); height: auto; display: block; border-radius: 8px;
+    background: #0c0016; }
+  #dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
+  @media (pointer: fine) { #dpad { display: none; } }
+  @media (pointer: coarse) { canvas { width: min(95vw, calc(100dvh - 200px)); } }
+  .dp { width: 50px; height: 50px; font-size: 22px; border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-touch-callout: none; }
+  .dp:active, .dp.held { background: var(--primary); color: var(--bg); }
+  #dp-up    { grid-column: 2; grid-row: 1; }
+  #dp-left  { grid-column: 1; grid-row: 2; }
+  #dp-down  { grid-column: 2; grid-row: 2; }
+  #dp-right { grid-column: 3; grid-row: 2; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(12,0,22,0.9); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #start-card { max-width: 440px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,34px); margin: 0 0 14px; letter-spacing: 1px; text-shadow: 2px 2px 0 var(--secondary); }
+  #start-card p { color: var(--accent); font-size: 13px; line-height: 1.6; margin: 0 0 26px; font-style: italic; }
+  #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 24px; font-family: inherit; transition: opacity 0.15s; }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(12,0,22,0.85); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
+  #overlay h2 { color: var(--accent); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; text-shadow: 2px 2px 0 var(--secondary); }
+  #overlay p { color: #fff; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 420px; line-height: 1.5; }
+  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px); font-weight: 700;
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 24px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="marquee">
+    <span class="bulbs">🟢🔴🟡</span>
+    <h1>Señor Frog's: Conga Chaos</h1>
+    <span class="bulbs">🟡🔴🟢</span>
+  </div>
+  <div id="hud">
+    <span>🐸 Señor Frog</span>
+    <span id="score">Conga line: 0</span>
+    <span id="hi">Best: 0</span>
+  </div>
+  <canvas id="game" width="440" height="440"></canvas>
+  <div id="dpad">
+    <button class="dp" id="dp-up">▲</button>
+    <button class="dp" id="dp-left">◀</button>
+    <button class="dp" id="dp-down">▼</button>
+    <button class="dp" id="dp-right">▶</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>Señor Frog's: Conga Chaos</h2>
+    <p id="controls-hint">Lead the conga line · arrows / WASD / swipe · recruit thirsty tourists · dodge the walls, your own line, AND the spills, cactus &amp; tables 🍹🌵🪑 · more obstacles pile up the bigger you get</p>
+    <button id="start-btn">▶ Start the conga</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">Party foul!</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Round 2 — vamos</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const hiEl    = document.getElementById('hi');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); started = true; requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const COL3 = css.getPropertyValue('--accent').trim();
+  const W = canvas.width;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // Snake reskinned as a Senor Frog's conga line. The head is Senor Frog,
+  // each body segment is a recruited dancer, the "food" is a thirsty
+  // tourist waiting to join the line. Line speeds up as it grows.
+  const GRID        = 22;                 // 22x22 on 440px = 20px cells
+  const BASE_MS     = 185;                // starting ms per step (higher = slower/easier start)
+  const MIN_MS      = 62;                 // fastest the party gets
+  const RAMP_MS     = 3.5;                // ms shaved off per recruit — progressive speed-up
+  const DANCERS     = ['💃','🕺','🪇','🎉','🍹','🌴','🦩','🍤','🌶️'];
+  const TOURISTS    = ['🧍','🕺','💃','🧑‍🦱','👯','🍸','😎'];
+  const HAZARDS     = ['🍹','🌵','🪑','🚧','🍾'];   // spills, cactus, tables — touch = wipeout
+  const START_HAZARDS = 5;                // hazards on the floor at the start
+  const HAZARD_EVERY  = 4;                // add a new hazard every N recruits
+  const MAX_HAZARDS   = 40;               // cap so the floor stays playable
+  const DIE_WALL_MSG    = 'Señor Frog conga-ed straight off the patio and into the surf.';
+  const DIE_SELF_MSG    = 'The conga line tangled into a human knot. Bouncers are not amused.';
+  const DIE_HAZARD_MSG  = 'The conga line plowed into the obstacles. Glass everywhere. Cleanup on aisle Cabo.';
+  // ==================================
+
+  const CELL = W / GRID;
+  const DIRS = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
+  const OPP  = { up:'down', down:'up', left:'right', right:'left' };
+
+  let snake, food, foodEmoji, hazards, dir, next, score, hiScore = 0, running, started, lastStep, deathReason;
+
+  function moveMs() { return Math.max(MIN_MS, BASE_MS - score * RAMP_MS); }
+
+  function occupied(x, y) {
+    return snake.some(s => s[0]===x && s[1]===y) ||
+           (hazards && hazards.some(h => h[0]===x && h[1]===y)) ||
+           (food && food[0]===x && food[1]===y);
+  }
+  function randFree() {
+    const free = [];
+    for (let x = 0; x < GRID; x++)
+      for (let y = 0; y < GRID; y++)
+        if (!occupied(x, y)) free.push([x,y]);
+    return free[Math.floor(Math.random() * free.length)];
+  }
+  function addHazard() {
+    if (hazards.length >= MAX_HAZARDS) return;
+    const c = Math.floor(GRID / 2);
+    // keep a small breathing zone around the conga line's start row
+    let cell, tries = 0;
+    do { cell = randFree(); tries++; }
+    while (tries < 60 && Math.abs(cell[1]-c) <= 1 && Math.abs(cell[0]-c) <= 3);
+    hazards.push([cell[0], cell[1], HAZARDS[Math.floor(Math.random()*HAZARDS.length)]]);
+  }
+  function spawnFood() {
+    food = null;
+    food = randFree();
+    foodEmoji = TOURISTS[Math.floor(Math.random() * TOURISTS.length)];
+  }
+  function reset() {
+    const c = Math.floor(GRID / 2);
+    snake = [[c,c],[c-1,c],[c-2,c]];
+    dir = 'right'; next = 'right'; score = 0; running = true; started = false; lastStep = 0; deathReason = 'self';
+    hazards = [];
+    for (let i = 0; i < START_HAZARDS; i++) addHazard();
+    spawnFood();
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = 'Conga line: ' + score;
+    hiEl.textContent = 'Best: ' + hiScore;
+  }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function endGame() {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = 'Party foul!';
+    overMsg.textContent = deathReason === 'wall' ? DIE_WALL_MSG
+                        : deathReason === 'hazard' ? DIE_HAZARD_MSG
+                        : DIE_SELF_MSG;
+    overScore.textContent = 'You recruited ' + score + ' dancers' +
+      (score >= hiScore && score > 0 ? ' — new record!' : '  ·  Best: ' + hiScore);
+    updateHud(); overlay.style.display = 'flex';
+  }
+  function setDir(d) {
+    if (!running) return;
+    if (!started) started = true;
+    if (d !== OPP[dir]) next = d;
+  }
+
+  function step(now) {
+    if (!started || now - lastStep < moveMs()) return;
+    lastStep = now;
+    dir = next;
+    const [dx, dy] = DIRS[dir];
+    const head = [snake[0][0] + dx, snake[0][1] + dy];
+    if (head[0] < 0 || head[0] >= GRID || head[1] < 0 || head[1] >= GRID) { deathReason = 'wall'; endGame(); return; }
+    if (snake.some(s => s[0] === head[0] && s[1] === head[1])) { deathReason = 'self'; endGame(); return; }
+    if (hazards.some(h => h[0] === head[0] && h[1] === head[1])) { deathReason = 'hazard'; endGame(); return; }
+    snake.unshift(head);
+    if (head[0] === food[0] && head[1] === food[1]) {
+      score++;
+      if (score % HAZARD_EVERY === 0) addHazard();
+      spawnFood();
+    } else { snake.pop(); }
+    updateHud();
+  }
+
+  function emojiAt(em, cx, cy, size) {
+    ctx.font = size + 'px system-ui';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(em, cx, cy);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, W);
+    // pulsing checkered club dance floor
+    const t = Date.now() / 700;
+    for (let x = 0; x < GRID; x++) {
+      for (let y = 0; y < GRID; y++) {
+        if ((x + y) % 2 === 0) {
+          const wave = 0.5 + Math.sin(t + (x + y) * 0.5) * 0.5;
+          ctx.fillStyle = wave > 0.5 ? COL2 : COL1;
+          ctx.globalAlpha = 0.07 + wave * 0.09;
+          ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    // spotlight glow from the top
+    const spot = ctx.createRadialGradient(W/2, 0, 0, W/2, 0, W);
+    spot.addColorStop(0, 'rgba(255,212,0,0.12)');
+    spot.addColorStop(1, 'rgba(255,212,0,0)');
+    ctx.fillStyle = spot; ctx.fillRect(0, 0, W, W);
+    // hazards on the floor
+    for (let i = 0; i < hazards.length; i++) {
+      const [hx, hy, hem] = hazards[i];
+      emojiAt(hem, hx*CELL + CELL/2, hy*CELL + CELL/2, CELL - 3);
+    }
+    // tourist waiting to join (pulsing)
+    const pulse = 0.85 + Math.sin(Date.now() / 250) * 0.15;
+    emojiAt(foodEmoji, food[0]*CELL + CELL/2, food[1]*CELL + CELL/2, (CELL - 2) * pulse);
+    // conga line
+    for (let i = 0; i < snake.length; i++) {
+      const [sx, sy] = snake[i];
+      const cx = sx*CELL + CELL/2, cy = sy*CELL + CELL/2;
+      if (i === 0) {
+        emojiAt('🐸', cx, cy, CELL);
+      } else {
+        ctx.globalAlpha = Math.max(0.5, 1 - i / snake.length * 0.5);
+        emojiAt(DANCERS[i % DANCERS.length], cx, cy, CELL - 3);
+        ctx.globalAlpha = 1;
+      }
+    }
+    // start hint
+    if (!started) {
+      ctx.fillStyle = COL3; ctx.globalAlpha = 0.8;
+      ctx.font = Math.round(W * 0.04) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Arrows / swipe to start the conga', W/2, W/2);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // keyboard
+  addEventListener('keydown', e => {
+    const map = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+                  w:'up', s:'down', a:'left', d:'right' };
+    if (map[e.key]) { e.preventDefault(); setDir(map[e.key]); }
+    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+  });
+  // D-pad buttons
+  ['up','down','left','right'].forEach(d => {
+    const el = document.getElementById('dp-' + d);
+    const go = e => { e.preventDefault(); setDir(d); };
+    el.addEventListener('mousedown', go);
+    el.addEventListener('touchstart', go, { passive: false });
+  });
+  // swipe on canvas
+  let swipeStart = null;
+  canvas.addEventListener('touchstart', e => { swipeStart = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+  canvas.addEventListener('touchend', e => {
+    if (!swipeStart) return;
+    const dx = e.changedTouches[0].clientX - swipeStart[0];
+    const dy = e.changedTouches[0].clientY - swipeStart[1];
+    swipeStart = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+
+  function loop(now) { if (running) step(now); draw(); requestAnimationFrame(loop); }
+  document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
+})();
+</script>
+</body>
+</html>

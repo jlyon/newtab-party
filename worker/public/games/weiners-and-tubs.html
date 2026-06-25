@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Weiners and Tubs</title>
+<style>
+  :root { --primary: #E8341C; --secondary: #2E9BE6; --bg: #14171c; --mustard: #F5B400; --wood: #8a5a2b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff;
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+  h1 { margin: 0; font-size: clamp(15px, 4.5vw, 24px); letter-spacing: 1px; font-weight: 800; }
+  h1 .a { color: var(--primary); } h1 .b { color: var(--secondary); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; }
+  canvas { border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    width: min(95vw, calc((100dvh - 150px) * 0.667)); height: auto; display: block; }
+  #controls { display: flex; gap: 14px; margin-top: 2px; }
+  .btn { width: 96px; height: 54px; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 800; color: #fff; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; cursor: pointer;
+    user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  .btn:active, .btn.held { background: var(--primary); border-color: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8,10,14,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #overlay { display: none; }
+  .badge { width: min(78vw, 320px); height: auto; margin-bottom: 14px; }
+  .card p { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6; margin: 0 0 22px; font-style: italic; max-width: 360px; }
+  .card h2 { font-size: clamp(20px,6vw,30px); margin: 0 0 6px; }
+  #overTitle { color: var(--secondary); }
+  .card .score { color: #fff; margin: 4px 0 0; font-size: clamp(13px,3.4vw,16px); }
+  button.play { margin-top: 8px; padding: 13px 38px; font-size: 16px; font-weight: 800; letter-spacing: 1px;
+    background: var(--primary); color: #fff; border: none; cursor: pointer; border-radius: 8px; font-family: inherit; }
+  button.play:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1><span class="a">Weiners</span> &amp; <span class="b">Tubs</span></h1>
+  <div id="hud">
+    <span id="score">Height: 0</span>
+    <span id="hi">Best: 0</span>
+  </div>
+  <canvas id="game" width="360" height="540"></canvas>
+  <div id="controls">
+    <div class="btn" id="leftBtn">&#9664;</div>
+    <div class="btn" id="rightBtn">&#9654;</div>
+  </div>
+</div>
+
+<div id="start-overlay" class="overlay">
+  <div class="card">
+    <div id="badgeSlot1"></div>
+    <p id="controls-hint">Frank auto-bounces &mdash; you just steer. &larr; &rarr; / A&middot;D / buttons &middot; tilt or swipe on phone.<br>Hop tub to tub up the tower. &#127866; beer = super-bounce. Icy tubs crack after one hop. Don't fall in the cold!</p>
+    <button class="play" id="start-btn">&#9654; Start hopping</button>
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="card">
+    <div id="badgeSlot2"></div>
+    <h2 id="overTitle">Splashdown!</h2>
+    <p class="score" id="overMsg"></p>
+    <p class="score" id="overScore"></p>
+    <button class="play" id="restart">&#9654; Hop again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===== LOGO =====
+  // Paste the absolute URL of your uploaded logo here and it will be used on the
+  // start and end screens automatically. Leave blank to use the drawn fallback below.
+  const LOGO_URL = '';
+  const BADGE = LOGO_URL ? `<img class="badge" src="${LOGO_URL}" alt="Weiners and Tubs" />` : `
+  <svg class="badge" viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="160" cy="150" rx="120" ry="14" fill="rgba(0,0,0,0.35)"/>
+    <g fill="#cfe8ff" opacity="0.55">
+      <circle cx="64" cy="44" r="9"/><circle cx="74" cy="32" r="7"/><circle cx="58" cy="30" r="6"/>
+      <circle cx="256" cy="44" r="9"/><circle cx="246" cy="32" r="7"/><circle cx="262" cy="30" r="6"/>
+    </g>
+    <path d="M70 78 q90 26 180 0 l-12 64 q-78 22 -156 0 z" fill="#8a5a2b" stroke="#5e3a16" stroke-width="4"/>
+    <g stroke="#5e3a16" stroke-width="3" opacity="0.7">
+      <line x1="104" y1="92" x2="98" y2="146"/><line x1="140" y1="98" x2="138" y2="152"/>
+      <line x1="180" y1="98" x2="182" y2="152"/><line x1="216" y1="92" x2="222" y2="146"/>
+    </g>
+    <ellipse cx="160" cy="80" rx="92" ry="22" fill="#2E9BE6"/>
+    <g fill="#bfe6ff">
+      <circle cx="120" cy="76" r="6"/><circle cx="150" cy="84" r="5"/><circle cx="186" cy="74" r="6"/>
+      <circle cx="210" cy="82" r="5"/><circle cx="135" cy="72" r="4"/><circle cx="172" cy="86" r="4"/>
+    </g>
+    <g transform="translate(118,18)">
+      <rect x="-6" y="18" width="40" height="46" rx="20" fill="#E8341C" stroke="#a11f0d" stroke-width="3"/>
+      <path d="M-2 34 q14 12 28 0" stroke="#F5B400" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <rect x="-6" y="40" width="40" height="14" rx="6" fill="#f1c27d" opacity="0.85"/>
+      <g transform="translate(2,16)">
+        <rect x="-4" y="0" width="14" height="9" rx="2" fill="#111"/>
+        <rect x="14" y="0" width="14" height="9" rx="2" fill="#111"/>
+        <line x1="10" y1="4" x2="14" y2="4" stroke="#111" stroke-width="3"/>
+      </g>
+      <path d="M2 30 q12 8 24 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(196,30)">
+      <rect x="0" y="8" width="22" height="30" rx="3" fill="#F5B400" stroke="#b98300" stroke-width="2"/>
+      <rect x="22" y="14" width="9" height="16" rx="4" fill="none" stroke="#b98300" stroke-width="3"/>
+      <ellipse cx="11" cy="8" rx="13" ry="6" fill="#fff"/>
+    </g>
+    <text x="160" y="178" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="34">
+      <tspan fill="#E8341C">Weiners</tspan><tspan fill="#fff" font-size="22"> &amp; </tspan><tspan fill="#2E9BE6">Tubs</tspan>
+    </text>
+  </svg>`;
+  document.getElementById('badgeSlot1').innerHTML = BADGE;
+  document.getElementById('badgeSlot2').innerHTML = BADGE;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const hiEl    = document.getElementById('hi');
+  const overlay = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  const W = canvas.width, H = canvas.height;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = 'Frank';
+  const GRAV    = 0.27;          // gentler gravity = slower, floatier
+  const JUMP     = -10.6;        // normal tub bounce
+  const SUPER    = -16;          // beer super-bounce
+  const MOVE      = 4.6;          // horizontal steer speed
+  const TUB_W = 74, TUB_H = 30;   // taller barrel tubs; landing surface stays at top (t.y)
+  const SCROLL_LINE = H * 0.46;   // when player rises above this, world scrolls
+  const GAP_MIN = 64, GAP_MAX = 92;  // tubs spaced out a bit more = fewer of them, harder
+  const PW = 32, PH = 50;          // player size (feet = bun bottom)
+  const LOSE_MSGS = [
+    PLAYER_NAME + ' belly-flopped into the cold. Ouch.',
+    'Gravity: 1. Hot dog: 0.',
+    'Should have grabbed that beer. Splash.'
+  ];
+  // ==================================
+
+  const held = { left: false, right: false };
+  const keys = {};
+  let tiltX = 0;
+  let player, tubs, beers, score, hiScore = 0, running, started, bubbles, squash, highestY;
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); started = true; };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('leftBtn', 'left');
+  holdBtn('rightBtn', 'right');
+
+  addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
+    if (['ArrowLeft','ArrowRight','a','d',' '].includes(e.key)) started = true;
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+
+  function makeTub(x, y) {
+    const r = Math.random();
+    let type = 'normal';
+    const diff = Math.min(0.4, score / 12000);   // ramps slowly with height
+    if (r < 0.06 + diff * 0.3) type = 'move';
+    else if (r < 0.12 + diff * 0.4) type = 'ice';
+    return { x, y, type, vx: (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random()*0.45), used: false, cracked: false };
+  }
+
+  function reset() {
+    player = { x: W/2, y: H - 90, vx: 0, vy: JUMP };
+    tubs = []; beers = []; bubbles = []; score = 0; squash = 0; highestY = player.y;
+    running = true; started = false;
+    // starting platform right under the player + a column above
+    tubs.push({ x: W/2, y: H - 60, type: 'normal', vx: 0, used: false, cracked: false });
+    let y = H - 60;
+    while (y > -40) { y -= GAP_MIN + Math.random()*(GAP_MAX-GAP_MIN); tubs.push(makeTub(30 + Math.random()*(W-60), y)); }
+    maybeBeer();
+    overlay.style.display = 'none'; updateHud();
+  }
+  function maybeBeer() {
+    // attach a beer above a random upper tub occasionally
+    const top = tubs.filter(t => t.y < H*0.6);
+    if (top.length && Math.random() < 0.7) {
+      const t = top[(Math.random()*top.length)|0];
+      beers.push({ x: t.x, y: t.y - 30, taken: false });
+    }
+  }
+  function updateHud() { scoreEl.textContent = 'Height: ' + score; hiEl.textContent = 'Best: ' + hiScore; }
+  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function popBubbles(x, y, color, n) {
+    for (let i = 0; i < (n||8); i++) bubbles.push({ x, y, vx:(Math.random()-0.5)*3, vy:-Math.random()*3-1, life:24, color });
+  }
+  function endGame() {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = score >= 4000 ? 'Hot tub hero!' : 'Splashdown!';
+    overMsg.textContent = LOSE_MSGS[(Math.random()*LOSE_MSGS.length)|0];
+    overScore.textContent = 'Height: ' + score + (score >= hiScore && score > 0 ? '  — new best!' : '   ·  Best: ' + hiScore);
+    updateHud(); overlay.style.display = 'flex';
+  }
+
+  function step() {
+    if (squash > 0) squash--;
+    if (!started) return;
+
+    // horizontal steer
+    let ax = 0;
+    if (keys['ArrowLeft'] || keys['a'] || held.left)  ax -= MOVE;
+    if (keys['ArrowRight']|| keys['d'] || held.right)  ax += MOVE;
+    if (ax === 0 && tiltX !== 0) ax = tiltX * MOVE;
+    player.vx = ax;
+    player.x += player.vx;
+    // wrap edges
+    if (player.x < -PW/2) player.x = W + PW/2;
+    if (player.x > W + PW/2) player.x = -PW/2;
+
+    // gravity
+    player.vy += GRAV;
+    player.y += player.vy;
+
+    // moving tubs
+    for (const t of tubs) {
+      if (t.type === 'move') {
+        t.x += t.vx;
+        if (t.x < TUB_W/2 || t.x > W - TUB_W/2) t.vx *= -1;
+      }
+    }
+
+    // bounce: only when falling and feet cross the tub top
+    if (player.vy > 0) {
+      for (const t of tubs) {
+        if (t.cracked) continue;
+        const feet = player.y + PH/2;
+        if (feet >= t.y - 6 && feet <= t.y + TUB_H &&
+            Math.abs(player.x - t.x) < TUB_W/2 + 4 &&
+            (player.y + PH/2 - player.vy) <= t.y + 2) {
+          player.vy = JUMP;
+          squash = 6;
+          popBubbles(player.x, t.y, '#bfe6ff', 5);
+          if (t.type === 'ice') { t.cracked = true; }
+          break;
+        }
+      }
+    }
+
+    // beer pickup -> super bounce
+    for (const b of beers) {
+      if (b.taken) continue;
+      if (Math.abs(player.x - b.x) < 20 && Math.abs(player.y - b.y) < 22) {
+        b.taken = true; player.vy = SUPER; squash = 8;
+        score += 100; popBubbles(b.x, b.y, '#F5B400', 12);
+      }
+    }
+
+    // scroll world when player rises above the line
+    if (player.y < SCROLL_LINE) {
+      const dy = SCROLL_LINE - player.y;
+      player.y = SCROLL_LINE;
+      for (const t of tubs) t.y += dy;
+      for (const b of beers) b.y += dy;
+      for (const bb of bubbles) bb.y += dy;
+      score += Math.round(dy);
+    }
+
+    // recycle tubs that fell below; spawn new ones above
+    tubs = tubs.filter(t => t.y < H + 30);
+    beers = beers.filter(b => b.y < H + 30 && !b.taken);
+    let topY = Math.min(...tubs.map(t => t.y), H);
+    while (topY > -40) {
+      topY -= GAP_MIN + Math.random()*(GAP_MAX-GAP_MIN);
+      const nt = makeTub(30 + Math.random()*(W-60), topY);
+      tubs.push(nt);
+      if (Math.random() < 0.14) beers.push({ x: nt.x, y: nt.y - 28, taken: false });
+    }
+
+    for (const b of bubbles) { b.x += b.vx; b.y += b.vy; b.vy += 0.12; b.life--; }
+    bubbles = bubbles.filter(b => b.life > 0);
+
+    // fall off bottom = game over
+    if (player.y - PH/2 > H) { endGame(); return; }
+    updateHud();
+  }
+
+  // ---------- drawing ----------
+  function drawTub(t) {
+    const cold = t.type === 'ice';
+    const L = t.x - TUB_W/2, R = t.x + TUB_W/2, B = t.y + TUB_H;
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.ellipse(t.x, B - 1, TUB_W/2 - 2, 4, 0, 0, Math.PI*2); ctx.fill();
+    // barrel body (slightly tapered staves)
+    ctx.fillStyle = t.cracked ? '#5b6b78' : '#8a5a2b';
+    ctx.strokeStyle = '#5e3a16'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(L, t.y + 4);
+    ctx.lineTo(R, t.y + 4);
+    ctx.lineTo(R - 4, B);
+    ctx.lineTo(L + 4, B);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // vertical staves
+    ctx.strokeStyle = 'rgba(94,58,22,0.45)'; ctx.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath(); ctx.moveTo(t.x + i*14, t.y + 6); ctx.lineTo(t.x + i*13, B - 2); ctx.stroke();
+    }
+    // metal hoops
+    ctx.strokeStyle = '#caa46a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(L + 1, t.y + TUB_H*0.42); ctx.lineTo(R - 1, t.y + TUB_H*0.42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L + 2, t.y + TUB_H*0.78); ctx.lineTo(R - 2, t.y + TUB_H*0.78); ctx.stroke();
+    // rim
+    ctx.strokeStyle = '#6e451f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(t.x, t.y + 4, TUB_W/2, 6, 0, 0, Math.PI*2); ctx.stroke();
+    // water surface (where Frank lands)
+    ctx.fillStyle = t.cracked ? '#9fb4c4' : (cold ? '#bfe4ff' : '#2E9BE6');
+    ctx.beginPath(); ctx.ellipse(t.x, t.y + 4, TUB_W/2 - 3, 5, 0, 0, Math.PI*2); ctx.fill();
+    if (cold && !t.cracked) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.roundRect(t.x - 7, t.y, 5, 5, 1); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(t.x + 3, t.y + 2, 4, 4, 1); ctx.fill();
+    } else if (!t.cracked) {
+      ctx.fillStyle = '#bfe6ff';
+      ctx.beginPath(); ctx.arc(t.x - 12, t.y + 3, 2.2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x + 9, t.y + 5, 1.8, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x + 2, t.y + 2, 1.4, 0, Math.PI*2); ctx.fill();
+    }
+    if (t.type === 'move' && !t.cracked) {
+      ctx.fillStyle = 'rgba(245,180,0,0.85)';
+      ctx.beginPath(); ctx.moveTo(L - 8, t.y + TUB_H*0.5); ctx.lineTo(L - 2, t.y + TUB_H*0.5 - 4); ctx.lineTo(L - 2, t.y + TUB_H*0.5 + 4); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(R + 8, t.y + TUB_H*0.5); ctx.lineTo(R + 2, t.y + TUB_H*0.5 - 4); ctx.lineTo(R + 2, t.y + TUB_H*0.5 + 4); ctx.closePath(); ctx.fill();
+    }
+  }
+  function drawBeer(b) {
+    ctx.save(); ctx.translate(b.x, b.y);
+    ctx.fillStyle = '#F5B400'; ctx.beginPath(); ctx.roundRect(-9, -6, 16, 20, 3); ctx.fill();
+    ctx.strokeStyle = '#b98300'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(7, -2, 6, 11, 3); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-1, -6, 9, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  function drawPlayer() {
+    const x = player.x, y = player.y;
+    const sq = squash > 0 ? 1 - squash * 0.045 : 1;           // squash on bounce
+    const stretch = player.vy < 0 ? 1.06 : 1;
+    const lean = (player.vx < 0 ? -1 : player.vx > 0 ? 1 : 0) * 0.10;
+    const w = PW, h = PH;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(lean); ctx.scale(stretch, sq * (player.vy < 0 ? 1.04 : 1));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+    // BUN — single tan roll behind, lower half
+    ctx.fillStyle = '#edb46b'; ctx.strokeStyle = '#c98a45'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(-w/2, h*0.10, w, h*0.40, 8); ctx.fill(); ctx.stroke();
+    // bun end caps
+    ctx.fillStyle = '#f3c485';
+    ctx.beginPath(); ctx.ellipse(-w/2 + 4, h*0.30, 4, 7, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(w/2 - 4, h*0.30, 4, 7, 0, 0, Math.PI*2); ctx.fill();
+
+    // SAUSAGE — narrow tall capsule sitting in the bun
+    const sw = 18, sx = -sw/2, sTop = -h/2, sBot = h*0.30;
+    ctx.fillStyle = '#c9381c'; ctx.strokeStyle = '#971f0b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(sx, sTop, sw, sBot - sTop, sw/2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.beginPath(); ctx.roundRect(sx + 3, sTop + 4, 3, (sBot - sTop) - 12, 2); ctx.fill();
+
+    // FACE
+    const faceY = sTop + 11;
+    ctx.fillStyle = '#15171c';
+    ctx.beginPath(); ctx.roundRect(-8.5, faceY, 7, 5, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(1.5, faceY, 7, 5, 2); ctx.fill();
+    ctx.fillRect(-1.5, faceY + 1.5, 3, 1.8);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillRect(-7.5, faceY + 0.8, 2, 1.8); ctx.fillRect(2.5, faceY + 0.8, 2, 1.8);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(0, faceY + 9, 3.4, 0.12*Math.PI, 0.88*Math.PI); ctx.stroke();
+
+    // mustard squiggle
+    ctx.strokeStyle = '#F6BE16'; ctx.lineWidth = 2.2;
+    const my = faceY + 15;
+    ctx.beginPath(); ctx.moveTo(-5.5, my); ctx.lineTo(-2, my + 3); ctx.lineTo(2, my); ctx.lineTo(5.5, my + 3); ctx.stroke();
+
+    // arms (flip up when rising)
+    const wave = player.vy < 0 ? -1 : 1;
+    ctx.strokeStyle = '#c9381c'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(sx, -2); ctx.lineTo(sx - 7, -2 + wave*7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-sx, -2); ctx.lineTo(-sx + 7, -2 + wave*7); ctx.stroke();
+    ctx.restore();
+  }
+  function draw() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#101722'); g.addColorStop(1, '#1b2a3a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // rising steam streaks
+    ctx.fillStyle = 'rgba(207,232,255,0.05)';
+    for (let i = 0; i < 6; i++) {
+      const sx = (i*73 + (performance.now()*0.02)) % W;
+      ctx.beginPath(); ctx.arc(sx, (i*120 + (performance.now()*0.05)) % H, 26, 0, Math.PI*2); ctx.fill();
+    }
+    for (const t of tubs) drawTub(t);
+    for (const b of beers) if (!b.taken) drawBeer(b);
+    drawPlayer();
+    for (const b of bubbles) {
+      ctx.globalAlpha = Math.max(0, b.life/24); ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (!started) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.textAlign = 'center';
+      ctx.font = 'bold ' + Math.round(W*0.045) + 'px system-ui';
+      ctx.fillText('Steer to start hopping!', W/2, H*0.3);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // swipe steering
+  let ts = null;
+  canvas.addEventListener('touchstart', e => { ts = e.touches[0].clientX; started = true; }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    if (ts === null) return;
+    const dx = e.touches[0].clientX - ts;
+    if (dx < -6) { held.left = true; held.right = false; }
+    else if (dx > 6) { held.right = true; held.left = false; }
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => { held.left = false; held.right = false; ts = null; });
+
+  // tilt steering
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      const gg = e.gamma || 0, DEAD = 6, MAX = 36, abs = Math.abs(gg);
+      if (abs < DEAD) { tiltX = 0; return; }
+      tiltX = Math.sign(gg) * Math.min((abs - DEAD)/(MAX - DEAD), 1);
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+
+  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none'; reset(); requestAnimationFrame(loop);
+  });
+  document.getElementById('restart').addEventListener('click', () => { reset(); });
+
+  reset();
+})();
+</script>
+</body>
+</html>

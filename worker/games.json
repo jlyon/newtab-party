@@ -22,7 +22,10 @@
     "smithereens",
     "yedric-bombs",
     "yeti-run",
-    "hognose"
+    "hognose",
+    "senor-frogs-cabo",
+    "weiners-and-tubs",
+    "moonslayer"
   ],
   "games": [
     {
@@ -192,6 +195,30 @@
       "type": "Battleship",
       "description": "Pirate-cove battleship. Sink the enemy fleet before they sink yours — fewer shots means a higher score, ye efficient sea-dog.",
       "controls": "Tap squares in Enemy Waters to fire · Re-roll your fleet or set sail to start"
+    },
+    {
+      "id": "senor-frogs-cabo",
+      "name": "Señor Frog's: Conga Chaos",
+      "file": "games/senor-frogs-cabo.html",
+      "type": "snake",
+      "description": "Lead the Señor Frog's conga line around the club, recruiting thirsty tourists to grow the line. Dodge the walls, your own dancers, and the spills, cactus & tables that pile up as you grow.",
+      "controls": "Arrows / WASD / D-pad to steer · Swipe on mobile · Don't crash the conga line"
+    },
+    {
+      "id": "weiners-and-tubs",
+      "name": "Weiners & Tubs",
+      "file": "games/weiners-and-tubs.html",
+      "type": "doodle-jump",
+      "description": "Frank the hot dog auto-bounces up a tower of hot tubs — you just steer. Grab a beer for a super-bounce, watch the icy tubs that crack after one hop, and don't fall in the cold.",
+      "controls": "← → / A·D / buttons to steer · Tilt or swipe on mobile · Hop tub to tub"
+    },
+    {
+      "id": "moonslayer",
+      "name": "Moonslayer",
+      "file": "games/moonslayer.html",
+      "type": "Hearts",
+      "description": "A lunar hunt of polite betrayal. Take the fewest souls — dodge every heart and the Black Queen (Q♠) — or slay the moon by taking them all. Lowest score wins.",
+      "controls": "Click 3 cards to pass · Click a card to play · Follow the led suit"
     }
   ]
 }
