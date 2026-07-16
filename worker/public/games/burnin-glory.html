@@ -18,10 +18,10 @@
   .bpip.charged { background: #aaff00; border-color: #aaff00; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
-  #controls { display: none; gap: 8px; max-width: 95vw; }
+  #controls { display: none; gap: 8px; max-width: 95vw; width: min(95vw, 420px); }
   body.touch #controls { display: flex; }
   @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 0.621)); } }
-  .btn { height: 56px; font-size: 22px; border: 2px solid #444;
+  .btn { height: 56px; min-width: 48px; font-size: 22px; border: 2px solid #444;
     background: #1e1e1e; color: #ccc; cursor: pointer; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; user-select: none;
     -webkit-touch-callout: none; flex: 1; transition: background 0.1s; }
@@ -74,7 +74,7 @@
   <div id="start-card">
     <h2>BURNIN' GLORY</h2>
     <div class="subtitle">Jungle Rally Championship</div>
-    <p>← → to steer &nbsp;·&nbsp; Space or button to boost<br>Overtake rivals, dodge traffic, reach the finish line!</p>
+    <p>← → to steer &nbsp;·&nbsp; Space or button to boost<br>The road sweeps deep into the jungle — stay out of the mud, overtake rivals, dodge the traffic!</p>
     <button id="start-btn">▶ Race</button>
   </div>
 </div>
@@ -112,10 +112,8 @@
   const W = canvas.width, H = canvas.height;
 
   // ===== GAME-SPECIFIC SECTION =====
-  const PLAYER_NAME = 'The Kart';
   const RIVAL_NAME  = 'jungle racers';
-  const WIN_SCORE   = 0;                           // 0 = endless road (fixed finish lines hurt leaderboard fairness)
-  const MILESTONE   = 1000;                        // cosmetic milestone interval for the endless progress bar
+  const MILESTONE   = 1000;      // cosmetic milestone interval for the endless progress bar
   const BASE_SPEED  = 2.5;
   const TOP_SPEED   = 7;
   const STEER       = 4.5;
@@ -124,17 +122,29 @@
   const BOOST_DURATION = 110;
   const BOOST_RECHARGE = 360;
   const CRASH_MSG   = 'Wrecked by the ' + RIVAL_NAME + '. The jungle wins this round.';
-  const WIN_MSG     = 'THE KART IS UNSTOPPABLE. Burnin\' Glory is YOURS! 🏆';
+  // Rival types (vs = world speed; hotshots chase from behind)
   const CAR_TYPES = [
-    { w: 46, h: 74, spd: 0.25, pts: 25, col: '#8B4513' }, // wide slow mud truck
-    { w: 36, h: 60, spd: 0.6,  pts: 50, col: COL2      }, // lime rival kart
-    { w: 30, h: 54, spd: 1.3,  pts: 80, col: '#cc2244' }, // fast oncoming hotshot
+    { w: 46, h: 74, vs: 1.0, pts: 25, col: '#8B4513' },                 // wide slow mud truck
+    { w: 36, h: 60, vs: 2.2, pts: 50, col: COL2      },                 // lime rival kart
+    { w: 30, h: 54, vs: 0,   pts: 80, col: '#cc2244', behind: true }    // hotshot from behind
   ];
   // ==================================
 
-  // Road geometry
-  const RX = 28, RW = 304, RR = RX + RW;
-  const LW = RW / 3;
+  // Smooth looping circuit (sum of sines — no kinks, closes every lap)
+  const LAP = 5000;
+  const TAU = Math.PI * 2;
+  function offsetAt(d) {
+    const t = TAU * (d / LAP);
+    return 85 * Math.sin(t) + 55 * Math.sin(2 * t + 2.4) + 40 * Math.sin(3 * t + 0.6);
+  }
+
+  // Perspective projection: flat ground, camera above the kart
+  const HY = 200, ZN = 120, ZV = 900;
+  const ROAD_HW = 130, LANE_B = ROAD_HW / 3;
+  function proj(z) {
+    const s = ZN / (ZN + z);
+    return { s, y: HY + (H - HY) * s };
+  }
 
   const held = { left: false, right: false, boost: false };
   const keys = {};
@@ -151,36 +161,49 @@
   addEventListener('keydown', e => {
     keys[e.key] = true;
     if (e.key === ' ') { e.preventDefault(); held.boost = true; }
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
   });
   addEventListener('keyup', e => { keys[e.key] = false; if (e.key === ' ') held.boost = false; });
 
-  let px, spd, frame, score, hiScore = 0, running;
-  let dashOff, rivals, particles, popups, jungleDeco;
-  let boostCharges, boostT, rechargeT;
-  let boosting, nearMissStreak, lastBoostUse;
-  let kmhDisplay;
+  // Swipe / drag steering on the canvas
+  let dragX = null;
+  function canvasX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    return (clientX - rect.left) * (W / rect.width);
+  }
+  canvas.addEventListener('touchstart', e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchmove',  e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchend',   () => { dragX = null; }, { passive: true });
+  canvas.addEventListener('touchcancel',() => { dragX = null; }, { passive: true });
 
-  // Jungle-side decorations (trees, ferns)
-  function makeJungleDeco() {
-    jungleDeco = [];
-    for (let i = 0; i < 20; i++) {
-      jungleDeco.push({
-        x: Math.random() < 0.5 ? Math.random() * (RX - 4) : RR + 4 + Math.random() * (W - RR - 4),
-        y: Math.random() * H,
-        r: 6 + Math.random() * 14,
-        col: ['#1a5c0a','#2a7a14','#0d4008','#3a8a20','#166010'][Math.floor(Math.random()*5)]
-      });
-    }
+  let px, camX, spd, frame, score, hiScore = 0, running;
+  let dashOff, worldDist, rivals, particles, popups, trees, treeAcc;
+  let boostCharges, boostT, rechargeT;
+  let boosting, nearMissStreak;
+  let kmhDisplay, steerVis, wasOffroad;
+
+  const CANOPY = ['#1a5c0a','#2a7a14','#0d4008','#3a8a20','#166010'];
+
+  function spawnTree(d) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    trees.push({ d, rel: side * (ROAD_HW + 30 + Math.random() * 280),
+      r: 14 + Math.random() * 22, col: CANOPY[Math.floor(Math.random() * CANOPY.length)] });
+  }
+  function initWorld() {
+    trees = []; treeAcc = 0;
+    for (let d = worldDist + 30; d < worldDist + ZV; d += 26) spawnTree(d);
   }
 
   function reset() {
-    px = W / 2; spd = BASE_SPEED; frame = 0; score = 0; dashOff = 0;
+    worldDist = 0;
+    px = offsetAt(0); camX = px;
+    spd = BASE_SPEED; frame = 0; score = 0; dashOff = 0;
     rivals = []; particles = []; popups = [];
     boostCharges = BOOST_MAX; boostT = 0; rechargeT = 0;
-    boosting = false; nearMissStreak = 0; lastBoostUse = 0; kmhDisplay = 60;
+    boosting = false; nearMissStreak = 0; kmhDisplay = 60;
+    steerVis = 0; wasOffroad = false;
     running = true;
-    makeJungleDeco();
+    initWorld();
     overlay.style.display = 'none'; updateHud();
   }
   function updateHud() {
@@ -198,12 +221,12 @@
     if (v > _hi) _hi = v;
     window.parent.postMessage({ highScore: v }, '*');
   }
-  function endGame(won) {
+  function endGame() {
     running = false;
     if (score > hiScore) hiScore = score;
     postHi(score);
-    overTitle.textContent = won ? '🏆 GLORY!' : 'WRECKED!';
-    overMsg.textContent = won ? WIN_MSG : CRASH_MSG;
+    overTitle.textContent = 'WRECKED!';
+    overMsg.textContent = CRASH_MSG;
     overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);
     updateHud(); overlay.style.display = 'flex';
   }
@@ -211,20 +234,19 @@
   function addPopup(x, y, text, col) { popups.push({ x, y, text, col: col || '#fff', life: 50 }); }
   function addParticles(x, y, col, count, vScale) {
     for (let i = 0; i < count; i++) {
-      const a = Math.random() * Math.PI * 2;
+      const a = Math.random() * TAU;
       const v = (0.5 + Math.random() * 1.5) * (vScale || 1);
       particles.push({ x, y, vx: Math.cos(a)*v, vy: Math.sin(a)*v - 1, life: 20 + Math.random()*20, col });
     }
   }
 
+  function laneRel(lane) { return (lane - 1) * (ROAD_HW * 0.55); }
+
   function spawnRival() {
     const type = CAR_TYPES[Math.floor(Math.random() * CAR_TYPES.length)];
-    const lane = Math.floor(Math.random() * 3);
-    const lx = RX + lane * LW + LW / 2;
-    const fromBottom = type.spd > 1;
-    rivals.push({ ...type, x: lx + (Math.random() - 0.5) * 20,
-      y: fromBottom ? H + type.h : -type.h,
-      dir: fromBottom ? -1 : 1, overtaken: false });
+    const d = type.behind ? worldDist - 100 : worldDist + ZV + 60;
+    rivals.push({ ...type, d, rel: laneRel(Math.floor(Math.random() * 3)) + (Math.random() - 0.5) * 24,
+      prevDz: d - worldDist, done: false });
   }
 
   function step() {
@@ -232,61 +254,80 @@
     const wantBoost = held.boost;
     if (wantBoost && !boosting && boostCharges > 0) {
       boosting = true; boostT = BOOST_DURATION; boostCharges--;
-      lastBoostUse = frame; rechargeT = 0;
-      addPopup(px, H * 0.7, '🌿 BOOST!', '#aaff00');
+      rechargeT = 0;
+      addPopup(W / 2, H * 0.7, '🌿 BOOST!', COL2);
     }
     if (boosting) { boostT--; if (boostT <= 0) boosting = false; }
     if (boostCharges < BOOST_MAX) {
       rechargeT++;
-      if (rechargeT >= BOOST_RECHARGE) { boostCharges++; rechargeT = 0; addPopup(px, H * 0.8, 'BOOST READY', '#aaff00'); }
+      if (rechargeT >= BOOST_RECHARGE) { boostCharges++; rechargeT = 0; addPopup(W / 2, H * 0.8, 'BOOST READY', COL2); }
     }
 
-    const targetSpd = Math.min(TOP_SPEED, BASE_SPEED + frame * 0.001) * (boosting ? BOOST_SPEED : 1);
+    // Off-road = jungle mud
+    const rc0 = offsetAt(worldDist);
+    const offroad = Math.abs(px - rc0) > ROAD_HW - 16;
+    if (offroad && !wasOffroad) addPopup(W / 2, H - 150, 'MUD!', '#b8935a');
+    wasOffroad = offroad;
+
+    let targetSpd = Math.min(TOP_SPEED, BASE_SPEED + frame * 0.001) * (boosting ? BOOST_SPEED : 1);
+    if (offroad) targetSpd *= 0.45;
     spd += (targetSpd - spd) * 0.05;
-    dashOff = (dashOff + spd) % 50;
+    worldDist += spd;
+    dashOff = (dashOff + spd) % 12600;
     kmhDisplay += (60 + spd * 22 - kmhDisplay) * 0.08;
 
-    if (keys['ArrowLeft'] || keys['a'] || held.left)  px -= STEER;
-    if (keys['ArrowRight'] || keys['d'] || held.right) px += STEER;
-    px = Math.max(RX + 18, Math.min(RR - 18, px));
+    const psx = W / 2 + (px - camX), psy = H - 74;
+    if (offroad && frame % 3 === 0) addParticles(psx, psy + 20, '#6b4a2e', 2, 1);
 
+    // Steering
+    let steer = 0;
+    if (keys['ArrowLeft'] || keys['a'] || held.left)  steer -= 1;
+    if (keys['ArrowRight'] || keys['d'] || held.right) steer += 1;
+    if (tiltX !== 0 && steer === 0) steer = tiltX;
+    if (dragX !== null && steer === 0) steer = Math.max(-1, Math.min(1, (dragX - W / 2) / 50));
+    steerVis += (steer - steerVis) * 0.2;
+    px += steer * STEER;
+    px = Math.max(rc0 - ROAD_HW - 80, Math.min(rc0 + ROAD_HW + 80, px));
+    camX += (px - camX) * 0.35;
+
+    // Spawns
     if (frame % 110 === 0) spawnRival();
+    treeAcc += spd;
+    while (treeAcc > 26) { treeAcc -= 26; spawnTree(worldDist + ZV + 20); }
 
-    // Scroll jungle deco
-    for (const d of jungleDeco) {
-      d.y += spd * 0.5;
-      if (d.y > H + 20) { d.y = -20; d.x = Math.random() < 0.5 ? Math.random() * (RX - 4) : RR + 4 + Math.random() * (W - RR - 4); }
-    }
+    // Move rivals
+    for (const r of rivals) r.d += r.behind ? spd + 1.6 : r.vs;
 
-    for (const r of rivals) r.y += r.dir * (spd - r.spd * r.dir);
-
-    const PY = H - 90, PW = 34, PH = 60;
+    // Collisions, near misses, overtakes
     for (const r of rivals) {
-      const dx = Math.abs(px - r.x), dy = Math.abs(PY - r.y);
-      const hit = dx < (PW + r.w) / 2 - 4 && dy < (PH + r.h) / 2 - 4;
-      if (hit) { addParticles(px, PY, '#aaff00', 20, 3); endGame(false); return; }
-      if (!r._nearMissed && dx < (PW + r.w) / 2 + 10 && dy < (PH + r.h) / 2 + 10) {
-        if (!hit) {
-          r._nearMissed = true; nearMissStreak++;
-          const bonus = nearMissStreak * 10;
-          score += bonus;
-          addPopup(px, PY - 30, 'CLOSE! +' + bonus, '#ffdd44');
-          addParticles(px, PY, '#ffdd44', 6, 1);
-        }
+      const dz = r.d - worldDist;
+      const lat = offsetAt(r.d) + r.rel;
+      const latDiff = Math.abs(px - lat);
+      if (Math.abs(dz) < 30 && latDiff < (34 + r.w) / 2 - 4) {
+        addParticles(psx, psy, COL2, 20, 3); endGame(); return;
       }
-      if (!r.overtaken && r.dir === 1 && r.y > H + r.h) {
-        r.overtaken = true;
+      if (!r._nearMissed && Math.abs(dz) < 44 && latDiff < (34 + r.w) / 2 + 12) {
+        r._nearMissed = true; nearMissStreak++;
+        const bonus = nearMissStreak * 10;
+        score += bonus;
+        addPopup(psx, psy - 40, 'CLOSE! +' + bonus, '#ffdd44');
+        addParticles(psx, psy, '#ffdd44', 6, 1);
+      }
+      if (!r.done && !r.behind && r.prevDz >= -40 && dz < -40) {
+        r.done = true;
         const bonus = r.pts * (boosting ? 2 : 1);
         score += bonus;
-        addPopup(RX + RW / 2, H * 0.3, 'OVERTAKE +' + bonus, COL2);
+        addPopup(W / 2, H * 0.3, 'OVERTAKE +' + bonus, COL2);
         nearMissStreak = 0;
       }
-      if (!r.overtaken && r.dir === -1 && r.y < -r.h) {
-        r.overtaken = true; score += 15;
-        addPopup(RX + RW / 2, H * 0.3, 'DODGED +15', '#aaddff');
+      if (!r.done && r.behind && r.prevDz <= 40 && dz > 40) {
+        r.done = true; score += 15;
+        addPopup(W / 2, H * 0.3, 'DODGED +15', '#aaddff');
       }
+      r.prevDz = dz;
     }
-    rivals = rivals.filter(r => !r.overtaken && r.y < H + 80 && r.y > -80);
+    rivals = rivals.filter(r => r.d > worldDist - 120 && r.d < worldDist + ZV + 140);
+    trees = trees.filter(t => t.d > worldDist - 30);
 
     for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
     particles = particles.filter(p => p.life > 0);
@@ -294,7 +335,6 @@
     popups = popups.filter(p => p.life > 0);
 
     score += Math.floor(spd * 0.08);
-    if (WIN_SCORE > 0 && score >= WIN_SCORE) { endGame(true); return; }
     updateHud();
   }
 
@@ -306,12 +346,10 @@
     ctx.closePath();
   }
 
-  function drawCar(x, y, w, h, col) {
-    ctx.save();
-    ctx.translate(x, y);
-
+  // Draws a rally car centered at origin of the current transform.
+  function carBody(w, h, col) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(3, 3, w/2, h/5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3, 3, w/2, h/5, 0, 0, TAU); ctx.fill();
 
     ctx.fillStyle = col;
     rr(-w/2, -h/2, w, h, 5); ctx.fill();
@@ -345,139 +383,192 @@
     ctx.fillStyle = '#ff2200';
     ctx.fillRect(-w/2+4, h/2-4, 7, 3); ctx.fillRect(w/2-11, h/2-4, 7, 3);
 
-    // Lime green racing stripe for player (navy car)
+    // Lime green racing stripe for the player (navy car)
     if (col === COL1) {
       ctx.fillStyle = 'rgba(170,255,0,0.7)';
       ctx.fillRect(-3, -h/2+4, 6, h-8);
     }
+  }
 
+  function drawCar(x, y, sc, w, h, col, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    if (angle) ctx.rotate(angle);
+    carBody(w, h, col);
     ctx.restore();
   }
 
-  // Draw a jungle tree/bush blob
-  function drawTree(x, y, r, col) {
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.07)';
-    ctx.beginPath(); ctx.arc(x - r*0.25, y - r*0.25, r*0.5, 0, Math.PI * 2); ctx.fill();
+  function drawCanopyTree(t, x, y, sc) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    const r = t.r;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(3, r * 0.5, r * 0.9, r * 0.3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#4a3018';
+    ctx.fillRect(-r * 0.12, -r * 0.3, r * 0.24, r * 0.8);
+    ctx.fillStyle = t.col;
+    ctx.beginPath(); ctx.arc(0, -r * 0.7, r, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r * 0.6, -r * 0.3, r * 0.6, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.6, -r * 0.3, r * 0.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.95, r * 0.5, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHills() {
+    const layers = [
+      { k: 0.04, col: '#7ba86a', amp: 40, base: 80 },
+      { k: 0.09, col: '#4a7a3a', amp: 60, base: 48 }
+    ];
+    const bend = offsetAt(worldDist + 500) - offsetAt(worldDist);
+    for (const L of layers) {
+      const shift = -(camX * L.k) - bend * L.k * 6;
+      ctx.fillStyle = L.col;
+      const period = 130;
+      const start = -((shift % period) + period) % period - period;
+      let n = Math.floor(shift / period);
+      for (let x = start; x < W + period; x += period, n++) {
+        const a = L.amp * (0.6 + 0.4 * Math.abs(Math.sin(n * 2.3)));
+        ctx.beginPath();
+        ctx.moveTo(x, HY);
+        ctx.quadraticCurveTo(x + period / 2, HY - L.base - a, x + period, HY);
+        ctx.closePath(); ctx.fill();
+      }
+    }
   }
 
   function draw() {
-    // Jungle floor sides
-    ctx.fillStyle = '#1a4a0a';
-    ctx.fillRect(0, 0, W, H);
+    // Hazy jungle sky
+    ctx.fillStyle = '#d9e6b0';
+    ctx.fillRect(0, 0, W, HY);
+    // Sun
+    ctx.fillStyle = '#ffd98a';
+    ctx.beginPath(); ctx.arc(W - 64, 52, 22, 0, TAU); ctx.fill();
+    drawHills();
 
-    // Jungle deco (trees behind road)
-    for (const d of jungleDeco) drawTree(d.x, d.y, d.r, d.col);
-
-    // Dirt road
-    ctx.fillStyle = '#3d2a1a';
-    ctx.fillRect(RX, 0, RW, H);
-
-    // Road texture (lighter dirt patches)
-    ctx.fillStyle = 'rgba(255,220,150,0.04)';
-    for (let y = -(dashOff * 0.4 | 0) % 60; y < H; y += 60)
-      ctx.fillRect(RX, y, RW, 30);
-
-    // Rumble strips (warning strips at edges)
-    for (let y = -(dashOff % 18); y < H + 18; y += 18) {
-      const alt = Math.floor((y + dashOff) / 18) % 2;
-      ctx.fillStyle = alt ? '#cc1100' : '#f5e6c8';
-      ctx.fillRect(RX, y, 10, 19); ctx.fillRect(RR - 10, y, 10, 19);
-    }
-
-    // Inner road surface
-    ctx.fillStyle = '#4a3520';
-    ctx.fillRect(RX + 10, 0, RW - 20, H);
-
-    // Lane dashes (beige for dirt road feel)
-    ctx.strokeStyle = 'rgba(245,230,200,0.45)'; ctx.lineWidth = 2;
-    ctx.setLineDash([24, 18]); ctx.lineDashOffset = -dashOff;
-    for (const lx of [RX + LW, RX + LW * 2]) {
-      ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
-    }
-
-    // Lime center line
-    ctx.strokeStyle = 'rgba(170,255,0,0.5)'; ctx.lineWidth = 3;
-    ctx.setLineDash([36, 24]); ctx.lineDashOffset = -dashOff;
-    ctx.beginPath(); ctx.moveTo(RX + RW/2, 0); ctx.lineTo(RX + RW/2, H); ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.strokeStyle = 'rgba(245,230,200,0.45)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(RX+10, 0); ctx.lineTo(RX+10, H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(RR-10, 0); ctx.lineTo(RR-10, H); ctx.stroke();
-
-    // Endless milestone bar on right edge — fills toward the next MILESTONE, then resets.
-    if (WIN_SCORE > 0) {
-      // (legacy finish-line mode — disabled while WIN_SCORE === 0)
-      const t = Math.min(1, score / WIN_SCORE);
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillRect(W - 8, 0, 6, H);
-      ctx.fillStyle = '#aaff00';
-      ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
-      const fy = (1 - t) * H * 0.3;
-      if (fy > 0 && fy < H) {
-        ctx.fillStyle = '#f5e6c8';
-        for (let i = 0; i < 8; i++)
-          if (i % 2 === 0) ctx.fillRect(RX+10 + i*(RW-20)/8, fy-4, (RW-20)/8, 8);
-        ctx.fillStyle = '#1a1a1a';
-        for (let i = 0; i < 8; i++)
-          if (i % 2 !== 0) ctx.fillRect(RX+10 + i*(RW-20)/8, fy-4, (RW-20)/8, 8);
+    // Ground + dirt road, one scanline at a time
+    for (let y = HY + 1; y < H; y++) {
+      const s = (y - HY) / (H - HY);
+      const z = ZN * (1 / s - 1);
+      const d = worldDist + z;
+      // Jungle floor
+      ctx.fillStyle = Math.floor(d / 80) % 2 ? '#1f5410' : '#1a4a0a';
+      ctx.fillRect(0, y, W, 1);
+      // Dirt road
+      const cx = W / 2 + (offsetAt(d) - camX) * s;
+      const hw = ROAD_HW * s;
+      ctx.fillStyle = Math.floor(d / 60) % 2 ? '#443019' : '#4a3520';
+      ctx.fillRect(cx - hw, y, hw * 2, 1);
+      // Rumble strips at the edges
+      const pw = Math.max(1.5, 9 * s);
+      ctx.fillStyle = Math.floor(d / 26) % 2 ? '#cc1100' : '#f5e6c8';
+      ctx.fillRect(cx - hw, y, pw, 1);
+      ctx.fillRect(cx + hw - pw, y, pw, 1);
+      // Edge shading
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(cx - hw + pw, y, Math.max(1, 3 * s), 1);
+      ctx.fillRect(cx + hw - pw - Math.max(1, 3 * s), y, Math.max(1, 3 * s), 1);
+      // Beige lane dashes
+      if (((d % 42) + 42) % 42 < 26) {
+        ctx.fillStyle = 'rgba(245,230,200,0.45)';
+        const lw = Math.max(1, 2.4 * s);
+        ctx.fillRect(cx - LANE_B * s - lw / 2, y, lw, 1);
+        ctx.fillRect(cx + LANE_B * s - lw / 2, y, lw, 1);
       }
-    } else {
-      const t = (score % MILESTONE) / MILESTONE;
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillRect(W - 8, 0, 6, H);
-      ctx.fillStyle = '#aaff00';
-      ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
+      // Lime center line
+      if (((d % 60) + 60) % 60 < 36) {
+        ctx.fillStyle = 'rgba(170,255,0,0.5)';
+        ctx.fillRect(cx - Math.max(1, 3 * s) / 2, y, Math.max(1, 3 * s), 1);
+      }
     }
+
+    // Horizon haze
+    const fog = ctx.createLinearGradient(0, HY, 0, HY + 70);
+    fog.addColorStop(0, 'rgba(217,230,176,0.85)');
+    fog.addColorStop(1, 'rgba(217,230,176,0)');
+    ctx.fillStyle = fog;
+    ctx.fillRect(0, HY, W, 70);
+
+    // Sprites, far to near
+    const list = [];
+    for (const t of trees)  list.push({ z: t.d - worldDist, kind: 't', o: t });
+    for (const r of rivals) list.push({ z: r.d - worldDist, kind: 'r', o: r });
+    list.sort((a, b) => b.z - a.z);
+
+    for (const it of list) {
+      if (it.z < -10 || it.z > ZV) continue;
+      const pr = proj(Math.max(0, it.z));
+      const lat = offsetAt(it.o.d) + it.o.rel;
+      const sx = W / 2 + (lat - camX) * pr.s;
+      if (it.kind === 't') drawCanopyTree(it.o, sx, pr.y, pr.s * 2.2);
+      else drawCar(sx, pr.y, pr.s, it.o.w, it.o.h, it.o.col, 0);
+    }
+
+    // Incoming hotshot warning
+    for (const r of rivals) {
+      const dz = r.d - worldDist;
+      if (r.behind && dz < -5 && dz > -160) {
+        const lat = offsetAt(r.d) + r.rel;
+        const wx = Math.max(14, Math.min(W - 14, W / 2 + (lat - camX)));
+        ctx.fillStyle = '#e33';
+        ctx.beginPath();
+        ctx.moveTo(wx, H - 16); ctx.lineTo(wx - 8, H - 4); ctx.lineTo(wx + 8, H - 4);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    // Endless milestone bar on right edge
+    const t = (score % MILESTONE) / MILESTONE;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(W - 8, 0, 6, H);
+    ctx.fillStyle = COL2;
+    ctx.fillRect(W - 8, H * (1 - t), 6, H * t);
+
+    const psx = W / 2 + (px - camX), psy = H - 74;
+
+    // Tire marks
+    if (spd > BASE_SPEED * 1.15) {
+      const alpha = Math.min(0.35, (spd - BASE_SPEED * 1.15) / (TOP_SPEED - BASE_SPEED) * 0.35);
+      ctx.fillStyle = 'rgba(0,0,0,' + alpha + ')';
+      const len = Math.min(60, spd * 6);
+      ctx.fillRect(psx - 15, psy + 28, 5, len);
+      ctx.fillRect(psx + 10, psy + 28, 5, len);
+    }
+
+    // Boost exhaust (lime flare)
+    if (boosting) {
+      for (let i = 0; i < 6; i++) {
+        const fh = 8 + Math.random() * 24;
+        const fw = 3 + Math.random() * 4;
+        const fx = psx + (Math.random() - 0.5) * 22;
+        ctx.globalAlpha = 0.5 + Math.random() * 0.45;
+        const g = 150 + Math.floor(Math.random() * 105);
+        ctx.fillStyle = 'rgb(' + Math.floor(g*0.6) + ',' + g + ',0)';
+        ctx.beginPath(); ctx.ellipse(fx, psy + 32 + fh/2, fw/2, fh/2, 0, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Player kart (leans into the corners)
+    drawCar(psx, psy, 1.05, 34, 58, COL1, steerVis * 0.16);
 
     // Particles
     for (const p of particles) {
       ctx.globalAlpha = Math.max(0, p.life / 30);
       ctx.fillStyle = p.col;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1;
-
-    // Rival cars
-    for (const r of rivals) drawCar(r.x, r.y, r.w, r.h, r.col);
-
-    const PY = H - 90;
-
-    // Tire marks
-    if (spd > BASE_SPEED * 1.15) {
-      const alpha = Math.min(0.35, (spd - BASE_SPEED * 1.15) / (TOP_SPEED - BASE_SPEED) * 0.35);
-      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
-      const len = Math.min(70, spd * 7);
-      ctx.fillRect(px - 15, PY + 28, 5, len);
-      ctx.fillRect(px + 10, PY + 28, 5, len);
-    }
-
-    // Boost exhaust (lime green flare for jungle kart)
-    if (boosting) {
-      for (let i = 0; i < 6; i++) {
-        const fh = 8 + Math.random() * 24;
-        const fw = 3 + Math.random() * 4;
-        const fx = px + (Math.random() - 0.5) * 22;
-        ctx.globalAlpha = 0.5 + Math.random() * 0.45;
-        const g = 150 + Math.floor(Math.random() * 105);
-        ctx.fillStyle = `rgb(${Math.floor(g*0.6)},${g},0)`;
-        ctx.beginPath(); ctx.ellipse(fx, PY + 32 + fh/2, fw/2, fh/2, 0, 0, Math.PI*2); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    // Player car (navy with lime stripe)
-    drawCar(px, PY, 34, 58, COL1);
 
     // Speed motion lines
     if (spd > BASE_SPEED * 1.4) {
       const intensity = Math.min(0.45, (spd - BASE_SPEED*1.4) / (TOP_SPEED - BASE_SPEED*1.4) * 0.45);
       ctx.strokeStyle = 'rgba(170,255,0,0.8)'; ctx.lineWidth = 1;
       for (let i = 0; i < 10; i++) {
-        const lx = RX + 14 + Math.random() * (RW - 28);
-        const ly = Math.random() * H;
+        const lx = 20 + Math.random() * (W - 40);
+        const ly = HY + Math.random() * (H - HY);
         const len = (12 + Math.random() * 36) * intensity * 2.5;
         ctx.globalAlpha = intensity * 0.8;
         ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + len); ctx.stroke();
@@ -512,10 +603,6 @@
       const DEAD = 8, MAX = 40;
       const abs = Math.abs(g);
       tiltX = abs < DEAD ? 0 : Math.sign(g) * Math.min((abs - DEAD) / (MAX - DEAD), 1);
-      if (running) {
-        held.left  = tiltX < -0.3;
-        held.right = tiltX >  0.3;
-      }
     });
   }
   document.addEventListener('touchstart', enableTilt, { once: true });

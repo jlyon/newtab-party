@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>The Sunken Signal</title>
+<style>
+  :root {
+    --primary: #4ecb71;
+    --secondary: #e8c877;
+    --blue: #2fb6d9;
+    --bg: #06212d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg); color: #d9efe2;
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.5;
+  }
+  #wrap {
+    max-width: 760px; margin: 0 auto;
+    padding: 14px 14px 60px;
+    display: flex; flex-direction: column; align-items: stretch;
+  }
+  #hud {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 14px; padding: 2px 4px 8px; color: var(--secondary);
+    letter-spacing: 1px;
+  }
+  #hud .score { color: var(--blue); font-size: 16px; }
+  #hud .gems { color: var(--primary); }
+  #art {
+    width: 100%; border: 1px solid #0e3a4a; border-radius: 8px;
+    overflow: hidden; background: #041a24;
+  }
+  #art svg { display: block; width: 100%; height: auto; }
+  .gem { cursor: pointer; }
+  .gem:hover .rock { transform: scale(1.15); }
+  #scene {
+    font-size: clamp(15px, 2.6vw, 18px);
+    border-left: 3px solid var(--secondary);
+    padding: 2px 0 2px 16px;
+    margin: 16px 0 18px;
+    min-height: 84px;
+  }
+  #scene .item { color: var(--secondary); font-style: italic; }
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choice {
+    display: block; width: 100%; min-height: 52px;
+    text-align: left; font: inherit; font-size: clamp(14px, 2.4vw, 16px);
+    background: rgba(78,203,113,0.06);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none; -webkit-touch-callout: none;
+    transition: background 0.12s, color 0.12s;
+  }
+  .choice:hover, .choice:active { background: var(--primary); color: var(--bg); }
+  .ending .choice { border-color: var(--secondary); color: var(--secondary); background: rgba(232,200,119,0.06); }
+  .ending .choice:hover { background: var(--secondary); color: var(--bg); }
+  .meta { margin-top: 18px; font-size: 13px; opacity: 0.7; }
+  #overlay {
+    position: absolute; inset: 0;
+    background: rgba(4,22,30,0.72);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 20px; gap: 8px;
+  }
+  #overlay h1 {
+    color: var(--secondary); margin: 0;
+    font-size: clamp(26px, 6vw, 44px); letter-spacing: 3px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  }
+  #overlay p { max-width: 480px; font-size: clamp(13px, 2.6vw, 16px); margin: 4px 0; color: #cfe9dc; }
+  #overlay .hint { color: var(--blue); font-size: 13px; }
+  #playBtn {
+    font: inherit; font-size: 18px; letter-spacing: 2px;
+    background: var(--secondary); color: var(--bg);
+    border: none; border-radius: 8px;
+    padding: 14px 42px; margin-top: 10px; cursor: pointer;
+  }
+  #playBtn:hover { background: #f3d98f; }
+  #artbox { position: relative; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <span>THE SUNKEN SIGNAL</span>
+    <span class="gems" id="gemHud">◆ 0/9</span>
+    <span class="score" id="scoreHud">0</span>
+  </div>
+  <div id="artbox">
+    <div id="art"></div>
+    <div id="overlay">
+      <h1>THE SUNKEN SIGNAL</h1>
+      <p>You are Wren Calloway, salvage diver — the last person still listening on channel 121.5. Three nights ago, a research station that sank thirty-one years ago started broadcasting again.</p>
+      <p class="hint">Click choices to explore · 9 gems are hidden in the scenery — click them · Endings pay big</p>
+      <button id="playBtn">SET SAIL</button>
+    </div>
+  </div>
+  <div id="scene"></div>
+  <div id="choices" class="choices"></div>
+  <div class="meta" id="meta"></div>
+</div>
+<script>
+(() => {
+  const artEl = document.getElementById('art');
+  const sceneEl = document.getElementById('scene');
+  const choicesEl = document.getElementById('choices');
+  const metaEl = document.getElementById('meta');
+  const overlayEl = document.getElementById('overlay');
+  const gemHud = document.getElementById('gemHud');
+  const scoreHud = document.getElementById('scoreHud');
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.floor(n) || 0;
+    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  }
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const S = { gems: new Set(), score: 0, lantern: false, chart: false, visited: 0 };
+
+  const GEM_PTS = 100;
+  const GEMS = {
+    tidepool:  { scene: 'beach',    x: 668, y: 372 },
+    piling:    { scene: 'dock',     x: 118, y: 356 },
+    tackle:    { scene: 'boathouse',x: 640, y: 350 },
+    deck:      { scene: 'wreck',    x: 470, y: 262 },
+    canopy:    { scene: 'jungle',   x: 210, y: 96  },
+    roots:     { scene: 'jungle',   x: 610, y: 368 },
+    railing:   { scene: 'towertop', x: 700, y: 210 },
+    poolglow:  { scene: 'grotto',   x: 330, y: 356 },
+    labshelf:  { scene: 'station',  x: 172, y: 208 }
+  };
+
+  const sky = (top, bot) => `<defs>
+    <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient>
+    <linearGradient id="se" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fb6d9"/><stop offset="1" stop-color="#0a3345"/></linearGradient>
+    <radialGradient id="gl" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#7fe9ff" stop-opacity="0.9"/><stop offset="1" stop-color="#7fe9ff" stop-opacity="0"/></radialGradient>
+  </defs><rect width="800" height="420" fill="url(#sk)"/>`;
+
+  const sun = (x,y,r,c) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" opacity="0.95"/><circle cx="${x}" cy="${y}" r="${r*1.8}" fill="${c}" opacity="0.12"/>`;
+  const birds = `<path d="M120 70 q8 -8 16 0 M136 70 q8 -8 16 0" stroke="#0b2a36" stroke-width="2.5" fill="none"/><path d="M190 96 q7 -7 14 0" stroke="#0b2a36" stroke-width="2" fill="none"/>`;
+  const palm = (x, y, s, flip) => `<g transform="translate(${x},${y}) scale(${flip ? -s : s},${s})">
+    <path d="M0 0 q10 -60 -6 -110" stroke="#5a4426" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <g fill="#2e8b57"><path d="M-6 -112 q-46 -18 -78 8 q40 22 78 2z"/><path d="M-6 -112 q-30 -40 -70 -40 q18 40 62 48z"/>
+    <path d="M-6 -114 q10 -46 50 -58 q4 44 -38 62z"/><path d="M-4 -112 q46 -22 80 0 q-38 26 -80 8z"/>
+    <path d="M-6 -112 q4 -30 -12 -58 q-24 30 4 62z" fill="#3aa066"/></g>
+    <circle cx="-4" cy="-104" r="7" fill="#7a5c33"/><circle cx="8" cy="-100" r="6" fill="#7a5c33"/></g>`;
+  const tower = (x, y, s, lit) => `<g transform="translate(${x},${y}) scale(${s})" stroke="#8a2f2f" stroke-width="3" fill="none">
+    <path d="M-22 0 L0 -120 L22 0 M-16 -30 L16 -30 M-11 -60 L11 -60 M-6 -90 L6 -90 M-16 -30 L11 -60 M16 -30 L-11 -60 M-11 -60 L6 -90 M11 -60 L-6 -90"/>
+    ${lit ? '<circle cx="0" cy="-126" r="5" fill="#ff5d5d" stroke="none"><animate attributeName="opacity" values="1;0.15;1" dur="1.6s" repeatCount="indefinite"/></circle>' : '<circle cx="0" cy="-126" r="4" fill="#552222" stroke="none"/>'}</g>`;
+  const waves = y => `<path d="M0 ${y} q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 L800 420 L0 420 Z" fill="url(#se)"/>
+    <path d="M0 ${y+14} q60 -6 120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0" stroke="#7fe9ff" stroke-width="2" fill="none" opacity="0.35"/>`;
+
+  const SCENES = {
+    beach: () => sky('#0d4a63','#e8c877') + sun(600, 130, 40, '#f3d98f') + birds + waves(280)
+      + `<path d="M0 330 Q200 300 420 332 T800 322 L800 420 L0 420 Z" fill="#d4a95f"/>
+         <path d="M0 344 Q220 316 440 344 T800 338" stroke="#f0d9a0" stroke-width="4" fill="none" opacity="0.5"/>
+         <ellipse cx="660" cy="376" rx="52" ry="12" fill="#2fb6d9" opacity="0.5"/>`
+      + palm(90, 350, 1.1) + palm(190, 342, 0.8, true)
+      + `<g transform="translate(475,300)"><path d="M0 0 L60 -14 L64 4 L6 12 Z" fill="#5a4426"/><path d="M18 -10 L20 -46" stroke="#5a4426" stroke-width="4"/><path d="M20 -46 L48 -26 L22 -22 Z" fill="#c9b089"/></g>`
+      + tower(720, 300, 0.9, true)
+      + `<path d="M690 306 L750 306 L744 260 L698 262 Z" fill="#123c33" opacity="0.85"/>`,
+    dock: () => sky('#0b3648','#2e7d95') + sun(120, 90, 26, '#e8f4f8') + waves(250)
+      + `<g stroke="#4a3823" stroke-width="10"><path d="M120 420 L124 300"/><path d="M240 420 L240 296"/><path d="M370 416 L366 292"/><path d="M500 414 L498 290"/></g>
+         <path d="M60 300 L560 286 L560 306 L60 322 Z" fill="#6b5433"/>
+         <path d="M60 300 L560 286" stroke="#8a7146" stroke-width="4"/>
+         <g transform="translate(430,286)" stroke="#7d3b3b" stroke-width="7" fill="none"><path d="M0 0 L0 -110 L90 -60"/><path d="M90 -60 L90 -20" stroke-width="3"/><rect x="82" y="-20" width="16" height="20" fill="#7d3b3b" stroke="none"/></g>
+         <g transform="translate(150,258)"><rect x="0" y="0" width="90" height="44" fill="#1d5c3f"/><path d="M-6 0 L45 -30 L96 0 Z" fill="#164a32"/><rect x="34" y="14" width="22" height="30" fill="#0a2c1e"/></g>
+         <rect x="285" y="272" width="34" height="22" fill="#8a6d3f"/><rect x="290" y="266" width="24" height="8" fill="#a3854f"/>`,
+    boathouse: () => sky('#0a2e3d','#134b5f')
+      + `<rect x="0" y="330" width="800" height="90" fill="#3d2f1c"/>
+         <path d="M0 60 L400 10 L800 60 L800 90 L400 44 L0 90 Z" fill="#164a32"/>
+         <g stroke="#5a4426" stroke-width="6"><path d="M80 60 L80 330"/><path d="M720 60 L720 330"/></g>
+         <g transform="translate(120,140)"><rect width="200" height="120" fill="#0f3547"/><path d="M100 14 L100 106 M14 60 L186 60" stroke="#1d5c3f" stroke-width="6"/><rect width="200" height="120" fill="none" stroke="#5a4426" stroke-width="8"/><circle cx="60" cy="40" r="10" fill="#e8c877" opacity="0.8"/></g>
+         <g transform="translate(430,150)"><path d="M0 130 q90 40 200 0 L184 96 L18 96 Z" fill="#7d5a34"/><path d="M18 96 L184 96 L176 70 L26 70 Z" fill="#937042"/></g>
+         <g transform="translate(360,260)"><path d="M0 0 L0 46 M-14 0 L14 0" stroke="#c9a24b" stroke-width="4"/><rect x="-14" y="10" width="28" height="34" rx="8" fill="none" stroke="#c9a24b" stroke-width="4"/><circle cx="0" cy="27" r="8" fill="#ffe9a8"><animate attributeName="opacity" values="1;0.5;1" dur="2.4s" repeatCount="indefinite"/></circle></g>
+         <g transform="translate(600,300)"><rect width="80" height="50" fill="#6b5433"/><rect y="-12" width="80" height="12" fill="#8a7146"/><circle cx="40" cy="20" r="6" fill="#3b2c18"/></g>
+         <path d="M80 330 q160 20 320 12 t320 -8" stroke="#241b10" stroke-width="3" fill="none" opacity="0.6"/>`,
+    wreck: () => sky('#0d4a63','#3193b4') + sun(680, 90, 30, '#f3d98f') + waves(230)
+      + `<g transform="translate(310,290) rotate(-14)">
+         <path d="M0 0 L280 0 L252 60 L36 60 Z" fill="#7d3b3b"/>
+         <path d="M0 0 L280 0 L272 -18 L10 -18 Z" fill="#934949"/>
+         <rect x="120" y="-70" width="14" height="54" fill="#5a4426"/>
+         <path d="M134 -70 L200 -34 L134 -26 Z" fill="#c9b089" opacity="0.9"/>
+         <rect x="60" y="-14" width="24" height="14" fill="#0a2c36"/><rect x="180" y="-14" width="24" height="14" fill="#0a2c36"/>
+         <circle cx="230" cy="-6" r="9" fill="none" stroke="#3b2c18" stroke-width="4"/></g>
+         <path d="M240 330 q160 30 340 6" stroke="#7fe9ff" stroke-width="3" fill="none" opacity="0.4"/>
+         <text x="395" y="296" transform="rotate(-14 395 296)" font-size="17" fill="#e8c877" font-family="Georgia" letter-spacing="2" opacity="0.85">MERIDIAN</text>`,
+    jungle: () => sky('#0a2e24','#1d5c3f')
+      + `<g fill="#123c2c"><path d="M-20 420 Q80 140 150 420 Z"/><path d="M120 420 Q240 100 360 420 Z"/><path d="M330 420 Q460 130 590 420 Z"/><path d="M560 420 Q690 110 820 420 Z"/></g>
+         <g fill="#1d5c3f"><path d="M40 420 Q160 180 280 420 Z"/><path d="M420 420 Q540 170 660 420 Z"/></g>`
+      + palm(120, 420, 1.4) + palm(680, 420, 1.5, true) + palm(400, 424, 1.1)
+      + `<g stroke="#2e8b57" stroke-width="4" fill="none" opacity="0.9"><path d="M60 200 q80 60 40 160 M700 180 q-60 80 -20 200"/></g>
+         <path d="M0 400 Q200 380 400 396 T800 388 L800 420 L0 420 Z" fill="#3d2f1c"/>
+         <path d="M-10 386 C160 366 300 402 470 384 S760 396 810 380" stroke="#1a1a1a" stroke-width="7" fill="none"/>
+         <path d="M-10 386 C160 366 300 402 470 384 S760 396 810 380" stroke="#2fb6d9" stroke-width="2.5" fill="none"><animate attributeName="opacity" values="0.9;0.25;0.9" dur="2s" repeatCount="indefinite"/></path>
+         <g fill="#e8c877" opacity="0.8"><circle cx="260" cy="250" r="3"><animate attributeName="opacity" values="0.9;0.1;0.9" dur="3s" repeatCount="indefinite"/></circle><circle cx="520" cy="210" r="3"><animate attributeName="opacity" values="0.1;0.9;0.1" dur="2.4s" repeatCount="indefinite"/></circle><circle cx="440" cy="300" r="2.5"><animate attributeName="opacity" values="0.7;0.1;0.7" dur="3.6s" repeatCount="indefinite"/></circle></g>`,
+    tower: () => sky('#0d4a63','#7a9fae')
+      + `<path d="M0 420 L0 260 Q200 190 420 236 T800 220 L800 420 Z" fill="#2a4d3a"/>
+         <path d="M0 420 L0 320 Q260 260 520 300 T800 292 L800 420 Z" fill="#1d5c3f"/>`
+      + tower(400, 300, 1.9, true)
+      + `<g stroke="#8a2f2f" stroke-width="3" fill="none"><path d="M400 300 q-90 40 -180 34 M400 300 q100 44 200 30"/></g>
+         <path d="M330 314 L470 314 L458 258 L342 258 Z" fill="#123c33"/>
+         <rect x="386" y="286" width="28" height="28" fill="#0a2c36"/>
+         <circle cx="400" cy="272" r="5" fill="#e8c877" opacity="0.8"/>` + birds,
+    towertop: () => sky('#0d4a63','#e8c877') + sun(140, 110, 34, '#f3d98f')
+      + `<path d="M0 260 q200 -40 400 -10 t400 -18 L800 200 L800 420 L0 420 Z" fill="none"/>` + waves(250)
+      + `<path d="M0 330 q140 -60 260 -30 q80 18 160 4 L420 420 L0 420 Z" fill="#1d5c3f"/>
+         <ellipse cx="620" cy="330" rx="90" ry="20" fill="#7fe9ff" opacity="0.35"><animate attributeName="opacity" values="0.5;0.15;0.5" dur="2.6s" repeatCount="indefinite"/></ellipse>
+         <ellipse cx="620" cy="330" rx="40" ry="9" fill="url(#gl)"/>
+         <g stroke="#8a2f2f" stroke-width="6" fill="none"><path d="M40 420 L120 300 M200 420 L150 306"/></g>
+         <path d="M20 310 L260 296 L260 316 L20 330 Z" fill="#6b5433"/>
+         <g transform="translate(120,250)"><rect width="110" height="60" fill="#123c33"/><rect x="12" y="14" width="86" height="20" fill="#0a2c36"/><g fill="#4ecb71"><rect x="16" y="18" width="6" height="12"><animate attributeName="height" values="12;4;12" dur="1s" repeatCount="indefinite"/></rect><rect x="28" y="22" width="6" height="8"><animate attributeName="height" values="8;14;8" dur="1.3s" repeatCount="indefinite"/></rect><rect x="40" y="20" width="6" height="10"><animate attributeName="height" values="10;5;10" dur="0.8s" repeatCount="indefinite"/></rect></g><circle cx="86" cy="24" r="5" fill="#ff5d5d"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle><rect y="40" width="110" height="20" fill="#0e2f28"/></g>
+         <path d="M560 306 q60 -30 120 0" stroke="#e8c877" stroke-width="2" fill="none" stroke-dasharray="6 6"><animate attributeName="stroke-dashoffset" values="0;-48" dur="2s" repeatCount="indefinite"/></path>`,
+    grotto: () => sky('#04141c','#0a2e3d')
+      + `<path d="M0 0 L800 0 L800 420 L0 420 Z" fill="#0a2530"/>
+         <path d="M0 0 Q120 180 60 420 L0 420 Z" fill="#04141c"/>
+         <path d="M800 0 Q660 200 740 420 L800 420 Z" fill="#04141c"/>
+         <g fill="#04141c"><path d="M140 0 L190 110 L240 0 Z"/><path d="M330 0 L370 80 L410 0 Z"/><path d="M520 0 L570 130 L620 0 Z"/></g>
+         <g fill="#0f3a4a"><path d="M180 420 L210 330 L240 420 Z"/><path d="M600 420 L630 344 L660 420 Z"/></g>
+         <ellipse cx="400" cy="380" rx="240" ry="34" fill="#2fb6d9" opacity="0.8"/>
+         <ellipse cx="400" cy="380" rx="240" ry="34" fill="url(#gl)"><animate attributeName="opacity" values="1;0.5;1" dur="3s" repeatCount="indefinite"/></ellipse>
+         <ellipse cx="400" cy="378" rx="120" ry="16" fill="#7fe9ff" opacity="0.5"/>
+         <g stroke="#7fe9ff" opacity="0.5"><circle cx="340" cy="356" r="3" fill="#7fe9ff"><animate attributeName="cy" values="366;306" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.8;0" dur="4s" repeatCount="indefinite"/></circle><circle cx="452" cy="360" r="2.5" fill="#7fe9ff"><animate attributeName="cy" values="368;316" dur="3.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.8;0" dur="3.2s" repeatCount="indefinite"/></circle></g>`,
+    station: () => sky('#03202e','#06384e')
+      + `<g stroke="#9fdcef" stroke-width="30" opacity="0.08"><path d="M180 0 L120 420 M420 0 L380 420 M660 0 L620 420"/></g>
+         <path d="M0 400 q200 -24 400 -8 t400 -12 L800 420 L0 420 Z" fill="#0b2a36"/>
+         <g transform="translate(250,190)">
+           <ellipse cx="150" cy="120" rx="210" ry="26" fill="#08222e"/>
+           <path d="M0 100 L300 100 L300 30 Q150 -50 0 30 Z" fill="#12414f"/>
+           <path d="M0 100 L300 100 L300 88 L0 88 Z" fill="#0d3543"/>
+           <g fill="#ffe9a8"><rect x="40" y="44" width="34" height="26" rx="12"/><rect x="130" y="30" width="40" height="30" rx="14"/><rect x="230" y="44" width="34" height="26" rx="12"/></g>
+           <rect x="130" y="30" width="40" height="30" rx="14" fill="#4ecb71" opacity="0.6"><animate attributeName="opacity" values="0.7;0.15;0.7" dur="1.6s" repeatCount="indefinite"/></rect>
+           <path d="M150 -46 L150 -90" stroke="#3b6673" stroke-width="5"/><circle cx="150" cy="-96" r="6" fill="#ff5d5d"><animate attributeName="opacity" values="1;0.15;1" dur="1.6s" repeatCount="indefinite"/></circle>
+         </g>
+         <g fill="#2e8b57" opacity="0.8"><path d="M60 320 q10 -40 0 -80 q14 44 8 82 Z"/><path d="M96 330 q8 -50 -2 -96 q16 50 10 98 Z"/><path d="M710 316 q10 -44 2 -84 q14 44 6 86 Z"/></g>
+         <g><path d="M600 140 q14 -10 26 0 q-12 10 -26 0 Z" fill="#e8c877"><animateTransform attributeName="transform" type="translate" values="0 0; -220 24; 0 0" dur="11s" repeatCount="indefinite"/></path>
+         <path d="M160 110 q12 -8 22 0 q-10 8 -22 0 Z" fill="#f0a05a"><animateTransform attributeName="transform" type="translate" values="0 0; 260 40; 0 0" dur="14s" repeatCount="indefinite"/></path></g>`
+  };
+  const ENDART = {
+    win:  () => SCENES.towertop() + `<rect width="800" height="420" fill="#e8c877" opacity="0.12"/>`,
+    core: () => SCENES.station() + `<rect width="800" height="420" fill="#4ecb71" opacity="0.12"/>`,
+    lose: () => SCENES.grotto() + `<rect width="800" height="420" fill="#3a0d0d" opacity="0.35"/>`
+  };
+
+  const story = {
+    beach: {
+      art: 'beach',
+      text: () => "Your skiff scrapes onto black-gold sand. The island is exactly where the chart says nothing is. Somewhere inland, the signal keeps keying — three short, three long, three short. On the reef behind you, a wrecked tender rusts. To the north, an old dock leans into the surf.",
+      choices: () => [
+        { label: "Follow the signal into the jungle.", next: 'jungle' },
+        { label: "Search the old dock.", next: 'dock' },
+        { label: "Swim out to the wreck on the reef.", next: 'wreck' }
+      ]
+    },
+    dock: {
+      art: 'dock',
+      text: () => "The dock groans under your boots. A crane droops over the water like a dead heron. Inside a rotted crate: a logbook, salt-swollen but legible. <span class='item'>“Day 9 — the grotto glows at low tide. Nobody dives it without a lamp. Nobody dives it twice.”</span>",
+      choices: () => [
+        { label: "Check the boathouse up the shore.", next: 'boathouse' },
+        { label: "Head into the jungle.", next: 'jungle' }
+      ]
+    },
+    boathouse: {
+      art: 'boathouse',
+      text: () => S.lantern
+        ? "Nets, rot, and the smell of thirty-one years. You already took the storm lantern. It swings from your pack, patient."
+        : "Nets, rot, and the smell of thirty-one years. On the workbench, impossibly, a brass storm lantern — full of oil, wick dry. <span class='item'>You take the storm lantern.</span> Someone left it for whoever came next.",
+      onEnter: () => { S.lantern = true; },
+      choices: () => [
+        { label: "Cut through the jungle.", next: 'jungle' },
+        { label: "Walk back down to the beach.", next: 'beach' }
+      ]
+    },
+    wreck: {
+      art: 'wreck',
+      text: () => (S.chart
+        ? "The MERIDIAN's tender lists on the reef, half her name eaten by rust. The chart drawer hangs open and empty — the tide chart is folded in your jacket."
+        : "The MERIDIAN's tender lists on the reef. In the chart drawer, sealed in wax: a tide chart of the lagoon, currents inked in red. <span class='item'>You take the tide chart.</span>")
+        + " Below deck, a corroded hatch bulges like it's holding its breath.",
+      onEnter: () => { S.chart = true; },
+      choices: () => [
+        { label: "Leave the hatch alone. Swim back to shore.", next: 'beach' },
+        { label: "Pry open the corroded hatch.", next: 'loseHatch' }
+      ]
+    },
+    jungle: {
+      art: 'jungle',
+      text: () => "The jungle swallows the daylight. Antenna cables snake through the roots, humming faintly — alive after all these years. Uphill, they climb toward a rusted tower. Downhill, they vanish into a cave mouth that glows the wrong shade of blue.",
+      choices: () => [
+        { label: "Follow the cables uphill to the tower.", next: 'tower' },
+        { label: "Follow them down into the glowing cave.", next: 'grotto' }
+      ]
+    },
+    tower: {
+      art: 'tower',
+      text: () => "The relay tower leans against the sky, red light still blinking at its crown. The service ladder is rust and prayer. At its base, the cables plunge back underground, headed for the cave.",
+      choices: () => [
+        { label: "Climb to the transmitter room.", next: 'towertop' },
+        { label: "Follow the ground line down to the cave.", next: 'grotto' }
+      ]
+    },
+    towertop: {
+      art: 'towertop',
+      text: () => "The transmitter room, still warm. The signal loops on a machine older than you — but the meters tell the truth: this is only a relay. The source is under the lagoon. From up here you can see it, a green glow beneath the water, patient as a heartbeat.",
+      choices: () => [
+        { label: "Silence the relay and sail home.", next: 'endQuiet' },
+        { label: "Climb down and dive for the source.", next: 'grotto' }
+      ]
+    },
+    grotto: {
+      art: 'grotto',
+      text: () => "The grotto breathes with the tide. The pool at its heart glows from far below — a passage, drowned and waiting." + (S.lantern ? " Your storm lantern hisses to life, throwing gold against the dark." : " It is very, very dark down there."),
+      choices: () => {
+        const c = [];
+        if (S.lantern) c.push({ label: "Dive, storm lantern held high.", next: 'station' });
+        else c.push({ label: "Dive into the dark anyway.", next: 'loseDark' });
+        c.push({ label: "Turn back to the jungle.", next: 'jungle' });
+        return c;
+      }
+    },
+    station: {
+      art: 'station',
+      text: () => "You surface inside an air pocket, and there it is: Meridian Deep Research Station, lights still on, thirty-one years underwater. The beacon keys its message from a console — powered by an emerald core the size of your fist, mounted like a relic. A brass plaque reads: <span class='item'>“IF YOU CAN HEAR US, ANSWER.”</span>",
+      choices: () => {
+        const c = [
+          { label: "Sit down at the console and answer the signal.", next: 'winSignal' },
+          { label: "Pull the emerald core and swim for it.", next: S.chart ? 'winCore' : 'loseCore' }
+        ];
+        return c;
+      }
+    },
+    endQuiet: {
+      artFn: 'win', ending: 'neutral', bonus: 200,
+      text: () => "You flip the breaker and the island goes quiet for the first time in thirty-one years. Some questions are better left glowing under a lagoon. You sail home. Channel 121.5 never speaks again — but some nights, you still listen."
+    },
+    winSignal: {
+      artFn: 'win', ending: 'win', bonus: 500,
+      text: () => "You key the response. The loop stops. A pause — then a new message, recorded long ago: coordinates, a name, a thank-you from a crew that knew someone would come. The Meridian's crew made it out. They just wanted their story found. Wren Calloway, salvage diver, has salvaged the only thing that mattered."
+    },
+    winCore: {
+      artFn: 'core', ending: 'win', bonus: 800,
+      text: () => "You pull the core. The station shudders, the lights die, and the lagoon turns against you — but the tide chart is in your head, red-inked currents and all. You ride the ebb through the reef gap as the Meridian Deep goes dark behind you forever. The core hums in your pack. Selling it will be someone else's mistake."
+    },
+    loseCore: {
+      artFn: 'lose', ending: 'lose', bonus: 50,
+      text: () => "You pull the core. The station shudders, the lights die, and the lagoon turns against you. Without a tide chart, every current is a stranger. The Meridian Deep keeps its relic — and its first visitor in thirty-one years. The signal starts again at dusk."
+    },
+    loseDark: {
+      artFn: 'lose', ending: 'lose', bonus: 50,
+      text: () => "The logbook warned you. Ten feet down, the glow is nowhere and everywhere, and the passage forks like a lie. Your lungs make the decision your pride wouldn't. The tide returns Wren Calloway to the beach — alive, barely, done. The signal keys on, unanswered."
+    },
+    loseHatch: {
+      artFn: 'lose', ending: 'lose', bonus: 50,
+      text: () => "The hatch was holding its breath. It exhales. The tender rolls off the reef with you inside it, and the sea files you under 'salvage.' Somewhere above, the signal keys on — three short, three long, three short — for the next person listening."
+    }
+  };
+  // ==================================
+
+  function gemSvg(id, g) {
+    return `<g class="gem" data-gem="${id}" transform="translate(${g.x},${g.y})">
+      <circle r="16" fill="transparent"/>
+      <g class="rock"><path d="M0 -9 L8 -2 L0 10 L-8 -2 Z" fill="#7fe9ff" stroke="#e8fdff" stroke-width="1.5"/>
+      <path d="M0 -9 L0 10 M-8 -2 L8 -2" stroke="#e8fdff" stroke-width="1" opacity="0.8"/></g>
+      <circle r="12" fill="url(#gl)"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.8s" repeatCount="indefinite"/></circle></g>`;
+  }
+
+  function updateHud() {
+    gemHud.textContent = '◆ ' + S.gems.size + '/9';
+    scoreHud.textContent = S.score;
+  }
+
+  function render(id) {
+    const node = story[id];
+    if (!node) { sceneEl.textContent = '(missing scene: ' + id + ')'; return; }
+    S.visited++;
+    let art = node.artFn ? ENDART[node.artFn]() : SCENES[node.art]();
+    if (node.art) for (const [gid, g] of Object.entries(GEMS))
+      if (g.scene === node.art && !S.gems.has(gid)) art += gemSvg(gid, g);
+    artEl.innerHTML = '<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">' + art + '</svg>';
+    if (node.onEnter) node.onEnter();
+    sceneEl.innerHTML = node.text();
+    choicesEl.innerHTML = '';
+    choicesEl.classList.toggle('ending', !!node.ending);
+    if (node.ending) {
+      S.score += node.bonus;
+      updateHud();
+      postHi(S.score);
+      const label = node.ending === 'win' ? '✦ ' + (node.bonus === 800 ? 'Ending: the heist' : 'Ending: the answer') + ' · +' + node.bonus + ' ✦'
+        : node.ending === 'lose' ? '✦ Ending: the island keeps you · +' + node.bonus + ' ✦'
+        : '✦ Ending: the quiet life · +' + node.bonus + ' ✦';
+      metaEl.textContent = label + '  Final score: ' + S.score + (S.gems.size < 9 ? '  ·  ' + (9 - S.gems.size) + ' gems still hidden out there…' : '  ·  All 9 gems found. Show-off.');
+      const b = document.createElement('button');
+      b.className = 'choice';
+      b.textContent = '↻ Sail back and explore again (Enter)';
+      b.onclick = restart;
+      choicesEl.appendChild(b);
+      return;
+    }
+    metaEl.textContent = 'Scenes explored: ' + S.visited + (S.lantern ? ' · 🏮 lantern' : '') + (S.chart ? ' · 🗺 tide chart' : '');
+    for (const c of node.choices()) {
+      const b = document.createElement('button');
+      b.className = 'choice';
+      b.textContent = '› ' + c.label;
+      b.onclick = () => render(c.next);
+      choicesEl.appendChild(b);
+    }
+  }
+
+  function restart() {
+    S.gems.clear(); S.score = 0; S.lantern = false; S.chart = false; S.visited = 0;
+    updateHud();
+    render('beach');
+  }
+
+  artEl.addEventListener('click', e => {
+    const g = e.target.closest('.gem');
+    if (!g) return;
+    const id = g.dataset.gem;
+    if (S.gems.has(id)) return;
+    S.gems.add(id);
+    S.score += GEM_PTS;
+    updateHud();
+    g.outerHTML = `<g transform="translate(${GEMS[id].x},${GEMS[id].y})"><text text-anchor="middle" y="-6" font-size="18" fill="#7fe9ff" font-family="Georgia">+${GEM_PTS}<animate attributeName="opacity" values="1;0" dur="1s" fill="freeze"/><animateTransform attributeName="transform" type="translate" values="0 0; 0 -24" dur="1s" fill="freeze"/></text></g>`;
+  });
+
+  addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (overlayEl.style.display !== 'none') { start(); return; }
+    const first = document.querySelector('.choice');
+    if (first) first.click();
+  });
+
+  function start() {
+    overlayEl.style.display = 'none';
+    restart();
+  }
+  document.getElementById('playBtn').addEventListener('click', start);
+
+  artEl.innerHTML = '<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">' + SCENES.beach() + '</svg>';
+})();
+</script>
+</body>
+</html>

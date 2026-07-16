@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Abominable Speedway</title>
+<style>
+  :root { --primary: #7ec8e3; --secondary: #ff6bb5; --bg: #0e2a1c; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #f2fbff;
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; font-weight: 800; color: var(--primary); user-select: none; -webkit-touch-callout: none; }
+  #hud { display: flex; gap: 12px; font-size: clamp(11px, 3vw, 13px); align-items: center; }
+  #kmh { font-size: clamp(14px, 3.5vw, 17px); font-weight: 800; color: var(--secondary); min-width: 76px; }
+  #lap { font-weight: 800; color: var(--primary); }
+  #boosts { display: flex; gap: 4px; }
+  .bpip { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #4a7a63; background: transparent; transition: background 0.15s; }
+  .bpip.charged { background: var(--secondary); border-color: var(--secondary); }
+  canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
+  #controls { display: flex; gap: 8px; max-width: 95vw; width: min(95vw, 420px); }
+  @media (pointer: fine) { #controls { display: none; } }
+  @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 0.621)); } }
+  .btn { height: 56px; min-width: 48px; font-size: 22px; border: 2px solid #3a6a53;
+    background: #143526; color: #cfe8dc; cursor: pointer; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; user-select: none;
+    -webkit-touch-callout: none; flex: 1; transition: background 0.1s; }
+  .btn:active, .btn.held { background: #2a5a43; color: #fff; }
+  #btn-boost { border-color: var(--secondary); color: var(--secondary); flex: 1.2; font-size: 18px; }
+  #btn-boost:active, #btn-boost.held { background: var(--secondary); color: #fff; }
+  #btn-boost.empty { opacity: 0.3; }
+  #start-overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(4,18,11,0.9); flex-direction: column;
+    text-align: center; padding: 20px; z-index: 10;
+  }
+  #start-card { max-width: 420px; }
+  #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 12px; letter-spacing: 2px; }
+  #start-card p { color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.6; margin: 0 0 28px; }
+  #start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
+    background: var(--secondary); color: #fff; border: none; cursor: pointer;
+    border-radius: 6px; font-family: inherit; transition: opacity 0.15s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(4,18,11,0.88); flex-direction: column; text-align: center; padding: 20px; }
+  #overlay h2 { color: var(--primary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; letter-spacing: 2px; }
+  #overlay p { color: #d5eee2; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
+  #overlay button { margin-top: 18px; padding: 12px 32px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--secondary); color: #fff; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1 id="title">ABOMINABLE SPEEDWAY</h1>
+  <div id="hud">
+    <span>Yedric</span>
+    <span id="lap">Lap 1</span>
+    <span id="kmh">0 KM/H</span>
+    <span id="score">Score: 0</span>
+    <span id="hi">Best: 0</span>
+    <span id="boosts"><span class="bpip charged"></span><span class="bpip charged"></span><span class="bpip charged"></span><span class="bpip"></span><span class="bpip"></span></span>
+  </div>
+  <canvas id="game" width="360" height="580"></canvas>
+  <div id="controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-boost">❄ BOOST</button>
+    <button class="btn" id="btn-right">▶</button>
+  </div>
+</div>
+<div id="start-overlay">
+  <div id="start-card">
+    <h2>ABOMINABLE SPEEDWAY</h2>
+    <p id="controls-hint">← → to steer · Space or button to boost · The circuit sweeps through Yeti Hairpin, Icicle Sweep and worse — stay on the packed snow or eat powder. Ride pink booters for boost charges, dodge rival yetis, ice patches and snowballs. Rumor has it the mountain hides a secret or two.</p>
+    <button id="start-btn">▶ Race</button>
+  </div>
+</div>
+<div id="overlay">
+  <h2 id="overTitle">WIPEOUT!</h2>
+  <p id="overMsg"></p>
+  <p id="overScore"></p>
+  <button id="restart">Race again</button>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const hiEl    = document.getElementById('hi');
+  const kmhEl   = document.getElementById('kmh');
+  const lapEl   = document.getElementById('lap');
+  const boostPips = document.querySelectorAll('.bpip');
+  const overlay  = document.getElementById('overlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg   = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const startOverlay = document.getElementById('start-overlay');
+  document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    reset(); requestAnimationFrame(loop);
+  });
+  const css = getComputedStyle(document.documentElement);
+  const COL1 = css.getPropertyValue('--primary').trim();
+  const COL2 = css.getPropertyValue('--secondary').trim();
+  const W = canvas.width, H = canvas.height;
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const PLAYER_NAME = 'Yedric the Yeti';
+  const BASE_SPEED  = 3.1;
+  const TOP_SPEED   = 8.2;
+  const STEER       = 5.3;
+  const BOOST_SPEED = 1.8;
+  const BOOST_MAX   = 5;
+  const BOOST_DURATION = 110;
+  const BOOST_RECHARGE = 420;
+  const CRASH_MSGS = [
+    PLAYER_NAME + ' ate powder. The rival yetis are pointing and laughing.',
+    'Sled totaled. Fur everywhere. The mountain claims another.',
+    'Yedric yard-saled across three lanes. Spectacular. Tragic.'
+  ];
+  // Rival sled types (vs = world speed; speeders chase from behind)
+  const SLED_TYPES = [
+    { w: 48, h: 74, vs: 1.0, pts: 25, col: '#3f9b63', fur: '#dfe8e2', name: 'groomer' },
+    { w: 36, h: 60, vs: 2.2, pts: 50, col: COL2,      fur: '#e8eef2', name: 'rival'   },
+    { w: 32, h: 56, vs: 0,   pts: 80, col: '#8a6fe8', fur: '#e8eef2', name: 'speeder', behind: true }
+  ];
+  const GOLD_SLED = { w: 36, h: 60, vs: 1.6, pts: 500, col: '#f2c230', fur: '#ffe9a8', gold: true, name: 'golden' };
+  const LAP_BONUS = 200;
+  // ==================================
+
+  // Smooth looping circuit: road center lateral offset (world px) as a sum of
+  // sines over lap distance — C-infinity smooth, closes perfectly every lap.
+  const LAP = 5350;
+  const TAU = Math.PI * 2;
+  function offsetAt(d) {
+    const t = TAU * (d / LAP);
+    return 90 * Math.sin(t) + 60 * Math.sin(2 * t + 1.1) + 35 * Math.sin(3 * t + 2.2);
+  }
+  function slopeAt(d) { return offsetAt(d + 8) - offsetAt(d - 8); }
+  const CORNERS = [
+    [0.04, 'Powder Bend'],
+    [0.18, 'Yeti Hairpin'],
+    [0.33, 'Frostbite Esses'],
+    [0.50, 'Icicle Sweep'],
+    [0.68, 'Avalanche Alley'],
+    [0.85, "Grandpa's Elbow"]
+  ];
+
+  // Perspective projection: flat ground, camera above the sled
+  const HY = 200;            // horizon screen y
+  const ZN = 120;            // near-plane distance (world units)
+  const ZV = 900;            // view distance
+  const ROAD_HW = 130;       // road half-width (world px)
+  const LANE_B = ROAD_HW / 3; // lane boundary offset
+  function proj(z) {
+    const s = ZN / (ZN + z);
+    return { s, y: HY + (H - HY) * s };
+  }
+
+  const held = { left: false, right: false, boost: false };
+  const keys = {};
+
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false });
+    el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-boost', 'boost');
+
+  // Secret: type "yeti" for disco mode, press H to ROAR
+  let typed = '';
+  addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === ' ') { e.preventDefault(); held.boost = true; }
+    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
+    if (/^[a-z]$/i.test(e.key)) {
+      typed = (typed + e.key.toLowerCase()).slice(-8);
+      if (typed.endsWith('yeti')) { typed = ''; toggleDisco(); }
+      if (e.key.toLowerCase() === 'h') tryRoar();
+    }
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; if (e.key === ' ') held.boost = false; });
+
+  // Secret for mobile: tap the title 5 times fast
+  let titleTaps = 0, titleTapT = 0;
+  document.getElementById('title').addEventListener('click', () => {
+    const now = Date.now();
+    if (now - titleTapT > 2000) titleTaps = 0;
+    titleTapT = now; titleTaps++;
+    if (titleTaps >= 5) { titleTaps = 0; toggleDisco(); }
+  });
+
+  // Swipe / drag steering on the canvas
+  let dragX = null;
+  function canvasX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    return (clientX - rect.left) * (W / rect.width);
+  }
+  canvas.addEventListener('touchstart', e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchmove',  e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchend',   () => { dragX = null; }, { passive: true });
+  canvas.addEventListener('touchcancel',() => { dragX = null; }, { passive: true });
+
+  let px, camX, spd, frame, score, hiScore = 0, running;
+  let dashOff, worldDist, rivals, particles, popups, trees, pads, icePatches, throwers, snowballs;
+  let boostCharges, boostT, rechargeT;
+  let boosting, nearMissStreak;
+  let kmhDisplay, spinT, spinA, slideT, slideDir, lastDir, steerVis, sparks, treeAcc;
+  let disco = false, discoHue = 0, roarCd = 0;
+  let lastLap, lastCorner, wasOffroad;
+
+  function toggleDisco() {
+    disco = !disco;
+    if (running) addPopup(W / 2, H * 0.4, disco ? '🪩 YETI MODE' : 'yeti mode off', disco ? '#ff6bb5' : '#ccc');
+  }
+  function tryRoar() {
+    if (!running || roarCd > 0) return;
+    roarCd = 480;
+    addPopup(W / 2, H - 160, 'RAWR!!', COL1);
+    for (const r of rivals) {
+      if (Math.abs(r.d - worldDist) < 260) {
+        const lat = offsetAt(r.d) + r.rel;
+        r.rel += (lat < px ? -1 : 1) * 60;
+        r.rel = Math.max(-ROAD_HW + r.w / 2, Math.min(ROAD_HW - r.w / 2, r.rel));
+      }
+    }
+  }
+
+  function spawnTree(d) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    trees.push({ d, rel: side * (ROAD_HW + 40 + Math.random() * 260), s: 10 + Math.random() * 14 });
+  }
+  function initWorld() {
+    trees = []; treeAcc = 0;
+    for (let d = worldDist + 40; d < worldDist + ZV; d += 34) spawnTree(d);
+    sparks = [];
+    for (let i = 0; i < 26; i++) {
+      sparks.push({ x: Math.random() * W, y: HY + Math.random() * (H - HY), p: Math.random() * TAU });
+    }
+  }
+
+  function reset() {
+    worldDist = 0;
+    px = offsetAt(0); camX = px;
+    spd = BASE_SPEED; frame = 0; score = 0; dashOff = 0;
+    rivals = []; particles = []; popups = []; pads = []; icePatches = []; throwers = []; snowballs = [];
+    boostCharges = 3; boostT = 0; rechargeT = 0;
+    boosting = false; nearMissStreak = 0; kmhDisplay = 60;
+    spinT = 0; spinA = 0; slideT = 0; slideDir = 0; lastDir = 0; steerVis = 0; roarCd = 0;
+    lastLap = 0; lastCorner = -1; wasOffroad = false;
+    running = true;
+    initWorld();
+    overlay.style.display = 'none'; updateHud();
+  }
+  function updateHud() {
+    scoreEl.textContent = 'Score: ' + score;
+    hiEl.textContent = 'Best: ' + hiScore;
+    kmhEl.textContent = Math.round(kmhDisplay) + ' KM/H';
+    lapEl.textContent = 'Lap ' + (lastLap + 1);
+    boostPips.forEach((p, i) => p.classList.toggle('charged', i < boostCharges));
+    document.getElementById('btn-boost').classList.toggle('empty', boostCharges === 0 && !boosting);
+  }
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.floor(n) || 0;
+    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  }
+  function endGame() {
+    running = false;
+    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    overTitle.textContent = 'WIPEOUT!';
+    overMsg.textContent = CRASH_MSGS[Math.floor(Math.random() * CRASH_MSGS.length)];
+    overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);
+    updateHud(); overlay.style.display = 'flex';
+  }
+
+  function addPopup(x, y, text, col) { popups.push({ x, y, text, col: col || '#fff', life: 50 }); }
+  function addParticles(x, y, col, count, vScale) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * TAU;
+      const v = (0.5 + Math.random() * 1.5) * (vScale || 1);
+      particles.push({ x, y, vx: Math.cos(a)*v, vy: Math.sin(a)*v - 1, life: 20 + Math.random()*20, col });
+    }
+  }
+
+  function laneRel(lane) { return (lane - 1) * (ROAD_HW * 0.55); }
+
+  function spawnRival() {
+    const type = Math.random() < 0.02 ? GOLD_SLED
+      : SLED_TYPES[Math.floor(Math.random() * SLED_TYPES.length)];
+    const d = type.behind ? worldDist - 100 : worldDist + ZV + 60;
+    rivals.push({ ...type, d, rel: laneRel(Math.floor(Math.random() * 3)) + (Math.random() - 0.5) * 24,
+      prevDz: d - worldDist, done: false });
+  }
+  function spawnPad() {
+    pads.push({ d: worldDist + ZV + 40, rel: laneRel(Math.floor(Math.random() * 3)), used: false });
+  }
+  function spawnIce() {
+    icePatches.push({ d: worldDist + ZV + 40, rel: laneRel(Math.floor(Math.random() * 3)) + (Math.random() - 0.5) * 36 });
+  }
+  function spawnThrower() {
+    const left = Math.random() < 0.5;
+    throwers.push({ d: worldDist + ZV + 40, rel: (left ? -1 : 1) * (ROAD_HW + 20), left, cd: 30 + Math.random() * 60, arm: 0 });
+  }
+
+  function step() {
+    frame++;
+    if (roarCd > 0) roarCd--;
+    if (disco) discoHue = (discoHue + 3) % 360;
+
+    const wantBoost = held.boost;
+    if (wantBoost && !boosting && boostCharges > 0 && spinT <= 0) {
+      boosting = true; boostT = BOOST_DURATION; boostCharges--;
+      rechargeT = 0;
+      addPopup(W / 2, H * 0.7, '❄ BOOST!', COL2);
+    }
+    if (boosting) { boostT--; if (boostT <= 0) boosting = false; }
+    if (boostCharges < BOOST_MAX) {
+      rechargeT++;
+      if (rechargeT >= BOOST_RECHARGE) { boostCharges++; rechargeT = 0; addPopup(W / 2, H * 0.8, 'BOOST READY', COL2); }
+    }
+
+    // Off-track drag
+    const rc0 = offsetAt(worldDist);
+    const offroad = Math.abs(px - rc0) > ROAD_HW - 16;
+    if (offroad && !wasOffroad) addPopup(W / 2, H - 150, 'POWDER!', '#9fc4dd');
+    wasOffroad = offroad;
+
+    let targetSpd = Math.min(TOP_SPEED, BASE_SPEED + frame * 0.001) * (boosting ? BOOST_SPEED : 1);
+    if (spinT > 0) targetSpd *= 0.45;
+    if (offroad) targetSpd *= 0.45;
+    spd += (targetSpd - spd) * 0.05;
+    worldDist += spd;
+    dashOff = (dashOff + spd) % 12600;
+    kmhDisplay += (60 + spd * 22 - kmhDisplay) * 0.08;
+
+    // Player screen anchor for particle effects
+    const psx = W / 2 + (px - camX), psy = H - 74;
+    if (offroad && frame % 3 === 0) addParticles(psx, psy + 20, '#ffffff', 2, 1);
+
+    // Lap crossings
+    const lapNow = Math.floor(worldDist / LAP);
+    if (lapNow > lastLap) {
+      lastLap = lapNow; score += LAP_BONUS;
+      addPopup(W / 2, H * 0.35, '🏁 LAP ' + (lapNow + 1) + '  +' + LAP_BONUS, '#fff');
+    }
+
+    // Corner callouts
+    const lookD = worldDist + 420;
+    const frac = ((lookD % LAP) + LAP) % LAP / LAP;
+    let ci = -1;
+    for (let i = 0; i < CORNERS.length; i++) if (frac >= CORNERS[i][0]) ci = i;
+    const cKey = ci + Math.floor(lookD / LAP) * 100;
+    if (ci >= 0 && cKey !== lastCorner) {
+      lastCorner = cKey;
+      addPopup(W / 2, 60, CORNERS[ci][1] + (slopeAt(lookD) > 0 ? ' →' : ' ←'), '#5a8caf');
+    }
+
+    // Steering (blocked while spinning, mushy while sliding)
+    let steer = 0;
+    if (keys['ArrowLeft'] || keys['a'] || held.left)  steer -= 1;
+    if (keys['ArrowRight'] || keys['d'] || held.right) steer += 1;
+    if (tiltX !== 0 && steer === 0) steer = tiltX;
+    if (dragX !== null && steer === 0) steer = Math.max(-1, Math.min(1, (dragX - W / 2) / 50));
+    if (steer !== 0) lastDir = Math.sign(steer);
+    steerVis += (steer - steerVis) * 0.2;
+    if (spinT > 0) {
+      spinT--; spinA += 0.28;
+      px += slideDir * 1.2;
+    } else if (slideT > 0) {
+      slideT--;
+      px += steer * STEER * 0.3 + slideDir * STEER * 0.85;
+      if (frame % 4 === 0) addParticles(psx, psy + 16, '#cfeafa', 1, 0.6);
+    } else {
+      px += steer * STEER;
+    }
+    px = Math.max(rc0 - ROAD_HW - 80, Math.min(rc0 + ROAD_HW + 80, px));
+    camX += (px - camX) * 0.35;
+
+    // Spawns
+    if (frame % 110 === 0) spawnRival();
+    if (frame % 140 === 0) spawnPad();
+    if (frame % 260 === 130) spawnIce();
+    if (frame % 420 === 200) spawnThrower();
+    treeAcc += spd;
+    while (treeAcc > 34) { treeAcc -= 34; spawnTree(worldDist + ZV + 20); }
+
+    // Move entities
+    for (const r of rivals) r.d += r.behind ? spd + 1.6 : r.vs;
+    for (const th of throwers) {
+      th.cd--; th.arm = Math.max(0, th.arm - 1);
+      const z = th.d - worldDist;
+      if (th.cd <= 0 && z > 100 && z < 550) {
+        th.cd = 100 + Math.random() * 50; th.arm = 14;
+        snowballs.push({ d: th.d, rel: th.rel, vx: (th.left ? 1 : -1) * (2 + Math.random() * 1.2) });
+      }
+    }
+    for (const sb of snowballs) { sb.rel += sb.vx; sb.d -= 2; }
+    for (const s of sparks) {
+      s.y += spd * 0.9;
+      if (s.y > H + 4) { s.y = HY; s.x = Math.random() * W; }
+    }
+
+    // Booters
+    for (const p of pads) {
+      if (!p.used && Math.abs(p.d - worldDist) < 24 && Math.abs(px - (offsetAt(p.d) + p.rel)) < 34) {
+        p.used = true;
+        spd += 1.5;
+        if (boostCharges < BOOST_MAX) { boostCharges++; addPopup(psx, psy - 40, 'BOOTER! +1 ❄', COL2); }
+        else { score += 40; addPopup(psx, psy - 40, 'BOOTER! +40', COL2); }
+        addParticles(psx, psy + 20, COL2, 10, 2);
+      }
+    }
+    pads = pads.filter(p => p.d > worldDist - 60);
+
+    // Ice patches
+    if (slideT <= 0 && spinT <= 0) {
+      for (const ip of icePatches) {
+        if (Math.abs(ip.d - worldDist) < 22 && Math.abs(px - (offsetAt(ip.d) + ip.rel)) < 44) {
+          slideT = 34; slideDir = lastDir || (Math.random() < 0.5 ? -1 : 1);
+          addPopup(psx, psy - 40, 'ICE!', '#bfe6ff');
+        }
+      }
+    }
+    icePatches = icePatches.filter(ip => ip.d > worldDist - 60);
+    throwers = throwers.filter(th => th.d > worldDist - 60);
+
+    // Snowball hits: spin-out, not death
+    for (const sb of snowballs) {
+      if (spinT <= 0 && Math.abs(sb.d - worldDist) < 24 && Math.abs(px - (offsetAt(sb.d) + sb.rel)) < 26) {
+        sb.dead = true;
+        spinT = 55; spinA = 0; slideDir = Math.sign(sb.vx) || 1;
+        boosting = false; boostT = 0; nearMissStreak = 0;
+        addPopup(psx, psy - 44, 'SNOWBALLED!', '#fff');
+        addParticles(psx, psy, '#fff', 16, 2);
+      }
+    }
+    snowballs = snowballs.filter(sb => !sb.dead && Math.abs(sb.rel) < ROAD_HW + 140 && sb.d > worldDist - 50);
+
+    // Rival collisions, near misses, overtakes
+    for (const r of rivals) {
+      const dz = r.d - worldDist;
+      const lat = offsetAt(r.d) + r.rel;
+      const latDiff = Math.abs(px - lat);
+      if (Math.abs(dz) < 30 && latDiff < (34 + r.w) / 2 - 4) {
+        addParticles(psx, psy, '#fff', 24, 3); endGame(); return;
+      }
+      if (!r._nearMissed && Math.abs(dz) < 44 && latDiff < (34 + r.w) / 2 + 12) {
+        r._nearMissed = true; nearMissStreak++;
+        const bonus = nearMissStreak * 10;
+        score += bonus;
+        addPopup(psx, psy - 40, 'CLOSE! +' + bonus, '#ffdd44');
+        addParticles(psx, psy, '#ffdd44', 6, 1);
+      }
+      if (!r.done && !r.behind && r.prevDz >= -40 && dz < -40) {
+        r.done = true;
+        const bonus = r.pts * (boosting ? 2 : 1);
+        score += bonus;
+        addPopup(W / 2, H * 0.3, (r.gold ? '✨ GOLDEN YETI +' : 'OVERTAKE +') + bonus, r.gold ? '#f2c230' : COL1);
+        nearMissStreak = 0;
+      }
+      if (!r.done && r.behind && r.prevDz <= 40 && dz > 40) {
+        r.done = true; score += 15;
+        addPopup(W / 2, H * 0.3, 'DODGED +15', '#88ccff');
+      }
+      r.prevDz = dz;
+    }
+    rivals = rivals.filter(r => r.d > worldDist - 120 && r.d < worldDist + ZV + 140);
+    trees = trees.filter(t => t.d > worldDist - 30);
+
+    for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
+    particles = particles.filter(p => p.life > 0);
+    for (const p of popups) { p.y -= 1.2; p.life--; }
+    popups = popups.filter(p => p.life > 0);
+
+    score += Math.floor(spd * 0.08);
+    updateHud();
+  }
+
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function sledColor(base, i) {
+    return disco ? 'hsl(' + ((discoHue + i * 47) % 360) + ',85%,60%)' : base;
+  }
+
+  // Draws a snowmobile centered at origin of the current transform.
+  function sledBody(w, h, col, fur) {
+    // Ground shadow
+    ctx.fillStyle = 'rgba(20,40,60,0.25)';
+    ctx.beginPath(); ctx.ellipse(3, 5, w/2 + 2, h/3.2, 0, 0, Math.PI*2); ctx.fill();
+
+    // Rear track tread (animated lugs)
+    const trkW = w * 0.78, trkTop = h * 0.16, trkBot = h/2 + 4;
+    ctx.fillStyle = '#141e28';
+    rrect(-trkW/2, trkTop, trkW, trkBot - trkTop, 5); ctx.fill();
+    ctx.save();
+    rrect(-trkW/2, trkTop, trkW, trkBot - trkTop, 5); ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    const lugOff = dashOff % 7;
+    for (let ly = trkTop - 7 + lugOff; ly < trkBot; ly += 7) ctx.fillRect(-trkW/2 + 2, ly, trkW - 4, 2);
+    ctx.restore();
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(-trkW/2 - 1, trkTop + 2, 2, trkBot - trkTop - 6);
+    ctx.fillRect(trkW/2 - 1, trkTop + 2, 2, trkBot - trkTop - 6);
+
+    // Front skis on struts
+    const skiX = w/2 + 1, skiTop = -h/2 - 5, skiLen = h * 0.42;
+    for (const sx of [-skiX, skiX]) {
+      ctx.fillStyle = '#22303e';
+      rrect(sx - 2.5, skiTop, 5, skiLen, 2.5); ctx.fill();
+      ctx.fillStyle = '#31445a';
+      ctx.beginPath(); ctx.arc(sx, skiTop + 1, 3.2, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#31445a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(sx, skiTop + skiLen * 0.55); ctx.lineTo(sx * 0.45, -h * 0.26); ctx.stroke();
+    }
+
+    // Tunnel / seat
+    ctx.fillStyle = col;
+    rrect(-w * 0.28, -h * 0.08, w * 0.56, h * 0.42, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    rrect(-w * 0.28, -h * 0.08, w * 0.56, h * 0.42, 5); ctx.fill();
+
+    // Hood
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.18, -h/2);
+    ctx.lineTo(w * 0.18, -h/2);
+    ctx.quadraticCurveTo(w * 0.46, -h * 0.42, w * 0.44, -h * 0.24);
+    ctx.lineTo(w * 0.4, -h * 0.06);
+    ctx.quadraticCurveTo(0, 0, -w * 0.4, -h * 0.06);
+    ctx.lineTo(-w * 0.44, -h * 0.24);
+    ctx.quadraticCurveTo(-w * 0.46, -h * 0.42, -w * 0.18, -h/2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.06, -h/2 + 1);
+    ctx.lineTo(w * 0.06, -h/2 + 1);
+    ctx.lineTo(w * 0.04, -h * 0.1);
+    ctx.lineTo(-w * 0.04, -h * 0.1);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff8c8';
+    rrect(-w * 0.12, -h/2 - 1, w * 0.24, 3.5, 1.5); ctx.fill();
+
+    // Windshield
+    ctx.fillStyle = 'rgba(190,230,255,0.8)';
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.3, -h * 0.1);
+    ctx.quadraticCurveTo(0, -h * 0.34, w * 0.3, -h * 0.1);
+    ctx.lineTo(w * 0.24, -h * 0.02);
+    ctx.quadraticCurveTo(0, -h * 0.2, -w * 0.24, -h * 0.02);
+    ctx.closePath(); ctx.fill();
+
+    // Handlebars
+    ctx.strokeStyle = '#1a252f'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.42, -h * 0.03);
+    ctx.quadraticCurveTo(0, -h * 0.12, w * 0.42, -h * 0.03);
+    ctx.stroke();
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath(); ctx.arc(-w * 0.42, -h * 0.03, 2.6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.42, -h * 0.03, 2.6, 0, Math.PI*2); ctx.fill();
+
+    // Yeti rider
+    const fw = w * 0.6;
+    ctx.strokeStyle = fur; ctx.lineWidth = w * 0.16; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-fw * 0.32, h * 0.14); ctx.lineTo(-w * 0.4, -h * 0.02); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fw * 0.32, h * 0.14); ctx.lineTo(w * 0.4, -h * 0.02); ctx.stroke();
+    ctx.fillStyle = fur;
+    ctx.beginPath(); ctx.ellipse(0, h * 0.16, fw/2, h * 0.17, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, h * 0.05, fw * 0.36, h * 0.08, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -h * 0.015, w * 0.24, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-w * 0.18, -h * 0.09, w * 0.07, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.18, -h * 0.09, w * 0.07, 0, Math.PI*2); ctx.fill();
+    // Goggles + nose
+    ctx.fillStyle = '#22323e';
+    rrect(-w * 0.17, -h * 0.06, w * 0.34, h * 0.05, 3); ctx.fill();
+    ctx.fillStyle = '#8fd4f0';
+    rrect(-w * 0.14, -h * 0.055, w * 0.12, h * 0.04, 2); ctx.fill();
+    rrect(w * 0.02, -h * 0.055, w * 0.12, h * 0.04, 2); ctx.fill();
+    ctx.fillStyle = '#5aa8c8';
+    ctx.beginPath(); ctx.arc(0, h * 0.006, 2.2, 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawSled(x, y, sc, w, h, col, fur, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    if (angle) ctx.rotate(angle);
+    sledBody(w, h, col, fur);
+    ctx.restore();
+  }
+
+  function drawThrower(th, x, y, sc) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    ctx.fillStyle = 'rgba(20,40,60,0.2)';
+    ctx.beginPath(); ctx.ellipse(2, 12, 12, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#e8eef2';
+    ctx.beginPath(); ctx.ellipse(0, 4, 10, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -10, 7, 0, Math.PI*2); ctx.fill();
+    const up = th.arm > 0;
+    ctx.beginPath(); ctx.arc(th.left ? 9 : -9, up ? -12 : 0, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(th.left ? 13 : -13, up ? -16 : -2, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath(); ctx.arc(-2.5, -11, 1.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2.5, -11, 1.4, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTree(t, x, y, sc) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    const s = t.s;
+    ctx.translate(0, -s);
+    ctx.fillStyle = 'rgba(120,160,190,0.35)';
+    ctx.beginPath(); ctx.ellipse(3, s + 2, s * 0.9, s * 0.3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#6b4a2e';
+    ctx.fillRect(-s * 0.14, s * 0.6, s * 0.28, s * 0.5);
+    ctx.fillStyle = '#256b42';
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.5); ctx.lineTo(-s, s * 0.7); ctx.lineTo(s, s * 0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2e7d4f';
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.6); ctx.lineTo(-s * 0.72, s * 0.05); ctx.lineTo(s * 0.72, s * 0.05);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.6); ctx.lineTo(-s * 0.4, -s * 0.68); ctx.lineTo(s * 0.4, -s * 0.68);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawMountains() {
+    const layers = [
+      { k: 0.04, col: '#dcedf7', amp: 46, base: 90 },
+      { k: 0.09, col: '#c4dff0', amp: 64, base: 60 }
+    ];
+    const bend = offsetAt(worldDist + 500) - offsetAt(worldDist);
+    for (const L of layers) {
+      const shift = -(camX * L.k) - bend * L.k * 6;
+      ctx.fillStyle = L.col;
+      const period = 120;
+      const start = -((shift % period) + period) % period - period;
+      let n = Math.floor((shift) / period);
+      for (let x = start; x < W + period; x += period, n++) {
+        const a = L.amp * (0.6 + 0.4 * Math.abs(Math.sin(n * 2.7)));
+        ctx.beginPath();
+        ctx.moveTo(x, HY);
+        ctx.lineTo(x + period / 2, HY - L.base - a);
+        ctx.lineTo(x + period, HY);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+
+  function draw() {
+    // Sky
+    ctx.fillStyle = disco ? 'hsl(' + discoHue + ',45%,80%)' : '#c8e6f6';
+    ctx.fillRect(0, 0, W, HY);
+    // Sun
+    ctx.fillStyle = '#fff3c4';
+    ctx.beginPath(); ctx.arc(W - 64, 48, 20, 0, TAU); ctx.fill();
+    drawMountains();
+
+    // Ground + road, one scanline at a time
+    for (let y = HY + 1; y < H; y++) {
+      const s = (y - HY) / (H - HY);
+      const z = ZN * (1 / s - 1);
+      const d = worldDist + z;
+      // Snowfield
+      ctx.fillStyle = Math.floor(d / 80) % 2 ? '#e8f2f9' : '#eef6fb';
+      ctx.fillRect(0, y, W, 1);
+      // Road
+      const cx = W / 2 + (offsetAt(d) - camX) * s;
+      const hw = ROAD_HW * s;
+      ctx.fillStyle = Math.floor(d / 60) % 2 ? '#c9e2f1' : '#c2ddee';
+      ctx.fillRect(cx - hw, y, hw * 2, 1);
+      // Candy poles at the edges
+      const pw = Math.max(1.5, 8 * s);
+      ctx.fillStyle = Math.floor(d / 26) % 2 ? COL2 : '#ffffff';
+      ctx.fillRect(cx - hw, y, pw, 1);
+      ctx.fillRect(cx + hw - pw, y, pw, 1);
+      // Berm shading
+      ctx.fillStyle = 'rgba(90,130,165,0.22)';
+      ctx.fillRect(cx - hw + pw, y, Math.max(1, 3 * s), 1);
+      ctx.fillRect(cx + hw - pw - Math.max(1, 3 * s), y, Math.max(1, 3 * s), 1);
+      // Lane dashes
+      if (((d % 42) + 42) % 42 < 26) {
+        ctx.fillStyle = 'rgba(90,140,175,0.5)';
+        const lw = Math.max(1, 2.4 * s);
+        ctx.fillRect(cx - LANE_B * s - lw / 2, y, lw, 1);
+        ctx.fillRect(cx + LANE_B * s - lw / 2, y, lw, 1);
+      }
+    }
+
+    // Start/finish checkers at the lap boundary
+    const dB = Math.ceil(worldDist / LAP) * LAP;
+    const zB = dB - worldDist;
+    if (zB > 0 && zB < ZV) {
+      const pr = proj(zB);
+      const cx = W / 2 + (offsetAt(dB) - camX) * pr.s;
+      const hw = ROAD_HW * pr.s;
+      const n = 10, cw = (hw * 2) / n, ch = Math.max(2, 5 * pr.s);
+      for (let i = 0; i < n; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#22323e';
+        ctx.fillRect(cx - hw + i * cw, pr.y - ch, cw, ch);
+        ctx.fillStyle = i % 2 === 0 ? '#22323e' : '#ffffff';
+        ctx.fillRect(cx - hw + i * cw, pr.y, cw, ch);
+      }
+    }
+
+    // Horizon fog
+    const fog = ctx.createLinearGradient(0, HY, 0, HY + 70);
+    fog.addColorStop(0, 'rgba(238,246,251,0.9)');
+    fog.addColorStop(1, 'rgba(238,246,251,0)');
+    ctx.fillStyle = fog;
+    ctx.fillRect(0, HY, W, 70);
+
+    // Snow sparkles
+    for (const s of sparks) {
+      const a = 0.25 + 0.3 * Math.sin(frame * 0.12 + s.p);
+      if (a <= 0.28) continue;
+      const sc = (s.y - HY) / (H - HY);
+      ctx.globalAlpha = a * sc;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(s.x - 2, s.y - 0.7, 4, 1.4);
+      ctx.fillRect(s.x - 0.7, s.y - 2, 1.4, 4);
+    }
+    ctx.globalAlpha = 1;
+
+    // Sprites, far to near
+    const list = [];
+    for (const t of trees)      list.push({ z: t.d - worldDist, kind: 't', o: t });
+    for (const p of pads)       { if (!p.used) list.push({ z: p.d - worldDist, kind: 'p', o: p }); }
+    for (const ip of icePatches) list.push({ z: ip.d - worldDist, kind: 'i', o: ip });
+    for (const th of throwers)  list.push({ z: th.d - worldDist, kind: 'th', o: th });
+    for (const r of rivals)     list.push({ z: r.d - worldDist, kind: 'r', o: r });
+    for (const sb of snowballs) list.push({ z: sb.d - worldDist, kind: 's', o: sb });
+    list.sort((a, b) => b.z - a.z);
+
+    let ri = 0;
+    for (const it of list) {
+      if (it.z < -10 || it.z > ZV) continue;
+      const pr = proj(Math.max(0, it.z));
+      const lat = (it.kind === 't') ? it.o.rel + offsetAt(it.o.d)
+                : offsetAt(it.o.d) + it.o.rel;
+      const sx = W / 2 + (lat - camX) * pr.s;
+      const sy = pr.y;
+      if (it.kind === 't') drawTree(it.o, sx, sy, pr.s * 2.2);
+      else if (it.kind === 'p') {
+        ctx.save(); ctx.translate(sx, sy); ctx.scale(pr.s, pr.s * 0.55);
+        ctx.fillStyle = COL2;
+        for (let i = 0; i < 2; i++) {
+          const cy = -8 + i * 13;
+          ctx.beginPath();
+          ctx.moveTo(-24, cy + 7); ctx.lineTo(0, cy - 4); ctx.lineTo(24, cy + 7);
+          ctx.lineTo(24, cy + 12); ctx.lineTo(0, cy + 1); ctx.lineTo(-24, cy + 12);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
+      else if (it.kind === 'i') {
+        ctx.save(); ctx.translate(sx, sy); ctx.scale(pr.s, pr.s * 0.55);
+        ctx.fillStyle = 'rgba(160,215,250,0.85)';
+        ctx.beginPath(); ctx.ellipse(0, 0, 38, 20, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-19, -6); ctx.lineTo(-4, 0); ctx.lineTo(10, -8);
+        ctx.moveTo(-4, 0); ctx.lineTo(6, 9);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath(); ctx.ellipse(-9, -4, 11, 6, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      else if (it.kind === 'th') drawThrower(it.o, sx, sy, pr.s * 1.6);
+      else if (it.kind === 's') {
+        ctx.fillStyle = 'rgba(20,40,60,0.2)';
+        ctx.beginPath(); ctx.ellipse(sx + 2, sy + 3 * pr.s, 8 * pr.s, 3 * pr.s, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(sx, sy, 8 * pr.s, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(150,190,220,0.8)'; ctx.lineWidth = 1.5 * pr.s;
+        ctx.stroke();
+      }
+      else {
+        const r = it.o;
+        drawSled(sx, sy, pr.s, r.w, r.h, r.gold ? r.col : sledColor(r.col, ri++), r.fur, 0);
+      }
+    }
+
+    // Incoming speeder warning
+    for (const r of rivals) {
+      const dz = r.d - worldDist;
+      if (r.behind && dz < -5 && dz > -160) {
+        const lat = offsetAt(r.d) + r.rel;
+        const wx = Math.max(14, Math.min(W - 14, W / 2 + (lat - camX)));
+        ctx.fillStyle = '#e33';
+        ctx.beginPath();
+        ctx.moveTo(wx, H - 16); ctx.lineTo(wx - 8, H - 4); ctx.lineTo(wx + 8, H - 4);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    const psx = W / 2 + (px - camX), psy = H - 74;
+
+    // Ski trails
+    if (spd > BASE_SPEED * 1.15) {
+      const alpha = Math.min(0.3, (spd - BASE_SPEED * 1.15) / (TOP_SPEED - BASE_SPEED) * 0.3);
+      ctx.fillStyle = 'rgba(120,170,205,' + alpha + ')';
+      const len = Math.min(60, spd * 6);
+      ctx.fillRect(psx - 17, psy + 28, 4, len);
+      ctx.fillRect(psx + 13, psy + 28, 4, len);
+    }
+
+    // Boost snow spray
+    if (boosting) {
+      for (let i = 0; i < 7; i++) {
+        const fh = 8 + Math.random() * 26;
+        const fx = psx + (Math.random() - 0.5) * 26;
+        ctx.globalAlpha = 0.5 + Math.random() * 0.4;
+        ctx.fillStyle = disco ? 'hsl(' + (Math.random()*360|0) + ',90%,65%)' : (Math.random() < 0.5 ? COL2 : '#ffffff');
+        ctx.beginPath(); ctx.ellipse(fx, psy + 36 + fh/2, 2.5 + Math.random()*2, fh/2, 0, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Yedric (leans into the corners)
+    drawSled(psx, psy, 1.05, 34, 58, disco ? sledColor(COL1, 99) : COL1, '#ffffff',
+      spinT > 0 ? spinA : steerVis * 0.18);
+
+    // Particles
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / 30);
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Speed lines
+    if (spd > BASE_SPEED * 1.4) {
+      const intensity = Math.min(0.45, (spd - BASE_SPEED*1.4) / (TOP_SPEED - BASE_SPEED*1.4) * 0.45);
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 10; i++) {
+        const lx = 20 + Math.random() * (W - 40);
+        const ly = HY + Math.random() * (H - HY);
+        const len = (12 + Math.random() * 36) * intensity * 2.5;
+        ctx.globalAlpha = intensity * 0.8;
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + len); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Popups
+    ctx.textAlign = 'center';
+    for (const p of popups) {
+      ctx.globalAlpha = Math.max(0, p.life / 50);
+      ctx.fillStyle = p.col;
+      ctx.font = 'bold ' + Math.round(W * 0.042) + 'px system-ui';
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  }
+
+  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  document.getElementById('restart').addEventListener('click', reset);
+
+  // Tilt steering
+  let tiltX = 0;
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      const g = e.gamma || 0;
+      const DEAD = 8, MAX = 40;
+      const abs = Math.abs(g);
+      tiltX = abs < DEAD ? 0 : Math.sign(g) * Math.min((abs - DEAD) / (MAX - DEAD), 1);
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+})();
+</script>
+</body>
+</html>

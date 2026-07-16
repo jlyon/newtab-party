@@ -2,10 +2,6 @@
   "version": 1,
   "scheduleEpoch": "2026-06-15",
   "schedule": [
-    "burnin-glory",
-    "build-the-boardwalk",
-    "sweep-the-strait",
-    "yarrmada",
     "the-wildcard",
     "coeur-brise",
     "oligarchs-dilemma",
@@ -13,19 +9,27 @@
     "penalty-panic",
     "blouncerroozal",
     "frosty-freefall",
+    "bend-it-like-maxi",
     "chop-till-you-drop",
     "shootin-n-crackin",
+    "abominable-speedway",
     "tippity-toes",
     "rack-attack",
     "stump-grandpa",
+    "the-sunken-signal",
     "rock-em-sock-em-wrecking-ball",
     "smithereens",
     "yedric-bombs",
+    "cleanup-on-isle-11",
     "yeti-run",
     "hognose",
     "senor-frogs-cabo",
     "weiners-and-tubs",
-    "moonslayer"
+    "moonslayer",
+    "burnin-glory",
+    "build-the-boardwalk",
+    "sweep-the-strait",
+    "yarrmada"
   ],
   "games": [
     {
@@ -104,8 +108,8 @@
       "id": "burnin-glory",
       "name": "Burnin' Glory",
       "file": "games/burnin-glory.html",
-      "description": "Jungle Rally Championship. Pilot the navy kart through a dirt-road jungle circuit — overtake rivals, dodge oncoming traffic, and reach 5000 points to cross the finish line.",
-      "controls": "← → or A/D to steer · Space or button to boost · Overtake rivals for points",
+      "description": "Jungle Rally Championship. Pilot the navy kart down a sweeping 3D dirt road deep into the jungle — overtake rivals, dodge hotshots charging from behind, and stay out of the mud.",
+      "controls": "← → or A/D to steer through the sweepers · Space or button to boost · Swipe or tilt on mobile",
       "type": "racing"
     },
     {
@@ -219,6 +223,38 @@
       "type": "Hearts",
       "description": "A lunar hunt of polite betrayal. Take the fewest souls — dodge every heart and the Black Queen (Q♠) — or slay the moon by taking them all. Lowest score wins.",
       "controls": "Click 3 cards to pass · Click a card to play · Follow the led suit"
+    },
+    {
+      "id": "bend-it-like-maxi",
+      "name": "Bend it like Maxi",
+      "file": "games/bend-it-like-maxi.html",
+      "type": "Soccer",
+      "description": "96th minute of the World Cup final, 1-1. Pick your nation and curl ten free kicks over, around, or under the wall and past a keeper who gets better with every kick.",
+      "controls": "← → to aim · A / D to curve · Hold Space or KICK to charge · Release to shoot"
+    },
+    {
+      "id": "abominable-speedway",
+      "name": "Abominable Speedway",
+      "file": "games/abominable-speedway.html",
+      "description": "Yedric the Yeti laps a snaking mountain circuit — Yeti Hairpin, Icicle Sweep, Grandpa's Elbow. Overtake rival yetis, ride pink booters for boost charges, survive ice patches and snowball goons, and stay on the packed snow. The mountain hides a secret or two.",
+      "controls": "← → or A/D to steer through the corners · Space or button to boost · Swipe or tilt on mobile · Off track is slow",
+      "type": "racing"
+    },
+    {
+      "id": "the-sunken-signal",
+      "name": "The Sunken Signal",
+      "file": "games/the-sunken-signal.html",
+      "description": "Island mystery choose-your-own-adventure. A sunken research station starts broadcasting after 31 years — explore, gather what you need, and dive for the source. 9 gems hidden in the scenery, multiple endings, the greedy one pays best.",
+      "controls": "Click choices to explore · Click gems hidden in the scenery · Enter picks the first choice",
+      "type": "cyoa"
+    },
+    {
+      "id": "cleanup-on-isle-11",
+      "name": "Cleanup on isle 11",
+      "file": "games/cleanup-on-isle-11.html",
+      "description": "First-person supermarket sweep, grandma edition. Prowl the 3D warehouse aisles hunting everything on your shopping list while dodging puddles, rival shoppers, runaway carts, and the siren song of the free sample stand.",
+      "controls": "WASD to move (A/D strafe) · ←→ or click-drag to look · Left thumb moves, right thumb looks on mobile · Walk into items to grab them",
+      "type": "supermarket-sweep"
     }
   ]
 }
