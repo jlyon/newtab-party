@@ -29,7 +29,8 @@
     "burnin-glory",
     "build-the-boardwalk",
     "sweep-the-strait",
-    "yarrmada"
+    "yarrmada",
+    "prompter-payday"
   ],
   "games": [
     {
@@ -255,6 +256,14 @@
       "description": "First-person supermarket sweep, grandma edition. Prowl the 3D warehouse aisles hunting everything on your shopping list while dodging puddles, rival shoppers, runaway carts, and the siren song of the free sample stand.",
       "controls": "WASD to move (A/D strafe) · ←→ or click-drag to look · Left thumb moves, right thumb looks on mobile · Walk into items to grab them",
       "type": "supermarket-sweep"
+    },
+    {
+      "id": "prompter-payday",
+      "name": "Prompter Payday",
+      "file": "games/prompter-payday.html",
+      "description": "You run the teleprompter. You also, allegedly, bet on which words appear in tonight's speech. Unscramble each word and feed it to the prompter before airtime runs out — every word you land pays out your market position.",
+      "controls": "Tap letters to build the word · Tap a placed letter to send it back · Type + Enter on keyboard",
+      "type": "word-unscramble"
     }
   ]
 }

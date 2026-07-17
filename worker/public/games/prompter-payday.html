@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Prompter Payday</title>
+<style>
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --primary: #16a34a;
+    --secondary: #fbbf24;
+    --bg: #0b1226;
+  }
+  html,body{ touch-action:manipulation; }
+  html,body{
+    width:100%; height:100%;
+    background:var(--bg);
+    color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    overflow:hidden;
+  }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100%;
+  }
+  #game{
+    width:100%; max-width:520px;
+    padding:16px;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  /* HUD */
+  #hud{
+    width:100%; display:flex; justify-content:space-between; align-items:center;
+    font-size:clamp(13px,4vw,17px); font-weight:700;
+  }
+  .hud-box{
+    background:rgba(255,255,255,0.08); border-radius:10px;
+    padding:8px 12px; min-width:74px; text-align:center;
+  }
+  .hud-label{ display:block; font-size:0.65em; opacity:0.7; font-weight:600; letter-spacing:0.05em; }
+  .hud-val{ display:block; font-size:1.25em; color:var(--secondary); }
+  #timeBox.low .hud-val{ color:#ff5d5d; }
+
+  /* time bar */
+  #timeBarWrap{ width:100%; height:8px; background:rgba(255,255,255,0.12); border-radius:6px; overflow:hidden; }
+  #timeBar{ height:100%; width:100%; background:var(--secondary); transition:width 0.2s linear; }
+  #timeBar.low{ background:#ff5d5d; }
+
+  #hint{
+    width:100%; text-align:center; min-height:1.4em;
+    font-size:clamp(13px,3.6vw,16px); opacity:0.85; font-style:italic;
+  }
+
+  /* answer slots */
+  #answer{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    min-height:56px; width:100%;
+    padding:8px; border-radius:12px;
+    background:rgba(255,255,255,0.05);
+  }
+  #answer.shake{ animation:shake 0.4s; }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); }
+    20%,60%{ transform:translateX(-8px); }
+    40%,80%{ transform:translateX(8px); }
+  }
+  #answer.correct .slot.filled{ background:var(--secondary); border-color:var(--secondary); color:#101010; }
+
+  /* scramble row */
+  #scramble{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    min-height:56px; width:100%;
+  }
+
+  .tile{
+    width:clamp(38px,11vw,52px); height:clamp(44px,12vw,58px);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(20px,6vw,28px); font-weight:800; text-transform:uppercase;
+    cursor:pointer; transition:transform 0.1s, background 0.1s, opacity 0.1s;
+  }
+  .tile:active{ transform:scale(0.92); }
+  /* scramble tiles */
+  #scramble .tile{
+    background:var(--primary); color:#fff;
+    box-shadow:0 3px 0 rgba(0,0,0,0.25);
+  }
+  #scramble .tile.used{ visibility:hidden; }
+
+  /* answer slots: empty + filled */
+  .slot{
+    width:clamp(38px,11vw,52px); height:clamp(44px,12vw,58px);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(20px,6vw,28px); font-weight:800; text-transform:uppercase;
+    border:2px dashed rgba(255,255,255,0.25);
+    cursor:pointer; transition:transform 0.1s, background 0.1s;
+  }
+  .slot.filled{
+    border:2px solid var(--primary);
+    background:rgba(255,255,255,0.14);
+    color:#fff;
+  }
+  .slot.filled:active{ transform:scale(0.92); }
+
+  /* buttons */
+  #controls{ display:flex; gap:12px; width:100%; }
+  button.btn{
+    flex:1; padding:14px; border:none; border-radius:12px;
+    font-size:clamp(15px,4.4vw,18px); font-weight:800; cursor:pointer;
+    color:#fff; background:rgba(255,255,255,0.12);
+    transition:transform 0.08s, opacity 0.1s;
+  }
+  button.btn:active{ transform:scale(0.96); }
+  #submitBtn{ background:var(--primary); }
+  #submitBtn:disabled{ opacity:0.4; }
+
+  /* overlays */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.85);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:24px; z-index:10;
+  }
+  .overlay.hidden{ display:none; }
+  .panel{ max-width:380px; }
+  .panel h1{ font-size:clamp(26px,8vw,40px); margin-bottom:12px; color:var(--secondary); }
+  .panel p{ font-size:clamp(14px,4vw,17px); line-height:1.5; margin-bottom:18px; opacity:0.9; }
+  .panel .big{ font-size:clamp(20px,6vw,28px); font-weight:800; color:#fff; margin-bottom:6px; }
+  .panel .fine{ font-size:clamp(11px,3vw,13px); opacity:0.6; margin-top:14px; }
+  .play{
+    padding:16px 40px; border:none; border-radius:14px;
+    font-size:clamp(18px,5vw,22px); font-weight:800; cursor:pointer;
+    background:var(--primary); color:#fff;
+  }
+  .play:active{ transform:scale(0.96); }
+</style>
+</head>
+<body>
+  <div id="game">
+    <div id="hud">
+      <div class="hud-box"><span class="hud-label">PAYOUT</span><span class="hud-val" id="scoreVal">$0</span></div>
+      <div class="hud-box"><span class="hud-label">STREAK</span><span class="hud-val" id="streakVal">0</span></div>
+      <div class="hud-box" id="timeBox"><span class="hud-label">AIR TIME</span><span class="hud-val" id="timeVal">60</span></div>
+    </div>
+    <div id="timeBarWrap"><div id="timeBar"></div></div>
+    <div id="hint">&nbsp;</div>
+    <div id="answer"></div>
+    <div id="scramble"></div>
+    <div id="controls">
+      <button class="btn" id="shuffleBtn">Shuffle</button>
+      <button class="btn" id="submitBtn">Prompt It</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <h1>Prompter Payday</h1>
+      <p>You run the teleprompter. You also, allegedly, run a prediction-market
+         account betting on which words appear in tonight's speech.<br><br>
+         Unscramble each word and feed it to the prompter before airtime runs out.
+         Every word you land pays out your position. The odds are the hint.<br><br>
+         Tap letters to build the word, tap a placed letter to send it back.
+         Keyboard works too: type, Backspace, Enter to submit.</p>
+      <button class="play" id="startBtn">Go Live</button>
+      <p class="fine">Compliance disclaimer: there is no compliance.</p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overOverlay">
+    <div class="panel">
+      <h1>Unpaid Leave</h1>
+      <div class="big" id="finalWords">0 words hit</div>
+      <p>The speech ended and the ethics office froze your account.<br>
+         Total payout: <span id="finalScore">$0</span></p>
+      <button class="play" id="restartBtn">Appeal (Play Again)</button>
+    </div>
+  </div>
+
+<script>
+// ===== GAME-SPECIFIC SECTION =====
+// Word list. Each entry: { word, hint }. Hints read like prediction-market lines.
+const WORDS = [
+  { word: "tremendous", hint: "YES 99¢ — everything is this" },
+  { word: "bigly",      hint: "YES 97¢ — adverb of disputed origin" },
+  { word: "huge",       hint: "YES 98¢ — pronounced 'yuge'" },
+  { word: "tariffs",    hint: "YES 95¢ — taxes at the border" },
+  { word: "china",      hint: "YES 96¢ — comes up every speech" },
+  { word: "winning",    hint: "YES 94¢ — so much you'll get tired of it" },
+  { word: "believe",    hint: "YES 93¢ — '…me, folks'" },
+  { word: "ratings",    hint: "YES 88¢ — highest ever, ask anyone" },
+  { word: "fake",       hint: "YES 97¢ — pairs with 'news'" },
+  { word: "media",      hint: "YES 90¢ — the other half of that pair" },
+  { word: "hoax",       hint: "YES 92¢ — his word for bad headlines" },
+  { word: "wall",       hint: "YES 89¢ — big and beautiful" },
+  { word: "deal",       hint: "YES 91¢ — there's an art to it" },
+  { word: "golf",       hint: "YES 85¢ — weekend cardio" },
+  { word: "tower",      hint: "YES 84¢ — has his name on it, in gold" },
+  { word: "rally",      hint: "YES 87¢ — where the speech happens" },
+  { word: "borders",    hint: "YES 86¢ — strongest in history, reportedly" },
+  { word: "greatest",   hint: "YES 90¢ — the economy, ever, allegedly" },
+  { word: "beautiful",  hint: "YES 93¢ — clean coal is this" },
+  { word: "perfect",    hint: "YES 91¢ — the phone call was" },
+  { word: "genius",     hint: "YES 89¢ — a very stable one" },
+  { word: "billions",   hint: "YES 88¢ — and billions" },
+  { word: "witch",      hint: "YES 86¢ — half of a hunt" },
+  { word: "crooked",    hint: "YES 85¢ — a nickname prefix" },
+  { word: "loser",      hint: "YES 83¢ — what critics are" },
+  { word: "amazing",    hint: "YES 87¢ — everything he builds" },
+  { word: "frankly",    hint: "YES 90¢ — favorite sentence starter" },
+  { word: "history",    hint: "YES 92¢ — best in the ___ of our country" },
+  { word: "nobody",     hint: "YES 88¢ — '___ knew it could be so complicated'" },
+  { word: "teleprompter", hint: "YES 82¢ — your day job, and your alibi" },
+  { word: "prompter",   hint: "YES 81¢ — the machine you're feeding" },
+  { word: "covfefe",    hint: "YES 12¢ — nobody knows what it means. LONGSHOT" }
+];
+
+const TIME_LIMIT = 60;        // seconds of airtime per game
+const WRONG_PENALTY = 2;      // seconds lost when the speech goes off-script
+// ===== END GAME-SPECIFIC SECTION =====
+
+// ---- Scoring ----
+// Payout per word: (10 + length + speed bonus + streak bonus) * $5.
+// A strong 60s run solves ~12 words at ~$100-135 each => ~= 1000-1600.
+// Displayed dollars ARE the posted score, so SCORE_SCALE stays 1.
+const PAYOUT_MULT = 5;
+const SCORE_SCALE = 1;   // tuned so a great run ≈ 1000
+let _hi = 0;
+function postHi(raw){
+  const n = Math.round((Number(raw)||0) * SCORE_SCALE);
+  if(n > _hi){ _hi = n; }
+  try{ window.parent.postMessage({highScore:n},'*'); }catch(e){}
+}
+
+// ---- Keyboard self-focus ----
+function grabFocus(){ try{ window.focus(); }catch(e){} }
+window.addEventListener('load', grabFocus);
+window.addEventListener('pointerdown', grabFocus);
+
+// ---- Elements ----
+const scrambleEl = document.getElementById('scramble');
+const answerEl   = document.getElementById('answer');
+const hintEl     = document.getElementById('hint');
+const scoreValEl = document.getElementById('scoreVal');
+const streakValEl= document.getElementById('streakVal');
+const timeValEl  = document.getElementById('timeVal');
+const timeBox    = document.getElementById('timeBox');
+const timeBar    = document.getElementById('timeBar');
+const submitBtn  = document.getElementById('submitBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const startOverlay = document.getElementById('startOverlay');
+const overOverlay  = document.getElementById('overOverlay');
+const startBtn   = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const finalScoreEl = document.getElementById('finalScore');
+const finalWordsEl = document.getElementById('finalWords');
+
+// ---- State ----
+let rawScore = 0;
+let wordsSolved = 0;
+let streak = 0;
+let timeLeft = TIME_LIMIT;
+let running = false;
+let timerId = null;
+let deck = [];          // shuffled queue of word indices
+let current = null;     // { word, hint }
+let scrambleTiles = []; // [{ch, id, used}]
+let answerSlots = [];   // [{ch, id} | null]
+let wordStart = 0;      // timestamp word began (for speed bonus)
+
+function shuffleArray(a){
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function buildDeck(){
+  deck = shuffleArray(WORDS.map((_,i)=>i));
+}
+
+function nextWordIndex(){
+  if(deck.length === 0) buildDeck();
+  return deck.pop();
+}
+
+function scramble(word){
+  const chars = word.split('');
+  let out;
+  let tries = 0;
+  do{
+    out = shuffleArray(chars.slice());
+    tries++;
+  } while(out.join('') === word && tries < 20 && word.length > 1);
+  return out;
+}
+
+function loadWord(){
+  const idx = nextWordIndex();
+  const entry = WORDS[idx];
+  const w = entry.word.toLowerCase();
+  const scrambled = scramble(w);
+
+  current = { word: w, hint: entry.hint || "" };
+  scrambleTiles = scrambled.map((ch, i) => ({ ch, id: i, used:false }));
+  answerSlots = new Array(w.length).fill(null);
+  wordStart = Date.now();
+
+  hintEl.textContent = current.hint ? current.hint : ' ';
+  answerEl.classList.remove('correct','shake');
+  render();
+}
+
+function render(){
+  // answer slots
+  answerEl.innerHTML = '';
+  answerSlots.forEach((slot, pos) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (slot ? ' filled' : '');
+    el.textContent = slot ? slot.ch : '';
+    el.addEventListener('click', () => removeFromSlot(pos));
+    answerEl.appendChild(el);
+  });
+  // scramble tiles
+  scrambleEl.innerHTML = '';
+  scrambleTiles.forEach((t) => {
+    const el = document.createElement('div');
+    el.className = 'tile' + (t.used ? ' used' : '');
+    el.textContent = t.ch;
+    el.addEventListener('click', () => placeTile(t.id));
+    scrambleEl.appendChild(el);
+  });
+  submitBtn.disabled = answerSlots.some(s => s === null);
+}
+
+function placeTile(id){
+  if(!running) return;
+  const tile = scrambleTiles.find(t => t.id === id);
+  if(!tile || tile.used) return;
+  const pos = answerSlots.indexOf(null);
+  if(pos === -1) return;
+  answerSlots[pos] = { ch: tile.ch, id: tile.id };
+  tile.used = true;
+  render();
+}
+
+function removeFromSlot(pos){
+  if(!running) return;
+  const slot = answerSlots[pos];
+  if(!slot) return;
+  const tile = scrambleTiles.find(t => t.id === slot.id);
+  if(tile) tile.used = false;
+  answerSlots[pos] = null;
+  render();
+}
+
+// type a letter -> fill next unused matching scramble tile
+function typeLetter(ch){
+  if(!running) return;
+  ch = ch.toLowerCase();
+  const pos = answerSlots.indexOf(null);
+  if(pos === -1) return;
+  const tile = scrambleTiles.find(t => !t.used && t.ch === ch);
+  if(!tile) return;
+  answerSlots[pos] = { ch: tile.ch, id: tile.id };
+  tile.used = true;
+  render();
+}
+
+function backspace(){
+  if(!running) return;
+  for(let i = answerSlots.length - 1; i >= 0; i--){
+    if(answerSlots[i]){ removeFromSlot(i); return; }
+  }
+}
+
+function doShuffle(){
+  if(!running) return;
+  // reshuffle only the still-available tiles' display order; keep ids/used
+  shuffleArray(scrambleTiles);
+  render();
+}
+
+function submit(){
+  if(!running) return;
+  if(answerSlots.some(s => s === null)) return;
+  const guess = answerSlots.map(s => s.ch).join('');
+  if(guess === current.word){
+    // position pays out
+    const len = current.word.length;
+    const elapsed = (Date.now() - wordStart) / 1000;
+    const speedBonus = Math.max(0, Math.round(8 - elapsed)); // fast solve bonus
+    const streakBonus = streak; // grows with consecutive solves
+    const gain = (10 + len + speedBonus + streakBonus) * PAYOUT_MULT;
+    rawScore += gain;
+    wordsSolved++;
+    streak++;
+    updateHud();
+    answerEl.classList.add('correct');
+    setTimeout(() => { if(running) loadWord(); }, 350);
+  } else {
+    // off-script: the speech ad-libs and you lose airtime
+    streak = 0;
+    updateHud();
+    answerEl.classList.remove('shake');
+    void answerEl.offsetWidth; // reflow to restart animation
+    answerEl.classList.add('shake');
+    timeLeft = Math.max(0, timeLeft - WRONG_PENALTY);
+    updateTime();
+  }
+}
+
+function updateHud(){
+  scoreValEl.textContent = '$' + rawScore;
+  streakValEl.textContent = streak;
+}
+
+function updateTime(){
+  timeValEl.textContent = Math.ceil(timeLeft);
+  const pct = Math.max(0, timeLeft / TIME_LIMIT) * 100;
+  timeBar.style.width = pct + '%';
+  const low = timeLeft <= 10;
+  timeBox.classList.toggle('low', low);
+  timeBar.classList.toggle('low', low);
+}
+
+function tick(){
+  timeLeft -= 0.1;
+  if(timeLeft <= 0){
+    timeLeft = 0;
+    updateTime();
+    endGame();
+    return;
+  }
+  updateTime();
+}
+
+function startGame(){
+  rawScore = 0; wordsSolved = 0; streak = 0;
+  timeLeft = TIME_LIMIT;
+  running = true;
+  buildDeck();
+  updateHud();
+  updateTime();
+  startOverlay.classList.add('hidden');
+  overOverlay.classList.add('hidden');
+  loadWord();
+  grabFocus();
+  if(timerId) clearInterval(timerId);
+  timerId = setInterval(tick, 100);
+}
+
+function endGame(){
+  running = false;
+  if(timerId){ clearInterval(timerId); timerId = null; }
+  postHi(rawScore); // always posts; 0 words => $0
+  finalScoreEl.textContent = '$' + rawScore;
+  finalWordsEl.textContent = wordsSolved + (wordsSolved === 1 ? ' word hit' : ' words hit');
+  overOverlay.classList.remove('hidden');
+}
+
+// ---- Events ----
+submitBtn.addEventListener('click', submit);
+shuffleBtn.addEventListener('click', doShuffle);
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
+window.addEventListener('keydown', (e) => {
+  // start / restart with Enter when not running
+  if(!running){
+    if(e.key === 'Enter'){
+      if(!startOverlay.classList.contains('hidden') || !overOverlay.classList.contains('hidden')){
+        e.preventDefault();
+        startGame();
+      }
+    }
+    return;
+  }
+  if(e.key === 'Enter'){ e.preventDefault(); submit(); return; }
+  if(e.key === 'Backspace'){ e.preventDefault(); backspace(); return; }
+  if(/^[a-zA-Z]$/.test(e.key)){ e.preventDefault(); typeLetter(e.key); }
+});
+
+// initial paint
+updateTime();
+</script>
+</body>
+</html>
