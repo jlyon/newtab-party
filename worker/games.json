@@ -2,13 +2,12 @@
   "version": 1,
   "scheduleEpoch": "2026-06-15",
   "schedule": [
-    "the-wildcard",
-    "coeur-brise",
     "oligarchs-dilemma",
     "fly-by-the-seat-of-your-pants",
-    "penalty-panic",
-    "prompter-payday",
     "frosty-freefall",
+    "penalty-panic",
+    "blouncerroozal",
+    "prompter-payday",
     "bend-it-like-maxi",
     "chop-till-you-drop",
     "shootin-n-crackin",
@@ -30,7 +29,8 @@
     "build-the-boardwalk",
     "sweep-the-strait",
     "yarrmada",
-    "blouncerroozal"
+    "the-wildcard",
+    "coeur-brise"
   ],
   "games": [
     {
