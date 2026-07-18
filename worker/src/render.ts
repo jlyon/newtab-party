@@ -92,7 +92,9 @@ ${FAVICON}
   #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin: 4px 0; }
   .recent-game-link { text-decoration: none; color: inherit; display: block; }
   .recent-game-link:hover .about-game-card { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.07); }
-  .about-game-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 14px 16px; transition: background 0.12s, border-color 0.12s; }
+  .about-game-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 14px 16px; transition: background 0.12s, border-color 0.12s; overflow: hidden; }
+  .about-game-thumb { height: 92px; margin: -14px -16px 12px; background-size: cover; background-position: center; background-color: #0d0d16; position: relative; }
+  .about-game-thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 -34px 40px -22px rgba(17,17,24,0.95); }
   .about-game-date { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.25); margin-bottom: 4px; }
   .about-game-name { font-size: 13px; font-weight: 700; margin-bottom: 5px; color: #fff; }
   .about-game-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
@@ -268,6 +270,7 @@ async function loadRecentGames() {
       link.className = 'recent-game-link';
       link.href = href;
       link.innerHTML = '<div class="about-game-card">' +
+        (g.id ? '<div class="about-game-thumb" style="background-image:url(/games/backgrounds/' + esc(g.id) + '.jpg)"></div>' : '') +
         '<div class="about-game-date">' + esc(dateLabel) + '</div>' +
         '<div class="about-game-name">' + esc(g.name) + '</div>' +
         '<div class="about-game-type">' + esc(g.type||'') + '</div>' +
@@ -389,6 +392,109 @@ function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 init();
 </script>
+</body>
+</html>`;
+}
+
+// ── renderGamesCalendar ──────────────────────────────
+// The (unlinked) /games "practice room" — every game laid out on a calendar,
+// each cell thumbnailed with its own gameplay screenshot. Past days replay for
+// practice; today is the only one that counts toward the leaderboard.
+
+export interface CalCell {
+  date: string;        // YYYY-MM-DD
+  game: Game | null;
+  isToday: boolean;
+  isFuture: boolean;
+}
+
+export function renderGamesCalendar({ today, cells }: { today: string; cells: CalCell[] }): string {
+  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const cellHtml = (c: CalCell): string => {
+    const dayNum = Number(c.date.slice(8, 10));
+    const slug = c.game?.id ?? '';
+    const bg = slug ? `/games/backgrounds/${slug}.jpg` : '';
+    const name = c.game ? esc(c.game.name) : '';
+    const style = bg ? ` style="background-image:url('${bg}')"` : '';
+    const inner =
+      `<span class="cal-day">${dayNum}</span>` +
+      (c.game ? `<span class="cal-name">${name}</span>` : '') +
+      (c.isToday ? `<span class="cal-badge">Today · counts</span>` : '') +
+      (c.isFuture ? `<span class="cal-lock">🔒</span>` : '');
+    if (c.isFuture || !c.game) {
+      return `<div class="cal-cell is-future"${style}><div class="cal-scrim"></div>${inner}</div>`;
+    }
+    const href = c.isToday ? '/' : `/play/${c.date}`;
+    const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
+    const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
+    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"${style}><div class="cal-scrim"></div>${inner}</a>`;
+  };
+
+  // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
+  let weeks = '';
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
+  }
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newtab.party — the practice room</title>
+${FAVICON}
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 44px 20px 80px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .kicker { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,215,0,0.6); margin-bottom: 10px; }
+  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.5px; margin-bottom: 14px; }
+  .blurb { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.55); max-width: 640px; margin-bottom: 6px; }
+  .blurb b { color: #ffd700; font-weight: 700; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px; color: rgba(255,255,255,0.4); margin: 22px 0 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .dot.today { background: #ffd700; }
+  .dot.past { background: rgba(255,255,255,0.35); }
+  .dot.future { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+  .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+  .cal-head div { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.28); text-align: center; padding-bottom: 2px; }
+  .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background-size: cover; background-position: center; background-color: #12121c; border: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; text-decoration: none; color: #fff; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
+  .cal-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.82) 100%); }
+  a.cal-cell:hover { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); z-index: 2; }
+  .cal-day { position: relative; z-index: 1; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.75); align-self: flex-start; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .cal-name { position: relative; z-index: 1; font-size: 12px; font-weight: 700; line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,0.95); margin-top: auto; }
+  .cal-badge { position: relative; z-index: 1; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #ffd700; margin-top: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .cal-lock { position: absolute; top: 8px; right: 8px; z-index: 1; font-size: 12px; opacity: 0.6; }
+  .cal-cell.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
+  .cal-cell.is-future { opacity: 0.4; cursor: default; }
+  .cal-cell.is-future .cal-name { color: rgba(255,255,255,0.6); }
+  .foot { margin-top: 30px; font-size: 12px; color: rgba(255,255,255,0.28); }
+  .foot a { color: rgba(255,255,255,0.5); }
+  @media (max-width: 560px) {
+    .cal-name { font-size: 10px; }
+    .cal-cell { padding: 5px; border-radius: 8px; }
+    .cal-badge { font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">The Practice Room</div>
+  <h1>You found the back room.</h1>
+  <p class="blurb">Every game we have ever shipped, laid out for you to rehearse until your thumbs give out. Warm up, learn the patterns, run the table.</p>
+  <p class="blurb">One catch: the leaderboard only remembers <b>today's game</b>. Everything else here is strictly you versus your own ego. No pressure. No glory. Just reps.</p>
+  <div class="legend">
+    <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
+    <span><i class="dot past"></i> Past game (practice, scores not saved)</span>
+    <span><i class="dot future"></i> Not aired yet</span>
+  </div>
+  <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
+  ${weeks}
+  <div class="foot"><a href="/">← Back to today's game</a></div>
+</div>
 </body>
 </html>`;
 }

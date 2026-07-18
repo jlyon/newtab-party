@@ -64,6 +64,35 @@
   #overlay button, #start-overlay button { margin-top: 22px; padding: 12px 26px; font-size: 15px; font-family: 'Special Elite', monospace; background: var(--aged); color: var(--ink); border: 2px solid var(--bg); cursor: pointer; letter-spacing: 2px; text-transform: uppercase; }
   #overlay button:hover, #start-overlay button:hover { background: var(--bg); }
   .badge { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; font-size: 12px; letter-spacing: 2px; }
+
+  /* ── Landing page (start screen) — themed redesign ────────────── */
+  /* Font 'Special Elite' is already loaded via the <head> link (with IM Fell English SC). */
+  #start-overlay {
+    background:
+      radial-gradient(80% 66% at 50% 44%, rgba(0,0,0,0.5), rgba(58,31,14,0.55) 66%, rgba(30,16,7,0.84));
+    background:
+      radial-gradient(80% 66% at 50% 44%, rgba(0,0,0,0.5), rgba(58,31,14,0.55) 66%, rgba(30,16,7,0.84)),
+      url('backgrounds/stump-grandpa.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {
+    font-family: 'Special Elite', 'Courier New', monospace;
+    font-size: clamp(40px, 12vw, 92px); line-height: 0.98; margin: 0 0 14px;
+    letter-spacing: 3px; color: #f3e4c6;
+    text-shadow: 0 3px 30px rgba(0,0,0,0.9), 0 0 24px rgba(201,168,118,0.5);
+  }
+  #start-overlay p {
+    color: rgba(245,235,215,0.92); max-width: 44ch;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.9);
+  }
+  #start-overlay button {
+    font-family: 'Special Elite', monospace;
+    margin-top: 24px; padding: 15px 48px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #2a1a0c; background: var(--aged);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.06); }
 </style>
 </head>
 <body>

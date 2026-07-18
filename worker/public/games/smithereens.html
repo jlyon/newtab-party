@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Smithereens</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>"/>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&display=swap" rel="stylesheet" />
 <style>
   :root { --primary: #6B8E23; --secondary: #C3B091; --bg: #1a2410; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -34,6 +37,33 @@
   #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
   #overlay button, #start-overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+
+  /* ── Landing page (start screen) — themed redesign ────────────── */
+  #start-overlay {
+    background:
+      radial-gradient(86% 70% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.38) 70%, rgba(0,0,0,0.7)),
+      url('backgrounds/smithereens.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {
+    font-family: 'Black Ops One', system-ui, sans-serif;
+    font-size: clamp(40px, 12vw, 100px);
+    line-height: 0.95; margin: 0 0 16px; color: #fff; letter-spacing: 2px; text-transform: uppercase;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,140,40,0.55), 0 0 60px rgba(107,142,35,0.4);
+  }
+  #start-overlay p {
+    color: rgba(255,255,255,0.9); max-width: 42ch;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.95);
+  }
+  #start-overlay button {
+    font-family: 'Black Ops One', system-ui, sans-serif;
+    margin-top: 24px; padding: 15px 50px;
+    font-size: clamp(15px,4vw,20px); letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 6px; cursor: pointer;
+    color: #10100f; background: var(--secondary, #C3B091);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 </style>
 </head>
 <body>

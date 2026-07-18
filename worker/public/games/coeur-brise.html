@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Coeur Brisé</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet" />
 <style>
   :root { --primary: #c1121f; --secondary: #0a0a0a; --felt: #1a8c47; --felt-dark: #0c5e2d; --wood: #5a3a22; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -98,6 +101,37 @@
   #start-overlay button { margin-top: 20px; padding: 12px 28px; font-size: clamp(13px, 3.5vw, 15px); font-family: inherit;
     background: var(--primary); color: #fff; border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; min-height: 44px; }
   #start-overlay button:active { transform: scale(0.97); }
+
+  /* ── Landing page (start screen) — themed redesign ────────────── */
+  #start-overlay {
+    background:
+      radial-gradient(72% 60% at 50% 44%, rgba(0,0,0,0.62), rgba(6,20,12,0.5) 68%, rgba(6,20,12,0.84));
+    background:
+      radial-gradient(72% 60% at 50% 44%, rgba(0,0,0,0.62), rgba(6,20,12,0.5) 68%, rgba(6,20,12,0.84)),
+      url('backgrounds/coeur-brise.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {
+    font-family: 'Parisienne', cursive;
+    font-style: normal; font-weight: 400;
+    font-size: clamp(58px, 17vw, 138px);
+    line-height: 0.95; letter-spacing: 1px; margin: 0 0 8px;
+    color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.9), 0 0 30px rgba(255,120,140,0.45);
+  }
+  #start-overlay p {
+    color: rgba(255,255,255,0.9); max-width: 44ch;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.95);
+  }
+  #start-overlay button {
+    margin-top: 26px; padding: 14px 48px;
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic;
+    font-size: clamp(15px, 4vw, 20px); letter-spacing: 1px;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #fff; background: var(--primary);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.55);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 </style>
 </head>
 <body>

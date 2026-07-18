@@ -273,9 +273,77 @@ Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/p
 
 **Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.
 
+## Make the landing screen compelling (gameplay-screenshot background + themed font)
+
+The start/title screen is the game's landing page — it should sell the game. Two moves make a huge
+difference and both are cheap:
+
+**1. A theme-matched Google Font for the title.** Pick a font that fits the game's vibe (a pirate
+font for a pirate game, a pixel arcade font for a retro shooter, an elegant script for a card game).
+Load it with a `<link>` in `<head>` (right after `<title>`) and apply it to the start-screen title
+(and optionally the Play button). Examples that work well: `Pirata One` (pirate), `Press Start 2P`
+(retro arcade), `Orbitron` (sci-fi), `Racing Sans One` (racing), `Bangers` (comic/brawler),
+`Playfair Display`/`Cinzel` (elegant/classical), `Monoton` (neon casino), `VT323` (terminal), `Rye`
+(western/wood), `Bebas Neue`/`Teko` (sports). Use a distinct one per game.
+
+**2. A blown-up gameplay screenshot as the start-screen background.** Capture the game mid-play and
+use it, `cover`-sized, behind a legibility scrim.
+
+Capture it with the pre-installed browser (Playwright + `/opt/pw-browsers/chromium`):
+- Load the game, click Play/Start, drive a couple seconds of **actual gameplay**, then screenshot
+  the largest `<canvas>` (or the full page for DOM/board games). Save as
+  `worker/public/games/backgrounds/<slug>.jpg` (JPEG quality ~60).
+- **Avoid capturing a game-over / win screen.** Drive gently — e.g. for a minesweeper do one safe
+  first reveal; for a snake/runner nudge briefly and shoot early; for an unforgiving reflex game
+  capture the very first started frame. A "TIMBER!"/"Game Over" baked into the background looks broken.
+- The `backgrounds/` folder sits next to the game file, so the relative `url('backgrounds/<slug>.jpg')`
+  works both when served (worker serves everything under `public/`) and when the file is opened directly.
+
+Then append an override CSS block at the end of the `<style>`, using the game's actual start-container,
+title, and button selectors:
+
+```css
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {                 /* the start container (id varies per game) */
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)),
+      url('backgrounds/<slug>.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {              /* the title element */
+    font-family: '<Font>', <fallback>;
+    font-size: clamp(36px, 8vw, 72px);   /* keep it moderate — must NOT overflow/clip */
+    line-height: 0.98; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px <accent-rgba>;
+  }
+  #start-overlay p { color: rgba(255,255,255,0.9); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button {         /* the Play button */
+    font-family: '<Font>', <fallback>;
+    margin-top: 22px; padding: 15px 50px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #10100f; background: var(--primary, #fff);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    transition: transform 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+```
+
+Rules that keep it from looking broken:
+- **Legibility first.** If the start screen is text-heavy (long description) or the screenshot is
+  bright/busy, wrap the content in a glassy panel (`background: rgba(10,8,10,0.6); backdrop-filter:
+  blur(7px); border-radius: 18px; padding: 32px; max-width: 560px`) instead of relying on the scrim.
+- **Don't let the title overflow.** Keep `font-size` clamps moderate (roughly `max 60–80px`, less for
+  wide/condensed fonts) so the title never clips horizontally or spills past the container — especially
+  inside a card or a small artbox. Reduce `letter-spacing` for wide script/serif fonts.
+- **Make the overlay opaque enough.** A JPEG background is opaque, but if it fails to load only your
+  scrim remains — so keep the scrim dark enough that any game-over overlay sitting behind the start
+  screen (common) doesn't bleed through.
+- Scope every override to the **start** container only, never the shared game-over overlay.
+- Only new external resource is the Google Font `<link>`. Everything else stays self-contained.
+
 ## Deliver it
 
 1. Save the final file to `worker/public/games/<slug>.html` — use a short, lowercase, hyphenated filename.
+   Save its gameplay-screenshot background to `worker/public/games/backgrounds/<slug>.jpg`.
 2. Add an entry to `worker/games.json` under the `"games"` array:
    ```json
    {

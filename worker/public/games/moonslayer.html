@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <title>Moonslayer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet" />
 <style>
   :root { --primary: #cdd6f4; --secondary: #e0314b; --bg: #0a0e24; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -130,6 +133,33 @@
   #overlay p { color: var(--primary); margin: 3px 0; font-size: clamp(12px, 3vw, 14px); }
   #overlay button { margin-top: 16px; padding: 10px 26px; font-size: clamp(13px, 3.5vw, 15px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+
+  /* ── Landing page (start screen) — themed redesign ────────────── */
+  #intro {
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(10,14,36,0.55), rgba(5,7,20,0.86) 78%);
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(10,14,36,0.55), rgba(5,7,20,0.86) 78%),
+      url('backgrounds/moonslayer.jpg') center/cover no-repeat;
+  }
+  .lore-panel {
+    background: linear-gradient(160deg, rgba(20,28,66,0.74), rgba(10,14,36,0.84));
+    -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7), inset 0 0 30px rgba(205,214,244,0.05);
+  }
+  .lore-panel h2 {
+    font-family: 'Cinzel', serif; font-weight: 900;
+    font-size: clamp(28px, 6.5vw, 52px); letter-spacing: 2px; line-height: 1.02;
+    text-shadow: 0 3px 30px rgba(0,0,0,0.8), 0 0 26px rgba(205,214,244,0.4);
+  }
+  #begin-btn {
+    font-family: 'Cinzel', serif; font-weight: 900;
+    letter-spacing: 3px; text-transform: uppercase;
+    padding: 15px 44px; border-radius: 40px;
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5), 0 0 26px rgba(205,214,244,0.35);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  #begin-btn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.05); }
 </style>
 </head>
 <body>

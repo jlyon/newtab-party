@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Yarrmada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&display=swap" rel="stylesheet" />
 <style>
   :root{
     --red:#c0291f;          /* cannon fire */
@@ -108,6 +111,33 @@
   .wrap{position:relative;z-index:1;width:100%;max-width:760px;display:flex;flex-direction:column;align-items:center;min-height:440px;}
   #bgart{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;z-index:0;pointer-events:none;opacity:.18;}
   #bgart svg{width:min(720px,96vw);height:auto;display:block;}
+
+  /* ── Landing page (start screen) — themed redesign ────────────── */
+  #startOverlay {
+    background:
+      radial-gradient(84% 70% at 50% 44%, rgba(0,0,0,0.5), rgba(6,22,27,0.42) 70%, rgba(0,0,0,0.68)),
+      url('backgrounds/yarrmada.jpg') center/cover no-repeat;
+  }
+  #startOverlay h1 {
+    font-family: 'Pirata One', cursive;
+    font-size: clamp(46px, 15vw, 120px);
+    line-height: 0.92; letter-spacing: 2px; margin: 4px 0 8px; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.9), 0 0 26px rgba(192,41,31,0.55);
+  }
+  #startOverlay p {
+    color: rgba(244,239,230,0.92); max-width: 44ch;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.95);
+  }
+  #playBtn {
+    font-family: 'Pirata One', cursive;
+    margin-top: 8px; padding: 14px 48px;
+    font-size: clamp(16px,4.5vw,24px); letter-spacing: 1.5px;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #fff; background: var(--accent, #c0291f);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.55);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+  }
+  #playBtn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.1); }
 </style>
 </head>
 <body>

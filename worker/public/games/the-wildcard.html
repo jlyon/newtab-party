@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>the wildcard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
 <style>
   :root { --primary: #d896ff; --secondary: #ff6ec7; --bg: #150421; }
   * { box-sizing: border-box; }
@@ -35,6 +38,28 @@
   .ending .choice { border-color: var(--secondary); color: var(--secondary); }
   .ending .choice:hover { background: var(--secondary); color: var(--bg); }
   .meta { margin-top: 28px; font-size: 13px; opacity: 0.65; font-style: italic; }
+
+  /* ── Landing page (opening story screen) — themed redesign ─────── */
+  /* CYOA: no start overlay. Background on the page; readable glass panel on #wrap. */
+  body {
+    background:
+      linear-gradient(rgba(21,4,33,0.74), rgba(21,4,33,0.84)),
+      url('backgrounds/the-wildcard.jpg') center/cover no-repeat fixed;
+  }
+  #wrap {
+    margin: 40px auto; padding: 40px 30px 48px;
+    background: rgba(21,4,33,0.6);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  #wrap h1 {
+    font-family: 'Pacifico', cursive;
+    font-size: clamp(46px, 12vw, 92px); font-style: normal; letter-spacing: 1px;
+    line-height: 1.05; margin: 0 0 10px; color: #fff;
+    text-shadow: 0 3px 30px rgba(0,0,0,0.8), 0 0 26px rgba(255,110,199,0.5);
+  }
 </style>
 </head>
 <body>
