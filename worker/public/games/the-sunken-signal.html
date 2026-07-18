@@ -90,8 +90,9 @@
   /* ── Landing page (opening screen) — themed redesign ──────────── */
   /* CYOA: the intro #overlay over the art box IS the landing screen. */
   #overlay {
+    position: fixed; inset: 0; z-index: 50;
     background:
-      radial-gradient(90% 78% at 50% 42%, rgba(4,22,30,0.66), rgba(4,22,30,0.5) 68%, rgba(2,12,17,0.8)),
+      radial-gradient(90% 78% at 50% 42%, rgba(4,22,30,0.72), rgba(4,22,30,0.56) 68%, rgba(2,12,17,0.86)),
       url('backgrounds/the-sunken-signal.jpg') center/cover no-repeat;
   }
   #overlay h1 {
