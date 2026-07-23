@@ -39,7 +39,7 @@
   #pickHead { font-size:clamp(15px,4vw,20px); font-weight:800; margin:4px 0 2px; }
   #pickSub { color:var(--gold); font-size:13px; min-height:18px; margin-bottom:10px; }
   #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(74px,1fr)); gap:7px;
-    max-height:54vh; overflow-y:auto; padding:4px; }
+    padding:4px; }
   .flag { display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 3px;
     border:2px solid rgba(255,255,255,.14); border-radius:9px; background:rgba(255,255,255,.04); cursor:pointer; }
   .flag:hover { border-color:rgba(255,255,255,.5); }
@@ -57,7 +57,7 @@ body.touch #controls { display:flex; }
   #picker {
     background:
       radial-gradient(84% 68% at 50% 42%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.66)),
-      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/penalty-panic.jpg') center/cover no-repeat;
+      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/penalty-panic.jpg') center/contain no-repeat;
   }
   #picker { overflow-y: auto; }
   #picker .card {
@@ -65,7 +65,6 @@ body.touch #controls { display:flex; }
     backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
     border: 1px solid rgba(255,255,255,0.13); border-radius: 18px;
     padding: 24px 30px 30px; box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-    max-height: 94vh; overflow-y: auto;
   }
   #picker .card h2 {
     font-family: 'Teko', sans-serif; font-weight: 700;
@@ -105,7 +104,7 @@ body.touch #controls { display:flex; }
 
 <div id="picker" class="overlay">
   <div class="card">
-    <h2>Penalty Panic</h2>
+    <img src="logos/penalty-panic.png" alt="Penalty Panic" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
     <p>Best of 5 from the spot. When you shoot: drag to aim, then <b>hold</b> Shoot to load power and release to strike. When you defend: pick which way your keeper dives. Win it for your nation.</p>
     <div id="pickHead">Pick YOUR team</div>
     <div id="pickSub"></div>
