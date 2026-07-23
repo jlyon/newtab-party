@@ -413,22 +413,21 @@ export function renderGamesCalendar({ today, cells }: { today: string; cells: Ca
 
   const cellHtml = (c: CalCell): string => {
     const dayNum = Number(c.date.slice(8, 10));
-    const slug = c.game?.id ?? '';
-    const bg = slug ? `/games/backgrounds/${slug}.jpg` : '';
-    const name = c.game ? esc(c.game.name) : '';
-    const style = bg ? ` style="background-image:url('${bg}')"` : '';
-    const inner =
-      `<span class="cal-day">${dayNum}</span>` +
-      (c.game ? `<span class="cal-name">${name}</span>` : '') +
-      (c.isToday ? `<span class="cal-badge">Today · counts</span>` : '') +
-      (c.isFuture ? `<span class="cal-lock">🔒</span>` : '');
-    if (c.isFuture || !c.game) {
-      return `<div class="cal-cell is-future"${style}><div class="cal-scrim"></div>${inner}</div>`;
+    // Empty grid padding — no game scheduled on this day.
+    if (!c.game) {
+      return `<div class="cal-cell is-empty"><span class="cal-day">${dayNum}</span></div>`;
     }
+    const name = esc(c.game.name);
+    // Upcoming games stay hidden — locked placeholder, no logo or title revealed.
+    if (c.isFuture) {
+      return `<div class="cal-cell is-future"><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
+    }
+    const logo = `<img class="cal-logo" src="/games/logos/${c.game.id}.png" alt="${name}" loading="lazy">`;
+    const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
     const href = c.isToday ? '/' : `/play/${c.date}`;
     const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
     const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
-    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"${style}><div class="cal-scrim"></div>${inner}</a>`;
+    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
   };
 
   // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
@@ -461,16 +460,16 @@ ${FAVICON}
   .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
   .cal-head div { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.28); text-align: center; padding-bottom: 2px; }
   .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
-  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background-size: cover; background-position: center; background-color: #12121c; border: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; text-decoration: none; color: #fff; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
-  .cal-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.82) 100%); }
+  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background-color: #14141f; border: 1px solid rgba(255,255,255,0.07); display: block; text-decoration: none; color: #fff; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
+  .cal-logo { position: absolute; inset: 0; margin: auto; max-width: 82%; max-height: 82%; object-fit: contain; z-index: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); transition: transform 0.12s ease; }
   a.cal-cell:hover { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); z-index: 2; }
-  .cal-day { position: relative; z-index: 1; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.75); align-self: flex-start; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-  .cal-name { position: relative; z-index: 1; font-size: 12px; font-weight: 700; line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,0.95); margin-top: auto; }
-  .cal-badge { position: relative; z-index: 1; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #ffd700; margin-top: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-  .cal-lock { position: absolute; top: 8px; right: 8px; z-index: 1; font-size: 12px; opacity: 0.6; }
+  a.cal-cell:hover .cal-logo { transform: scale(1.05); }
+  .cal-day { position: absolute; top: 6px; left: 8px; z-index: 2; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .cal-badge { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; z-index: 2; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #ffd700; text-shadow: 0 1px 4px rgba(0,0,0,0.95); }
+  .cal-lock { position: absolute; inset: 0; margin: auto; width: 1.4em; height: 1.4em; display: flex; align-items: center; justify-content: center; z-index: 1; font-size: 18px; opacity: 0.4; }
   .cal-cell.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
-  .cal-cell.is-future { opacity: 0.4; cursor: default; }
-  .cal-cell.is-future .cal-name { color: rgba(255,255,255,0.6); }
+  .cal-cell.is-future { opacity: 0.5; cursor: default; }
+  .cal-cell.is-empty { opacity: 0.3; cursor: default; }
   .foot { margin-top: 30px; font-size: 12px; color: rgba(255,255,255,0.28); }
   .foot a { color: rgba(255,255,255,0.5); }
   @media (max-width: 560px) {
