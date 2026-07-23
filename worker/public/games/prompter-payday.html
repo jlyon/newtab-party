@@ -122,9 +122,10 @@
   /* overlays */
   .overlay{
     position:fixed; inset:0; background:rgba(0,0,0,0.85);
-    display:flex; align-items:center; justify-content:center;
+    display:flex; overflow-y:auto;
     text-align:center; padding:24px; z-index:10;
   }
+  .overlay > *{ margin:auto; }
   .overlay.hidden{ display:none; }
   .panel{ max-width:380px; }
   .panel h1{ font-size:clamp(26px,8vw,40px); margin-bottom:12px; color:var(--secondary); }

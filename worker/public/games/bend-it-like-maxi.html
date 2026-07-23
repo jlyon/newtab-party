@@ -29,16 +29,16 @@
   #btn-kick:active, #btn-kick.held { background: var(--secondary); color: var(--bg); }
   #power-bar-wrap { flex: 1; height: 16px; border: 2px solid var(--primary); border-radius: 4px; min-width: 60px; }
   #power-bar { height: 100%; width: 0%; background: var(--secondary); border-radius: 2px; }
-  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(4,10,18,0.94); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
-  #start-card { max-width: 460px; }
+  #start-overlay { position: fixed; inset: 0; display: flex; align-items: center;
+    background: rgba(4,10,18,0.94); flex-direction: column; text-align: center; padding: 20px; z-index: 10; overflow-y: auto; }
+  #start-card { max-width: 460px; margin: auto 0; }
   #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 10px; letter-spacing: 2px; }
   #start-card p { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.6; margin: 0 0 18px; font-style: italic; }
-  .team-row { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 0 0 22px; flex-wrap: wrap; }
-  .team-row label { color: rgba(255,255,255,0.6); font-size: 12px; display: block; margin-bottom: 4px; text-align: left; }
+  .team-row { display: flex; flex-direction: column; gap: 10px; justify-content: center; align-items: center; margin: 0 0 22px; }
+  .team-row label { color: rgba(255,255,255,0.6); font-size: 12px; display: block; margin-bottom: 4px; text-align: center; }
   select { background: #0f2233; color: #fff; border: 2px solid var(--primary); border-radius: 6px;
     padding: 10px 8px; font-size: 14px; font-family: inherit; max-width: 44vw; }
-  .vs { color: var(--secondary); font-weight: 700; font-size: 18px; padding-top: 14px; }
+  .vs { color: var(--secondary); font-weight: 700; font-size: 18px; padding: 2px 0; }
   #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; font-family: inherit; }
   #start-btn:hover { opacity: 0.85; }
