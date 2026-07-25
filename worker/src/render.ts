@@ -89,17 +89,13 @@ ${FAVICON}
   .about-link:hover { color: rgba(255,255,255,0.85); text-decoration-color: rgba(255,255,255,0.5); }
   #about-modal ol { padding-left: 18px; }
   #about-modal code { background: rgba(255,255,255,0.09); padding: 2px 7px; border-radius: 4px; font-family: 'SF Mono','Monaco',monospace; font-size: 12px; color: #e2e8f0; }
-  #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin: 4px 0; }
+  #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px,1fr)); gap: 8px; margin: 4px 0; }
   .recent-game-link { text-decoration: none; color: inherit; display: block; }
-  .recent-game-link:hover .about-game-card { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.07); }
-  .about-game-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 14px 16px; transition: background 0.12s, border-color 0.12s; overflow: hidden; }
-  .about-game-thumb { height: 92px; margin: -14px -16px 12px; background-size: cover; background-position: center; background-color: #0d0d16; position: relative; }
-  .about-game-thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 -34px 40px -22px rgba(17,17,24,0.95); }
-  .about-game-date { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.25); margin-bottom: 4px; }
-  .about-game-name { font-size: 13px; font-weight: 700; margin-bottom: 5px; color: #fff; }
-  .about-game-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
-  .about-game-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.45; }
-  .about-game-controls { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 6px; font-style: italic; }
+  .about-game-card { position: relative; aspect-ratio: 1 / 1; background: #14141f; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
+  .recent-game-link:hover .about-game-card { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); }
+  .about-game-card.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
+  .about-game-logo { position: absolute; inset: 0; margin: auto; max-width: 82%; max-height: 82%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); }
+  .about-game-date { position: absolute; top: 6px; left: 8px; z-index: 2; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
   .modal-links { margin-top: 32px; display: flex; gap: 10px; flex-wrap: wrap; }
   .modal-links a, .modal-links button { color: #e5e7eb; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 9px 16px; text-decoration: none; font-size: 13px; font-weight: 500; transition: background 0.12s; cursor: pointer; font-family: inherit; }
   .modal-links a:hover, .modal-links button:hover { background: rgba(255,255,255,0.16); }
@@ -163,6 +159,7 @@ ${FAVICON}
     <p>Every day at midnight UTC, a brand-new arcade game drops — same one for everyone, 24 hours to post your best score. After that the leaderboard locks and you're just playing for your own ego. You're already here, so you're already winning.</p>
     <div class="modal-section">Recent games</div>
     <div id="about-game-list"></div>
+    <p style="margin-top:10px;"><a class="about-link" href="/games">See more in the Practice Room →</a></p>
     <div class="modal-section">Add your own game</div>
     <p style="margin-bottom:14px;">You don't need to know how to code games. Tell Claude what you want, iterate until it's fun, send a PR. Your game gets its own day on the rotation.</p>
     <ol>
@@ -174,6 +171,7 @@ ${FAVICON}
     <div class="modal-links">
       <a href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener" style="background:rgba(255,215,0,0.14);border-color:rgba(255,215,0,0.38);color:#ffd700;font-weight:700;">+ Add to Chrome</a>
       <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub repo →</a>
+      <a href="/games">Practice room →</a>
       <button id="about-open-lb">Leaderboard →</button>
     </div>
   </div>
@@ -269,13 +267,9 @@ async function loadRecentGames() {
       const link = document.createElement('a');
       link.className = 'recent-game-link';
       link.href = href;
-      link.innerHTML = '<div class="about-game-card">' +
-        (g.id ? '<div class="about-game-thumb" style="background-image:url(/games/backgrounds/' + esc(g.id) + '.jpg)"></div>' : '') +
-        '<div class="about-game-date">' + esc(dateLabel) + '</div>' +
-        '<div class="about-game-name">' + esc(g.name) + '</div>' +
-        '<div class="about-game-type">' + esc(g.type||'') + '</div>' +
-        '<div class="about-game-desc">' + esc(g.description||'') + '</div>' +
-        (g.controls ? '<div class="about-game-controls">' + esc(g.controls) + '</div>' : '') +
+      link.innerHTML = '<div class="about-game-card' + (isToday ? ' is-today' : '') + '">' +
+        (g.id ? '<img class="about-game-logo" src="/games/logos/' + esc(g.id) + '.png" alt="' + esc(g.name) + '" loading="lazy">' : '') +
+        '<span class="about-game-date">' + esc(dateLabel) + '</span>' +
         '</div>';
       listEl.appendChild(link);
     }
@@ -483,7 +477,7 @@ ${FAVICON}
 <div class="wrap">
   <div class="kicker">The Practice Room</div>
   <h1>You found the back room.</h1>
-  <p class="blurb">Every game we have ever shipped, laid out for you to rehearse until your thumbs give out. Warm up, learn the patterns, run the table.</p>
+  <p class="blurb">Recent games, all laid out for you to rehearse until your thumbs give out. Warm up, learn the patterns, run the table.</p>
   <p class="blurb">One catch: the leaderboard only remembers <b>today's game</b>. Everything else here is strictly you versus your own ego. No pressure. No glory. Just reps.</p>
   <div class="legend">
     <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
