@@ -294,14 +294,9 @@
   const YELLOWISH = ['#FFDC02', '#FCD116', '#FFCD00', '#FFB81C', '#FFB612', '#FFDD00', '#F7D618', '#F9E814'];
   let kick, score, goals, phase, aim, curve, power, charging;
   let ball, loft, gxFinal, wallN, jumped, guessed, wallChecked, diveX, wind;
-  let resultTimer, comment, clockS, crowd = [], flashT = 0, resultBall = null;
+  let resultTimer, comment, clockS, tick = 0, flashT = 0, resultBall = null;   // tick: frame counter for ambient animation (advanced in step())
   let goalAnim = 0, netBall = null, confetti = [], splash = null;
   let popups = [], shake = 0;   // score pop-ups + brief screen shake (stepped in step(), read in draw())
-
-  for (let i = 0; i < 900; i++) {
-    crowd.push({ x: Math.random() * 600, y: 6 + Math.random() * 148,
-      c: ['#c0392b','#2980b9','#f1c40f','#ecf0f1','#8e44ad','#e67e22'][Math.floor(Math.random()*6)] });
-  }
 
   const selMy = document.getElementById('sel-my'), selOp = document.getElementById('sel-op');
   TEAMS.forEach((t, i) => {
@@ -523,145 +518,381 @@
       }
     }
     if (flashT > 0) flashT--;
+    tick++;
   }
 
-  const SKINS = ['#8d5524', '#c68642', '#e0ac69', '#f1c27d'];
-  function drawFigure(x, gy, s, jersey, shorts, jump, dive, keeper, tone) {
-    const h = 65 * s, skin = tone || '#c68642';
-    ctx.save();
-    ctx.translate(x, gy - jump * s);
-    if (dive) ctx.rotate(dive);
-    ctx.lineCap = 'round';
-    const lw = Math.max(2, 3.2 * s);
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = skin;
-    ctx.beginPath();
-    ctx.moveTo(-h * 0.07, -h * 0.26); ctx.lineTo(-h * 0.1, -h * 0.13);
-    ctx.moveTo(h * 0.07, -h * 0.26); ctx.lineTo(h * 0.1, -h * 0.13);
-    ctx.stroke();
-    ctx.strokeStyle = shorts;
-    ctx.beginPath();
-    ctx.moveTo(-h * 0.1, -h * 0.13); ctx.lineTo(-h * 0.11, -h * 0.02);
-    ctx.moveTo(h * 0.1, -h * 0.13); ctx.lineTo(h * 0.11, -h * 0.02);
-    ctx.stroke();
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(-h * 0.11 - lw * 1.1, -h * 0.03, lw * 2.2, lw);
-    ctx.fillRect(h * 0.11 - lw * 1.1, -h * 0.03, lw * 2.2, lw);
-    ctx.fillStyle = shorts;
-    ctx.fillRect(-h * 0.17, -h * 0.42, h * 0.34, h * 0.18);
-    ctx.fillStyle = jersey;
-    ctx.beginPath();
-    ctx.moveTo(-h * 0.2, -h * 0.74);
-    ctx.lineTo(h * 0.2, -h * 0.74);
-    ctx.lineTo(h * 0.17, -h * 0.4);
-    ctx.lineTo(-h * 0.17, -h * 0.4);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = shorts;
-    ctx.fillRect(-h * 0.185, -h * 0.6, h * 0.37, Math.max(1, h * 0.05));
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = jersey;
-    if (keeper) {
-      ctx.beginPath();
-      ctx.moveTo(-h * 0.18, -h * 0.68); ctx.lineTo(-h * 0.33, -h * 0.94);
-      ctx.moveTo(h * 0.18, -h * 0.68); ctx.lineTo(h * 0.33, -h * 0.94);
-      ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(-h * 0.33, -h * 0.94, lw * 0.9, 0, Math.PI * 2);
-      ctx.arc(h * 0.33, -h * 0.94, lw * 0.9, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(-h * 0.19, -h * 0.68); ctx.lineTo(-h * 0.08, -h * 0.44);
-      ctx.moveTo(h * 0.19, -h * 0.68); ctx.lineTo(h * 0.08, -h * 0.44);
-      ctx.stroke();
-      ctx.fillStyle = skin;
-      ctx.beginPath();
-      ctx.arc(-h * 0.07, -h * 0.43, lw * 0.7, 0, Math.PI * 2);
-      ctx.arc(h * 0.07, -h * 0.43, lw * 0.7, 0, Math.PI * 2);
-      ctx.fill();
+  // ===== RENDERING =====
+  // Heavy scenery is pre-rendered into offscreen canvases: the stadium backdrop, the crowd, the grass texture,
+  // the floodlight overlay and the ball texture are built once; the pitch (stripes, markings, haze) depends on
+  // the camera so it is rebuilt once per kick. draw() stays pure: it composites those layers and adds cheap
+  // per-frame overlays driven only by state that step() advances (tick, ball, goalAnim, splash, ...).
+  const RS = 2;                       // offscreen layer resolution multiplier (crisp on 2x phones)
+  const HORIZON = 150;                // y where the hoardings meet the far grass
+  const hash = n => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+  const lum = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const inkFor = hex => lum(hex) > 0.55 ? '#111' : '#fff';
+  function offCanvas(w, h) {
+    const c = document.createElement('canvas'); c.width = Math.ceil(w * RS); c.height = Math.ceil(h * RS);
+    const g = c.getContext('2d'); g.setTransform(RS, 0, 0, RS, 0, 0); return { c, g };
+  }
+  function rrect(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+    g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h);
+    g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+  }
+  const pentagon = (g, cx, cy, r, rot) => {
+    g.beginPath();
+    for (let k = 0; k < 5; k++) { const a = rot + k * Math.PI * 2 / 5; g[k ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+    g.closePath(); g.fill();
+  };
+  try { if (document.fonts && document.fonts.load) document.fonts.load('40px "Bebas Neue"'); } catch (e) {}
+  const STAMP_FONT = '"Bebas Neue", Impact, "Arial Narrow", sans-serif';
+
+  let stadiumL, lightsL, noiseL, ballTex, ballShade, ballShadowG, postGradH, postGradV;
+  function buildStatic() {
+    // --- stadium backdrop (0..HORIZON): night sky, roof, three tiers of seating, ad hoardings behind the goal
+    const S = offCanvas(W, HORIZON), g = S.g;
+    const sky = g.createLinearGradient(0, 0, 0, HORIZON);
+    sky.addColorStop(0, '#03060c'); sky.addColorStop(1, '#0d1a2c');
+    g.fillStyle = sky; g.fillRect(0, 0, W, HORIZON);
+    for (let i = 0; i < 50; i++) { g.fillStyle = 'rgba(255,255,255,' + (0.15 + Math.random() * 0.5).toFixed(2) + ')'; g.fillRect(Math.random() * W, Math.random() * 26, 1.2, 1.2); }
+    const tiers = [[26, 64, '#161f2b', '#0f1620'], [68, 104, '#1a2431', '#111924'], [108, 134, '#1f2a38', '#141d29']];
+    for (const [y0, y1, a, b] of tiers) {
+      const tg = g.createLinearGradient(0, y0, 0, y1); tg.addColorStop(0, a); tg.addColorStop(1, b);
+      g.fillStyle = tg; g.fillRect(0, y0, W, y1 - y0);
+      g.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 37; x < W; x += 75) g.fillRect(x, y0, 3, y1 - y0);   // aisles
+      g.fillStyle = '#2a3747'; g.fillRect(0, y1, W, 4);                                                        // walkway / tier front
+      g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(0, y1, W, 1);
+      g.fillStyle = 'rgba(255,230,180,0.4)'; for (let x = 10; x < W; x += 24) g.fillRect(x, y1 + 1.5, 2, 1);  // walkway lamps
     }
-    ctx.fillStyle = skin;
-    ctx.beginPath(); ctx.arc(0, -h * 0.86, h * 0.13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2a1a0a';
-    ctx.beginPath(); ctx.arc(0, -h * 0.88, h * 0.13, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+    const rg = g.createLinearGradient(0, 8, 0, 26); rg.addColorStop(0, '#0b1018'); rg.addColorStop(1, '#1c2736');
+    g.fillStyle = rg; g.fillRect(0, 8, W, 18);                                                                 // roof slab
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, 25, W, 1);
+    g.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 0; x < W; x += 40) g.fillRect(x, 8, 1, 18);          // trusses
+    for (const bx of [150, 300, 450]) {                                                                       // under-roof light banks
+      const gl = g.createRadialGradient(bx, 24, 2, bx, 24, 70); gl.addColorStop(0, 'rgba(255,250,225,0.35)'); gl.addColorStop(1, 'rgba(255,250,225,0)');
+      g.fillStyle = gl; g.fillRect(bx - 70, 0, 140, 95);
+      g.fillStyle = '#fff8dc'; for (let i = 0; i < 6; i++) g.fillRect(bx - 14 + i * 5, 20, 3, 2);
+    }
+    g.fillStyle = '#0c121a'; g.fillRect(0, 134, W, 4);                                                        // front wall
+    const ads = [['#1565c0', '#fff', 'NEWTAB.PARTY'], ['#f5d442', '#111', 'WORLD CUP 2026'], ['#c62828', '#fff', 'MAXI 10'], ['#f2f2f2', '#111', 'BEND IT'], ['#2e7d32', '#fff', 'THE FINAL']];
+    g.font = 'bold 8px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0, x = -40; x < W; i++, x += 100) {
+      const [bg, fg, txt] = ads[i % ads.length];
+      g.fillStyle = bg; g.fillRect(x, 138, 100, 12);
+      g.fillStyle = fg; g.fillText(txt, x + 50, 144.5);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x + 99, 138, 1, 12);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 138, W, 1.5);
+    stadiumL = S.c;
+
+    // --- floodlight overlay (full canvas, translucent): corner towers, their glow and light cones, pools on the grass, vignette
+    const L = offCanvas(W, H), l = L.g;
+    for (const tx of [26, 574]) {
+      const dir = tx < CX ? 1 : -1;
+      const cone = l.createLinearGradient(0, 20, 0, H); cone.addColorStop(0, 'rgba(255,250,225,0.16)'); cone.addColorStop(0.5, 'rgba(255,250,225,0.05)'); cone.addColorStop(1, 'rgba(255,250,225,0)');
+      l.fillStyle = cone; l.beginPath(); l.moveTo(tx - 10, 22); l.lineTo(tx + 10, 22); l.lineTo(tx + dir * 380, H + 10); l.lineTo(tx - dir * 150, H + 10); l.closePath(); l.fill();
+      const gl = l.createRadialGradient(tx, 18, 4, tx, 18, 110); gl.addColorStop(0, 'rgba(255,250,225,0.55)'); gl.addColorStop(0.3, 'rgba(255,250,225,0.18)'); gl.addColorStop(1, 'rgba(255,250,225,0)');
+      l.fillStyle = gl; l.fillRect(tx - 110, 0, 220, 130);
+      l.fillStyle = '#2b3645'; l.fillRect(tx - 2, 24, 4, 112);                                                // mast
+      l.strokeStyle = 'rgba(255,255,255,0.1)'; l.lineWidth = 1; l.beginPath();
+      for (let y = 30; y < 130; y += 12) { l.moveTo(tx - 2, y); l.lineTo(tx + 2, y + 6); l.moveTo(tx + 2, y); l.lineTo(tx - 2, y + 6); }
+      l.stroke();
+      l.fillStyle = '#3c4858'; l.fillRect(tx - 7, 128, 14, 8);
+      l.fillStyle = '#232c38'; l.fillRect(tx - 13, 8, 26, 18);                                                // lamp head
+      l.fillStyle = '#fff6d0'; for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) l.fillRect(tx - 11 + c * 6, 10 + r * 5.5, 4, 3.5);
+    }
+    for (const px of [170, 430]) {
+      l.save(); l.translate(px, 335); l.scale(1, 0.4);
+      const pg = l.createRadialGradient(0, 0, 10, 0, 0, 230); pg.addColorStop(0, 'rgba(255,250,220,0.1)'); pg.addColorStop(1, 'rgba(255,250,220,0)');
+      l.fillStyle = pg; l.fillRect(-240, -240, 480, 480); l.restore();
+    }
+    const vg = l.createRadialGradient(CX, 230, 180, CX, 230, 520); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+    l.fillStyle = vg; l.fillRect(0, 0, W, H);
+    lightsL = L.c;
+
+    // --- grass texture: thousands of tiny blades, larger toward the camera
+    const N = offCanvas(W, H), n = N.g;
+    for (let i = 0; i < 14000; i++) {
+      const y = HORIZON + Math.random() * (H - HORIZON), x = Math.random() * W, t = (y - HORIZON) / (H - HORIZON), a = 0.05 + Math.random() * 0.1;
+      n.fillStyle = (i & 1) ? 'rgba(255,255,255,' + a.toFixed(3) + ')' : 'rgba(0,0,0,' + (a * 1.3).toFixed(3) + ')';
+      n.fillRect(x, y, 0.8 + t * 0.6, 1 + t * 2.2);
+    }
+    noiseL = N.c;
+
+    // --- ball texture: classic pentagon panels, rotated per frame with the ball's travel
+    const BR = 40, B = offCanvas(BR * 2, BR * 2), b = B.g;
+    b.beginPath(); b.arc(BR, BR, BR, 0, Math.PI * 2); b.clip();
+    b.fillStyle = '#f4f4f4'; b.fillRect(0, 0, BR * 2, BR * 2);
+    b.fillStyle = '#1c1c1c';
+    pentagon(b, BR, BR, BR * 0.3, -Math.PI / 2);
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + Math.PI / 5 + k * Math.PI * 2 / 5; pentagon(b, BR + Math.cos(a) * BR * 0.82, BR + Math.sin(a) * BR * 0.82, BR * 0.26, a + Math.PI); }
+    b.strokeStyle = 'rgba(0,0,0,0.3)'; b.lineWidth = 1.5;
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; b.beginPath(); b.moveTo(BR + Math.cos(a) * BR * 0.3, BR + Math.sin(a) * BR * 0.3); b.lineTo(BR + Math.cos(a) * BR * 0.62, BR + Math.sin(a) * BR * 0.62); b.stroke(); }
+    ballTex = B.c;
+
+    // --- reusable gradients in unit space (scaled per use, so nothing is allocated per frame)
+    ballShade = ctx.createRadialGradient(-0.35, -0.38, 0.05, 0, 0, 1.05);
+    ballShade.addColorStop(0, 'rgba(255,255,255,0.5)'); ballShade.addColorStop(0.4, 'rgba(255,255,255,0.05)');
+    ballShade.addColorStop(0.78, 'rgba(0,0,0,0.1)'); ballShade.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ballShadowG = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    ballShadowG.addColorStop(0, 'rgba(0,0,0,0.55)'); ballShadowG.addColorStop(0.55, 'rgba(0,0,0,0.32)'); ballShadowG.addColorStop(1, 'rgba(0,0,0,0)');
+    postGradH = ctx.createLinearGradient(0, 0, 1, 0); postGradV = ctx.createLinearGradient(0, 0, 0, 1);
+    for (const pg of [postGradH, postGradV]) { pg.addColorStop(0, '#cfd5dc'); pg.addColorStop(0.3, '#ffffff'); pg.addColorStop(0.7, '#e9ecf0'); pg.addColorStop(1, '#8e97a3'); }
+  }
+  buildStatic();
+
+  // Pitch layer: perspective stripes, texture, markings, spray, haze. Depends on the camera (spotX/distF), so it is
+  // rebuilt only when those change, i.e. once per kick.
+  let pitchL = null, pitchKey = '';
+  function getPitch() {
+    const key = goalY + '|' + pEnd + '|' + spotX + '|' + distF + '|' + wallZ + '|' + wallN;
+    if (key === pitchKey) return pitchL.c;
+    pitchKey = key;
+    if (!pitchL) pitchL = offCanvas(W, H);
+    const g = pitchL.g; g.clearRect(0, 0, W, H);
+    const zAt = y => (392 - y) / (392 - goalY);
+    const yTop = HORIZON - 2, yBot = H + 12, zTop = zAt(yTop), zBot = zAt(yBot);
+    g.fillStyle = '#1b7c36'; g.fillRect(0, yTop, W, yBot - yTop);
+    g.fillStyle = '#239546';                                                   // mowed stripes converging on the vanishing point
+    for (let k = -15; k < 16; k += 2) {
+      g.beginPath(); g.moveTo(sx(k * 64, zBot), yBot); g.lineTo(sx((k + 1) * 64, zBot), yBot);
+      g.lineTo(sx((k + 1) * 64, zTop), yTop); g.lineTo(sx(k * 64, zTop), yTop); g.closePath(); g.fill();
+    }
+    const dz = 4 / (24 * distF);                                               // faint cross bands every 4 m (second mow pass)
+    g.fillStyle = 'rgba(0,0,0,0.055)';
+    for (let z = Math.floor(zBot / dz) * dz, i = 0; z < zTop; z += dz, i++) {
+      if (i & 1) continue;
+      g.fillRect(0, groundY(Math.min(z + dz, zTop)), W, groundY(z) - groundY(Math.min(z + dz, zTop)));
+    }
+    g.drawImage(noiseL, 0, 0, W, H);
+    // markings: goal line, six-yard box, penalty area, spot and the D (7.32 m goal = 2 * POST_X units)
+    const M = POST_X * 2 / 7.32, zm = m => 1 - m / (24 * distF);
+    const wline = (wx0, z0, wx1, z1) => { g.lineWidth = 2.2 * Math.max(0.55, persp((z0 + z1) / 2)); g.beginPath(); g.moveTo(sx(wx0, z0), groundY(z0)); g.lineTo(sx(wx1, z1), groundY(z1)); g.stroke(); };
+    g.strokeStyle = 'rgba(255,255,255,0.78)'; g.lineCap = 'butt'; g.lineJoin = 'round';
+    g.lineWidth = 2; g.beginPath(); g.moveTo(0, groundY(1)); g.lineTo(W, groundY(1)); g.stroke();
+    const z6 = zm(5.5), z18 = zm(16.5), hw6 = 9.16 * M, hw18 = 20.16 * M;
+    wline(-hw6, 1, -hw6, z6); wline(hw6, 1, hw6, z6); wline(-hw6, z6, hw6, z6);
+    wline(-hw18, 1, -hw18, z18); wline(hw18, 1, hw18, z18); wline(-hw18, z18, hw18, z18);
+    const zs = zm(11); g.fillStyle = 'rgba(255,255,255,0.8)';
+    g.beginPath(); g.ellipse(sx(0, zs), groundY(zs), 3 * persp(zs), 1.3 * persp(zs), 0, 0, Math.PI * 2); g.fill();
+    const aMax = Math.acos(5.5 / 9.15);
+    g.lineWidth = 2.2 * persp(z18); g.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const a = -aMax + 2 * aMax * i / 24, z = zm(11 + 9.15 * Math.cos(a)), x = sx(9.15 * Math.sin(a) * M, z);
+      i ? g.lineTo(x, groundY(z)) : g.moveTo(x, groundY(z));
+    }
+    g.stroke();
+    // referee's vanishing spray: the wall line and the ball spot
+    g.setLineDash([4, 3]); g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.5;
+    const wcx = spotX * (1 - wallZ), span = 13 * wallN + 14;
+    g.beginPath(); g.moveTo(sx(wcx - span, wallZ), groundY(wallZ) + 3); g.lineTo(sx(wcx + span, wallZ), groundY(wallZ) + 3); g.stroke();
+    g.setLineDash([]);
+    g.beginPath(); g.ellipse(CX, 392, 11, 3.5, 0, 0, Math.PI * 2); g.stroke();
+    // distance haze toward the stands, darker foreground edge
+    const fog = g.createLinearGradient(0, HORIZON, 0, HORIZON + 150);
+    fog.addColorStop(0, 'rgba(14,24,40,0.6)'); fog.addColorStop(0.35, 'rgba(14,24,40,0.22)'); fog.addColorStop(1, 'rgba(14,24,40,0)');
+    g.fillStyle = fog; g.fillRect(0, HORIZON - 2, W, 152);
+    const bot = g.createLinearGradient(0, H - 50, 0, H); bot.addColorStop(0, 'rgba(0,0,0,0)'); bot.addColorStop(1, 'rgba(0,0,0,0.3)');
+    g.fillStyle = bot; g.fillRect(0, H - 50, W, 50);
+    return pitchL.c;
+  }
+
+  // Crowd: two pre-rendered variants (same people, different brightness) cross-faded for a slow shimmer; team colours sprinkled in.
+  let crowdL = null, crowdKey = '';
+  function getCrowd() {
+    const key = my.id + '|' + op.id;
+    if (key === crowdKey) return crowdL;
+    crowdKey = key;
+    const A = offCanvas(W, HORIZON), B = offCanvas(W, HORIZON);
+    const pal = [my.c1, my.c2, op.c1, op.c2, '#e8e8e8', '#c0392b', '#2980b9', '#f1c40f', '#8e44ad', '#e67e22', '#2c3e50', '#34495e', '#1f2a36', '#4a3b2a', '#5d6d7e'];
+    const tiers = [[27, 63, 2.6, 3.0, 1.5], [69, 103, 3.0, 3.6, 2.0], [109, 133, 3.6, 4.4, 2.6]];   // y0, y1, col step, row step, size
+    for (const [y0, y1, cs, rs, sz] of tiers) {
+      for (let y = y0; y < y1 - sz; y += rs) for (let x = 2; x < W - 2; x += cs) {
+        const px = x + (Math.random() - 0.5) * cs * 0.8, py = y + (Math.random() - 0.5) * rs * 0.4;
+        const col = pal[Math.random() < 0.5 ? 10 + Math.floor(Math.random() * 5) : Math.floor(Math.random() * 10)];
+        const head = Math.random() < 0.5 ? '#d9b48f' : '#8d5524';
+        for (const Lr of [A, B]) {
+          Lr.g.globalAlpha = 0.45 + Math.random() * 0.55;
+          Lr.g.fillStyle = col; Lr.g.fillRect(px - sz / 2, py + sz * 0.35, sz, sz * 0.75);
+          Lr.g.fillStyle = head; Lr.g.fillRect(px - sz * 0.25, py - sz * 0.15, sz * 0.5, sz * 0.5);
+        }
+      }
+    }
+    crowdL = [A.c, B.c];
+    return crowdL;
+  }
+
+  // --- players
+  const SKINS = ['#8d5524', '#c68642', '#e0ac69', '#f1c27d'];
+  const HAIRS = ['#1b1008', '#3b2314', '#111111', '#a0522d', '#d9b86a', '#2a1a0a'];
+  // joint positions in body-height units, origin between the feet, y up is negative
+  const BASE = { hipL: [-0.08, -0.47], hipR: [0.08, -0.47], kneeL: [-0.09, -0.25], kneeR: [0.09, -0.25], ankL: [-0.1, -0.03], ankR: [0.1, -0.03],
+    shL: [-0.15, -0.72], shR: [0.15, -0.72], elL: [-0.21, -0.57], elR: [0.21, -0.57], hdL: [-0.07, -0.45], hdR: [0.07, -0.45] };
+  const POSES = {
+    stand: {},
+    charge: { kneeL: [-0.14, -0.26], ankL: [-0.2, -0.03], elL: [-0.27, -0.6], elR: [0.27, -0.6], hdL: [-0.31, -0.46], hdR: [0.31, -0.46] },
+    kick: { kneeL: [-0.1, -0.26], ankL: [-0.12, -0.03], kneeR: [0.18, -0.38], ankR: [0.36, -0.32], elL: [-0.31, -0.82], hdL: [-0.46, -0.92], elR: [0.25, -0.62], hdR: [0.32, -0.5] },
+    wallJump: { kneeL: [-0.13, -0.3], kneeR: [0.13, -0.3], ankL: [-0.09, -0.13], ankR: [0.09, -0.13], elL: [-0.19, -0.6], elR: [0.19, -0.6], hdL: [-0.05, -0.49], hdR: [0.05, -0.49] },
+    set: { kneeL: [-0.16, -0.24], kneeR: [0.16, -0.24], ankL: [-0.2, -0.03], ankR: [0.2, -0.03], elL: [-0.28, -0.6], elR: [0.28, -0.6], hdL: [-0.34, -0.47], hdR: [0.34, -0.47] },
+    stretch: { kneeL: [-0.08, -0.26], ankL: [-0.16, -0.03], kneeR: [0.17, -0.3], ankR: [0.13, -0.15], elL: [-0.21, -0.92], elR: [0.21, -0.92], hdL: [-0.27, -1.1], hdR: [0.27, -1.1] },
+  };
+  // kind: 'wall' | 'keeper' | 'kicker' (the kicker is seen from behind). pose: a key of POSES. num: shirt number or ''.
+  function drawFigure(x, gy, s, jersey, shorts, jump, dive, kind, tone, pose, num, hairIdx) {
+    const h = 65 * s, skin = tone || '#c68642', J = Object.assign({}, BASE, POSES[pose] || {});
+    const keeper = kind === 'keeper', back = kind === 'kicker', hair = HAIRS[(hairIdx || 0) % HAIRS.length];
+    const lw = Math.max(2, 3.4 * s);
+    // ground shadow: stays on the pitch, stretches as the body tilts, fades as the feet leave the ground
+    const sh = Math.max(0, 1 - jump / 45);
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.3 * sh).toFixed(3) + ')';
+    ctx.beginPath(); ctx.ellipse(x + Math.sin(dive) * h * 0.3, gy + 1.5, h * (0.2 + Math.abs(dive) * 0.2), h * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(x, gy - jump * s); ctx.rotate(dive);
+    if (pose === 'set') ctx.scale(1, 0.92);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const seg = (a, b, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a[0] * h, a[1] * h); ctx.lineTo(b[0] * h, b[1] * h); ctx.stroke(); };
+    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    for (const [hip, knee, ank] of [[J.hipL, J.kneeL, J.ankL], [J.hipR, J.kneeR, J.ankR]]) {   // thigh, shin, sock, boot
+      seg(hip, knee, skin, lw * 1.2); seg(knee, ank, skin, lw);
+      seg(mix(knee, ank, 0.35), ank, jersey, lw * 1.08);
+      ctx.fillStyle = '#141414'; ctx.beginPath();
+      ctx.ellipse(ank[0] * h + Math.sign(ank[0]) * lw * 0.25, ank[1] * h + lw * 0.3, lw * 1.2, lw * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = shorts; ctx.beginPath();                                                      // shorts
+    ctx.moveTo(-0.15 * h, -0.5 * h); ctx.lineTo(0.15 * h, -0.5 * h); ctx.lineTo(0.17 * h, -0.33 * h); ctx.lineTo(0.02 * h, -0.33 * h);
+    ctx.lineTo(0, -0.37 * h); ctx.lineTo(-0.02 * h, -0.33 * h); ctx.lineTo(-0.17 * h, -0.33 * h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath();
+    ctx.moveTo(0.04 * h, -0.5 * h); ctx.lineTo(0.15 * h, -0.5 * h); ctx.lineTo(0.17 * h, -0.33 * h); ctx.lineTo(0.04 * h, -0.33 * h); ctx.closePath(); ctx.fill();
+    const torso = () => { ctx.beginPath(); ctx.moveTo(-0.17 * h, -0.76 * h); ctx.lineTo(0.17 * h, -0.76 * h); ctx.lineTo(0.14 * h, -0.48 * h); ctx.lineTo(-0.14 * h, -0.48 * h); ctx.closePath(); };
+    torso(); ctx.fillStyle = jersey; ctx.fill();                                                  // jersey with cylindrical shading
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.moveTo(0.05 * h, -0.76 * h); ctx.lineTo(0.17 * h, -0.76 * h); ctx.lineTo(0.14 * h, -0.48 * h); ctx.lineTo(0.04 * h, -0.48 * h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.moveTo(-0.17 * h, -0.76 * h); ctx.lineTo(-0.09 * h, -0.76 * h); ctx.lineTo(-0.07 * h, -0.48 * h); ctx.lineTo(-0.14 * h, -0.48 * h); ctx.closePath(); ctx.fill();
+    torso(); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; ctx.stroke();
+    ctx.fillStyle = shorts; ctx.fillRect(-0.06 * h, -0.775 * h, 0.12 * h, Math.max(1, 0.03 * h));  // collar
+    for (const [shj, el, hd] of [[J.shL, J.elL, J.hdL], [J.shR, J.elR, J.hdR]]) {               // sleeve, forearm, hand / glove
+      const m = mix(shj, el, 0.55);
+      seg(shj, m, jersey, lw * 1.35); seg(m, el, skin, lw * 0.95); seg(el, hd, skin, lw * 0.9);
+      ctx.beginPath(); ctx.arc(hd[0] * h, hd[1] * h, keeper ? lw * 0.9 : lw * 0.55, 0, Math.PI * 2);
+      ctx.fillStyle = keeper ? '#f2f2f2' : skin; ctx.fill();
+      if (keeper) { ctx.strokeStyle = '#333'; ctx.lineWidth = 0.8; ctx.stroke(); }
+    }
+    if (num) {
+      ctx.fillStyle = inkFor(jersey); ctx.font = 'bold ' + Math.round(h * (num.length > 1 ? 0.16 : 0.18)) + 'px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(num, 0, -0.615 * h); ctx.textBaseline = 'alphabetic';
+    }
+    seg([0, -0.76], [0, -0.82], skin, lw * 0.9);                                                   // neck, head, hair, eyes
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, -0.9 * h, 0.115 * h, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = hair; ctx.beginPath();
+    if (back) ctx.arc(0, -0.9 * h, 0.118 * h, Math.PI * 0.85, Math.PI * 2.15);
+    else ctx.arc(0, -0.915 * h, 0.118 * h, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.fill();
+    if (!back) { const e = Math.max(1, 0.025 * h); ctx.fillStyle = '#222'; ctx.fillRect(-0.055 * h, -0.9 * h, e, e); ctx.fillRect(0.03 * h, -0.9 * h, e, e); }
     ctx.restore();
   }
 
-  function drawBallAt(x, y, r) {
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#111';
-    ctx.beginPath(); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  function drawBallAt(x, y, r, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
+    ctx.drawImage(ballTex, -r, -r, r * 2, r * 2);
+    ctx.rotate(-(rot || 0)); ctx.scale(r, r);
+    ctx.fillStyle = ballShade; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  // soft drop shadow on the grass; h = height above ground in screen px
+  function ballShadow(x, gy, h, s) {
+    const k = Math.max(0.45, s);
+    ctx.save(); ctx.translate(x, gy); ctx.scale((7 + h * 0.05) * k, 2.8 * k);
+    ctx.globalAlpha = Math.max(0.15, 0.6 - h * 0.004);
+    ctx.fillStyle = ballShadowG; ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
     ctx.save();
     if (shake > 0) ctx.translate(Math.sin(shake * 23.7) * shake * 0.6, Math.cos(shake * 17.3) * shake * 0.4);
-    // stands: layered dark gradient with a floodlight glow
-    const standsG = ctx.createLinearGradient(0, 0, 0, 162);
-    standsG.addColorStop(0, '#060b12'); standsG.addColorStop(1, '#13202e');
-    ctx.fillStyle = standsG; ctx.fillRect(-10, -10, W + 20, 172);
-    const glow = ctx.createRadialGradient(CX, -40, 10, CX, -40, 320);
-    glow.addColorStop(0, 'rgba(255,255,255,0.14)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 162);
-    for (const d of crowd) {
-      ctx.globalAlpha = 0.5 + Math.random() * 0.4;
-      ctx.fillStyle = d.c; ctx.fillRect(d.x, d.y, 2.4, 2.4);
-    }
-    ctx.globalAlpha = 1;
-    const nFlash = goalAnim > 0 ? 7 : (Math.random() < 0.12 ? 1 : 0);
-    ctx.fillStyle = '#fff';
-    for (let i = 0; i < nFlash; i++) {
-      ctx.fillRect(Math.random() * 600, 6 + Math.random() * 145, 3.5, 3.5);
-    }
-    for (const c of confetti) { ctx.fillStyle = c.c; ctx.fillRect(c.x, c.y, 3, 5); }
-
-    for (let i = 0; i < 8; i++) {
-      const yTop = groundY(1 - i / 8), yBot = groundY(1 - (i + 1) / 8);
-      ctx.fillStyle = i % 2 ? '#1f9440' : '#188034';
-      ctx.fillRect(0, yTop, 600, yBot - yTop + 1);
-    }
-    ctx.fillStyle = '#188034'; ctx.fillRect(-10, groundY(0), 620, H - groundY(0) + 10);
-    // pitch light falloff toward the stands
-    const pitchG = ctx.createLinearGradient(0, groundY(1), 0, H);
-    pitchG.addColorStop(0, 'rgba(0,0,0,0.28)'); pitchG.addColorStop(0.5, 'rgba(0,0,0,0)'); pitchG.addColorStop(1, 'rgba(0,0,0,0.12)');
-    ctx.fillStyle = pitchG; ctx.fillRect(0, groundY(1), W, H - groundY(1));
-
-    // penalty arc + spot flavor
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(CX, 392, 60, 10, 0, 0, Math.PI * 2); ctx.stroke();
-
-    // goal
     const s1 = persp(1), gY = groundY(1);
     const pl = sx(-POST_X, 1), pr = sx(POST_X, 1), barY = gY - BAR_H * s1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
-    for (let i = 1; i < 12; i++) {
-      const nx = pl + (pr - pl) * i / 12;
-      ctx.beginPath(); ctx.moveTo(nx, barY); ctx.lineTo(nx, gY); ctx.stroke();
-    }
-    for (let i = 1; i < 6; i++) {
-      const ny = barY + (gY - barY) * i / 6;
-      ctx.beginPath(); ctx.moveTo(pl, ny); ctx.lineTo(pr, ny); ctx.stroke();
-    }
-    ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(pl, gY); ctx.lineTo(pl, barY); ctx.lineTo(pr, barY); ctx.lineTo(pr, gY); ctx.stroke();
 
-    // keeper
-    let kx = sx(0, 1), kdive = 0, kjump = 0;
+    // --- scenery: cached pitch, static stands, crowd (shimmer normally; bobbing slices + warm pulse on a goal)
+    ctx.drawImage(getPitch(), 0, 0, W, H);
+    ctx.drawImage(stadiumL, 0, 0, W, HORIZON);
+    const cr = getCrowd();
+    if (goalAnim > 0) {
+      const amp = Math.min(1, goalAnim / 40);
+      for (let i = 0; i < 12; i++) {
+        const off = 2.5 * Math.max(0, Math.sin(tick * 0.35 + i * 0.9)) * amp;
+        ctx.drawImage(cr[0], i * 50 * RS, 0, 50 * RS, HORIZON * RS, i * 50, -off, 50, HORIZON);
+      }
+      ctx.fillStyle = 'rgba(255,235,190,' + (0.16 * (goalAnim / 165) * (0.5 + 0.5 * Math.sin(tick * 0.5))).toFixed(3) + ')';
+      ctx.fillRect(0, 26, W, 108);
+    } else {
+      ctx.drawImage(cr[0], 0, 0, W, HORIZON);
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(tick * 0.045); ctx.drawImage(cr[1], 0, 0, W, HORIZON); ctx.globalAlpha = 1;
+    }
+    const nFlash = goalAnim > 0 ? 7 : (hash(tick) < 0.12 ? 1 : 0);   // camera flashes in the stands
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < nFlash; i++) ctx.fillRect(hash(tick * 7 + i * 13) * W, 28 + hash(tick * 3 + i * 29) * 104, 3, 3);
+    ctx.drawImage(lightsL, 0, 0, W, H);
+    for (const c of confetti) { const w = 1.5 + 3 * Math.abs(Math.cos(c.sway)); ctx.fillStyle = c.c; ctx.fillRect(c.x - w / 2, c.y, w, 5); }
+
+    // --- goal: net as a perspective mesh (back panel, sides, roof) with sag, rippling where the ball hit it
+    const zb = 1 + 1.5 / (24 * distF), sb = persp(zb), gYb = groundY(zb), barYb = gYb - BAR_H * sb * 0.88;
+    const plb = sx(-POST_X, zb), prb = sx(POST_X, zb);
+    const bulge = netBall && goalAnim > 0 ? 11 * (goalAnim / 165) : 0, nAge = 165 - goalAnim;
+    const disp = (x, y) => {
+      if (!bulge) return [x, y];
+      const dx = x - netBall.x, dy = y - netBall.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (d > 46) return [x, y];
+      const f = Math.pow(1 - d / 46, 1.6) * bulge * (0.7 + 0.3 * Math.cos(d * 0.35 - nAge * 0.45));
+      return [x + dx / d * f, y + dy / d * f - f * 0.35];
+    };
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(plb, barYb); ctx.lineTo(prb, barYb); ctx.lineTo(prb, gYb); ctx.lineTo(plb, gYb); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.38)'; ctx.lineWidth = 0.9; ctx.lineCap = 'butt';
+    ctx.beginPath();
+    const NV = 14, NH = 7;
+    for (let i = 0; i <= NV; i++) {
+      const x = plb + (prb - plb) * i / NV;
+      for (let j = 0; j <= 6; j++) { const p = disp(x, barYb + (gYb - barYb) * j / 6); j ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+    }
+    for (let j = 0; j <= NH; j++) {
+      const y = barYb + (gYb - barYb) * j / NH, sag = (1 - j / NH) * 3.5;
+      for (let i = 0; i <= 12; i++) { const t = i / 12, p = disp(plb + (prb - plb) * t, y + sag * 4 * t * (1 - t)); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
+    }
+    for (let j = 0; j <= 6; j++) {
+      const yf = gY - (gY - barY) * j / 6, yb = gYb - (gYb - barYb) * j / 6;
+      let p = disp(plb, yb); ctx.moveTo(pl, yf); ctx.lineTo(p[0], p[1]);
+      p = disp(prb, yb); ctx.moveTo(pr, yf); ctx.lineTo(p[0], p[1]);
+    }
+    for (let i = 0; i <= NV; i++) { const p = disp(plb + (prb - plb) * i / NV, barYb); ctx.moveTo(pl + (pr - pl) * i / NV, barY); ctx.lineTo(p[0], p[1]); }
+    for (let k = 1; k <= 2; k++) {
+      const t = k / 3, xl = pl + (plb - pl) * t, xr = pr + (prb - pr) * t, yt = barY + (barYb - barY) * t, yg = gY + (gYb - gY) * t;
+      ctx.moveTo(xl, yt); ctx.lineTo(xl, yg); ctx.moveTo(xr, yt); ctx.lineTo(xr, yg); ctx.moveTo(xl, yt); ctx.lineTo(xr, yt);
+    }
+    ctx.stroke();
+    // posts and bar: rounded, shaded, with shadows on the grass
+    const pw = Math.max(3.5, 7 * s1);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    for (const px of [pl, pr]) { ctx.beginPath(); ctx.moveTo(px - pw / 2, gY); ctx.lineTo(px + pw * 3, gY + 3.5); ctx.lineTo(px + pw * 4, gY + 3.5); ctx.lineTo(px + pw / 2, gY); ctx.closePath(); ctx.fill(); }
+    for (const px of [pl, pr]) { ctx.save(); ctx.translate(px - pw / 2, barY); ctx.scale(pw, 1); ctx.fillStyle = postGradH; ctx.fillRect(0, 0, 1, gY - barY + 1); ctx.restore(); }
+    ctx.save(); ctx.translate(pl - pw / 2, barY - pw / 2); ctx.scale(1, pw); ctx.fillStyle = postGradV; ctx.fillRect(0, 0, pr - pl + pw, 1); ctx.restore();
+    ctx.fillStyle = '#f4f6f8'; ctx.beginPath(); ctx.arc(pl, barY, pw / 2, 0, Math.PI * 2); ctx.arc(pr, barY, pw / 2, 0, Math.PI * 2); ctx.fill();
+
+    // --- keeper: set stance, then a stretching dive toward the ball, then grounded once the kick is resolved
+    let kx = sx(0, 1), kdive = 0, kjump = 0, kpose = 'set';
     if ((phase === 'flight' && ball && ball.z > 0.55) || phase === 'result') {
       const t = phase === 'result' ? 1 : Math.min(1, (ball.z - 0.55) / 0.4);
-      kx = sx(diveX * t, 1);
-      kdive = (diveX > 0 ? 1 : -1) * t * 1.1;
-      kjump = t * 20;
+      const u = phase === 'result' ? Math.min(1, Math.max(0, (205 - resultTimer) / 35)) : 0;
+      const dir = diveX > 0 ? 1 : -1;
+      kx = sx(diveX * t, 1) + dir * 12 * u * s1;
+      kdive = dir * (t * 1.1 + 0.42 * u);
+      kjump = t * 20 * (1 - u);
+      kpose = t > 0.3 ? 'stretch' : 'set';
     }
-    drawFigure(kx, gY, s1 * 1.1, keeperKit, '#111', kjump, kdive, true, '#8d5524');
+    drawFigure(kx, gY, s1 * 1.1, keeperKit, '#111', kjump, kdive, 'keeper', '#8d5524', kpose, '1', 2);
     if (netBall) {
-      drawBallAt(netBall.x, netBall.y, 7 * 0.65);
+      drawBallAt(netBall.x, netBall.y, 7 * 0.65, netBall.y * 0.25);
       if (goalAnim > 137) {
         ctx.strokeStyle = 'rgba(255,255,255,' + ((goalAnim - 137) / 28) + ')';
         ctx.lineWidth = 2;
@@ -669,22 +900,34 @@
       }
     }
 
-    // ball beyond wall drawn behind wall
-    const ballShadow = (x, gy, h, s) => {
-      ctx.fillStyle = 'rgba(0,0,0,' + Math.max(0.08, 0.35 - h * 0.0025) + ')';
-      ctx.beginPath(); ctx.ellipse(x, gy, (7 + h * 0.03) * Math.max(0.45, s), 2.6 * Math.max(0.45, s), 0, 0, Math.PI * 2); ctx.fill();
-    };
+    // --- ball: faint path arc, drop shadow, motion trail, spin streaks, rotating pentagon ball
     const ballDraw = () => {
       if (ball) {
-        const s = persp(ball.z), h = pathH(ball.z);
-        ballShadow(sx(pathX(ball.z), ball.z), groundY(ball.z), h * s, s);
-        drawBallAt(sx(pathX(ball.z), ball.z), groundY(ball.z) - h * s, 7 * Math.max(0.45, s));
+        const z = ball.z, s = persp(z), h = pathH(z), bx = sx(pathX(z), z), by = groundY(z) - h * s, r = 7 * Math.max(0.45, s);
+        ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.2; ctx.beginPath();
+        for (let i = 0; i <= 16; i++) { const zz = z * i / 16, p = persp(zz), x = sx(pathX(zz), zz), y = groundY(zz) - pathH(zz) * p; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke(); ctx.setLineDash([]);
+        ballShadow(sx(pathX(z), z), groundY(z), h * s, s);
+        ctx.fillStyle = '#fff';
+        for (let k = 5; k >= 1; k--) {
+          const zz = z - k * ball.dz * 1.6; if (zz <= 0) continue;
+          const p = persp(zz); ctx.globalAlpha = 0.22 * (1 - k / 6.5);
+          ctx.beginPath(); ctx.arc(sx(pathX(zz), zz), groundY(zz) - pathH(zz) * p, 7 * Math.max(0.45, p) * (1 - k * 0.07), 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        if (Math.abs(curve) >= 2) {
+          const base = curve < 0 ? 0 : Math.PI, wob = Math.sin(tick * 0.6) * 0.12;
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+          for (let i = 0; i < 3; i++) { ctx.globalAlpha = 0.5 - i * 0.13; ctx.beginPath(); ctx.arc(bx, by, r * (1.55 + i * 0.4), base - 0.55 + wob, base + 0.55 + wob); ctx.stroke(); }
+          ctx.globalAlpha = 1;
+        }
+        drawBallAt(bx, by, r, z * 10 * (1 + Math.abs(curve) * 0.15) * (curve < 0 ? -1 : 1));
       }
-      if (resultBall) drawBallAt(resultBall.x, resultBall.y, 6 * resultBall.s);
+      if (resultBall) drawBallAt(resultBall.x, resultBall.y, 6 * resultBall.s, resultBall.x * 0.08 + resultBall.y * 0.05);
     };
     if (ball && ball.z > wallZ) ballDraw();
 
-    // wall lines up between the ball spot and the goal center
+    // --- wall lines up between the ball spot and the goal center
     const sw = persp(wallZ), wgy = groundY(wallZ), wallCX = spotX * (1 - wallZ);
     let wjump = 0;
     if (phase === 'flight' && ball && jumped && ball.z > wallZ - 0.17 && ball.z < wallZ + 0.13) {
@@ -692,47 +935,75 @@
     }
     for (let i = 0; i < wallN; i++) {
       const wx = sx(wallCX + (i - (wallN - 1) / 2) * 26, wallZ);
-      drawFigure(wx, wgy, sw, op.c1, op.c2 === '#FFFFFF' ? '#222' : op.c2, wjump, 0, false, SKINS[i % SKINS.length]);
+      drawFigure(wx, wgy, sw, op.c1, op.c2 === '#FFFFFF' ? '#222' : op.c2, wjump, 0, 'wall', SKINS[i % SKINS.length], wjump > 2 ? 'wallJump' : 'stand', '', i);
     }
 
     if (!(ball && ball.z > wallZ)) ballDraw();
-    if (!ball && !resultBall && phase === 'aim') { ballShadow(CX, 390, 0, 1); drawBallAt(CX, 388, 7); }
+    if (!ball && !resultBall && phase === 'aim') { ballShadow(CX, 390, 0, 1); drawBallAt(CX, 388, 7, aim * 0.02); }
 
-    // Maxi
-    if (phase === 'aim') drawFigure(CX - 42, 396, 1, my.c1, my.c2 === '#FFFFFF' ? '#222' : my.c2, 0, -0.08, false, '#e0ac69');
+    // --- Maxi: addressing the ball, leaning into the run-up as the power charges, then the follow-through
+    const myShorts = my.c2 === '#FFFFFF' ? '#222' : my.c2;
+    if (phase === 'aim') {
+      drawFigure(CX - 42 - power * 0.18, 396, 1, my.c1, myShorts, 0, -0.08 - power * 0.0025, 'kicker', '#e0ac69', charging ? 'charge' : 'stand', '10', 0);
+    } else if (phase === 'flight' && ball && ball.z < 0.2) {
+      const t = ball.z / 0.2;
+      drawFigure(CX - 24 - 10 * (1 - t), 396, 1, my.c1, myShorts, 2 * Math.sin(t * Math.PI), -0.3 + t * 0.15, 'kicker', '#e0ac69', 'kick', '10', 0);
+    }
 
-    // aim preview
+    // --- aim preview: trajectory dots with ground shadows, gold target on the goal line
     if (phase === 'aim') {
       const prevLoft = Math.pow(Math.max(power, 30) / 100, 1.15) * 170;
       const savedLoft = loft; loft = prevLoft;
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
       for (let z = 0.05; z <= wallZ * 0.8; z += wallZ * 0.13) {
-        const s = persp(z);
-        ctx.beginPath();
-        ctx.arc(sx(pathX(z), z), groundY(z) - pathH(z) * s, 2.2, 0, Math.PI * 2); ctx.fill();
+        const s = persp(z), x = sx(pathX(z), z);
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x, groundY(z), 2.4, 1, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.arc(x, groundY(z) - pathH(z) * s, 2.2, 0, Math.PI * 2); ctx.fill();
       }
       loft = savedLoft;
       const tx = sx(aim, 1);
+      ctx.fillStyle = 'rgba(245,212,66,0.18)'; ctx.beginPath(); ctx.arc(tx, gY - 4, 11, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#f5d442'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(tx - 6, gY - 4); ctx.lineTo(tx + 6, gY - 4); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(tx, gY - 10); ctx.lineTo(tx, gY + 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tx, gY - 4, 6.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tx - 10, gY - 4); ctx.lineTo(tx + 10, gY - 4); ctx.moveTo(tx, gY - 14); ctx.lineTo(tx, gY + 6); ctx.stroke();
     }
 
-    // score pop-ups
-    for (const p of popups) {
-      ctx.globalAlpha = Math.min(1, p.t / 30);
-      ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(p.text, p.x, p.y);
-      ctx.fillStyle = p.c; ctx.fillText(p.text, p.x, p.y);
+    // --- impact effects: sparks off the woodwork, a burst off the keeper's gloves, dust off the wall
+    if (splash && splash.t > 120 && (splash.text === 'OFF THE POST!' || splash.text === 'SAVED!' || splash.text === 'BLOCKED!')) {
+      const age = 165 - splash.t;
+      let ix, iy;
+      if (splash.text === 'BLOCKED!') { ix = sx(pathX(wallZ), wallZ); iy = groundY(wallZ) - pathH(wallZ) * persp(wallZ); }
+      else { ix = sx(Math.max(-POST_X, Math.min(POST_X, gxFinal)), 1); iy = gY - Math.min(pathH(1), BAR_H) * s1; }
+      ctx.globalAlpha = Math.max(0, 1 - age / 40);
+      if (splash.text === 'OFF THE POST!') {
+        ctx.lineWidth = 2; ctx.lineCap = 'round';
+        for (let i = 0; i < 12; i++) {
+          const a = hash(i + 1) * Math.PI * 2, len = 6 + age * (0.9 + hash(i + 40) * 1.4);
+          ctx.strokeStyle = i & 1 ? '#f5d442' : '#fff';
+          ctx.beginPath(); ctx.moveTo(ix + Math.cos(a) * len * 0.45, iy + Math.sin(a) * len * 0.45); ctx.lineTo(ix + Math.cos(a) * len, iy + Math.sin(a) * len); ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(ix, iy, 3 + age * 0.5, 0, Math.PI * 2); ctx.fill();
+      } else if (splash.text === 'SAVED!') {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(ix, iy, 5 + age * 2.2, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ix, iy, 2 + age * 1.3, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + 0.3, d = 6 + age * 1.6; ctx.beginPath(); ctx.arc(ix + Math.cos(a) * d, iy + Math.sin(a) * d, 1.8, 0, Math.PI * 2); ctx.fill(); }
+      } else {
+        ctx.fillStyle = 'rgba(220,220,210,0.7)';
+        for (let i = 0; i < 8; i++) { const a = hash(i + 7) * Math.PI * 2, d = 3 + age * (0.5 + hash(i + 90)); ctx.beginPath(); ctx.arc(ix + Math.cos(a) * d, iy + Math.sin(a) * d * 0.6 - age * 0.3, 2 + age * 0.08, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
 
-    // jumbotron in the stands above the goal (two lines so nothing overflows the board)
+    // --- broadcast scorebug in the stands above the goal (two lines so nothing overflows the board)
     const jFlash = flashT > 0 && flashT % 10 < 5;
-    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-    ctx.fillRect(78, 4, 444, 64);
-    ctx.strokeStyle = jFlash ? '#ffffff' : '#f5d442'; ctx.lineWidth = 2;
-    ctx.strokeRect(78, 4, 444, 64);
+    rrect(ctx, 78, 4, 444, 64, 7); ctx.fillStyle = 'rgba(5,9,16,0.86)'; ctx.fill();
+    ctx.save(); rrect(ctx, 78, 4, 444, 64, 7); ctx.clip();
+    ctx.fillStyle = my.c1; ctx.fillRect(78, 4, 6, 64); ctx.fillStyle = my.c2; ctx.fillRect(84, 4, 3, 64);
+    ctx.fillStyle = op.c1; ctx.fillRect(516, 4, 6, 64); ctx.fillStyle = op.c2; ctx.fillRect(513, 4, 3, 64);
+    ctx.fillStyle = 'rgba(245,212,66,0.9)'; ctx.fillRect(78, 4, 444, 2);
+    ctx.restore();
+    rrect(ctx, 78, 4, 444, 64, 7); ctx.strokeStyle = jFlash ? '#ffffff' : 'rgba(245,212,66,0.75)'; ctx.lineWidth = jFlash ? 2.5 : 1.5; ctx.stroke();
     ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center';
     const cm = Math.floor(clockS / 60), cs = String(clockS % 60).padStart(2, '0');
     ctx.fillStyle = jFlash ? '#f5d442' : '#fff';
@@ -744,8 +1015,18 @@
     ctx.fillStyle = '#f5d442';
     ctx.fillText(comment, CX, 57);
 
-    // aim HUD
+    // --- score pop-ups (after the scorebug so they float over it)
+    for (const p of popups) {
+      ctx.globalAlpha = Math.min(1, p.t / 30);
+      ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = p.c; ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // --- aim HUD on a dark strip along the bottom
     if (phase === 'aim') {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 397, W, 23);
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
       const sideTxt = spotX < -25 ? 'left channel' : spotX > 25 ? 'right channel' : 'dead center';
       ctx.fillText((isTouch() ? '' : '← → aim  ·  A/D curve  ·  hold Space  ·  ') + 'Curve ' + (curve >= 0 ? '↷ ' : '↶ ') + Math.abs(curve).toFixed(1) +
@@ -753,21 +1034,24 @@
       if (power > 88) { ctx.fillStyle = '#ff4400'; ctx.textAlign = 'right'; ctx.fillText('WILD!', 590, 409); }
     }
 
-    // outcome splash (goal or miss)
+    // --- outcome stamp (goal or miss): banner slams in with a little overshoot, then breathes
     if (splash) {
-      const a = splash.t > 151 ? (165 - splash.t) / 14 : splash.t < 24 ? splash.t / 24 : 1;
-      const sc = 1 + 0.05 * Math.sin((165 - splash.t) * 0.3);
+      const age = 165 - splash.t;
+      const a = splash.t > 151 ? age / 14 : splash.t < 24 ? splash.t / 24 : 1;
+      const sc = splash.t > 151 ? 1.5 - 0.5 * (age / 14) : 1 + 0.03 * Math.sin(age * 0.25);
       ctx.save();
-      ctx.translate(CX, 268); ctx.scale(sc, sc); ctx.globalAlpha = a;
-      ctx.font = 'bold ' + (splash.text.length > 8 ? 38 : 46) + 'px system-ui';
-      ctx.textAlign = 'center';
-      ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-      ctx.strokeText(splash.text, 0, 0);
-      ctx.fillStyle = splash.color;
-      ctx.fillText(splash.text, 0, 0);
+      ctx.translate(CX, 268); ctx.rotate(-0.06); ctx.scale(sc, sc); ctx.globalAlpha = a;
+      ctx.font = '54px ' + STAMP_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = Math.min(560, ctx.measureText(splash.text).width + 48);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; rrect(ctx, -tw / 2 + 4, -30 + 5, tw, 60, 8); ctx.fill();
+      ctx.fillStyle = splash.color; rrect(ctx, -tw / 2, -30, tw, 60, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; rrect(ctx, -tw / 2 + 4, -26, tw - 8, 52, 6); ctx.stroke();
+      ctx.fillStyle = '#0a1420'; ctx.fillText(splash.text, 0, 2);
       ctx.restore();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
     }
+    // goal flash
+    if (flashT > 45) { ctx.fillStyle = 'rgba(255,255,255,' + ((flashT - 45) / 15 * 0.45).toFixed(3) + ')'; ctx.fillRect(-10, -10, W + 20, H + 20); }
     ctx.textAlign = 'left';
     ctx.restore();
   }
