@@ -1,6 +1,6 @@
 import type { Env, Game } from './types';
 import * as db from './db';
-import { renderArcade, renderLeaderboard, renderReplay, esc } from './render';
+import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, esc } from './render';
 import gamesData from '../games.json';
 
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
@@ -204,6 +204,30 @@ export default {
         db.getPreviousDays(env.DB, 7),
       ]);
       return html(renderLeaderboard({ today, game, scores, totalToday: count, previousDays: prev }));
+    }
+
+    // ── /games — the (unlinked) practice room: every game on a calendar ──
+    if (pathname === '/games' && method === 'GET') {
+      const games = getGames();
+      const today = todayUTC();
+      const DAY = 86400000;
+      const L = (gamesData as { schedule?: string[] }).schedule?.length || games.length || 1;
+      const span = Math.max(L, 28); // cover at least one full rotation so every game appears
+      const todayMs = Date.UTC(
+        Number(today.slice(0, 4)),
+        Number(today.slice(5, 7)) - 1,
+        Number(today.slice(8, 10)),
+      );
+      // Window ends today; start `span-1` days back, then pad out to whole weeks (Sun–Sat).
+      let startMs = todayMs - (span - 1) * DAY;
+      startMs -= new Date(startMs).getUTCDay() * DAY;
+      let endMs = todayMs + (6 - new Date(todayMs).getUTCDay()) * DAY;
+      const cells = [];
+      for (let ms = startMs; ms <= endMs; ms += DAY) {
+        const date = new Date(ms).toISOString().slice(0, 10);
+        cells.push({ date, game: getDailyGame(games, date), isToday: date === today, isFuture: date > today });
+      }
+      return html(renderGamesCalendar({ today, cells }));
     }
 
     const playMatch = pathname.match(/^\/play\/(\d{4}-\d{2}-\d{2})$/);

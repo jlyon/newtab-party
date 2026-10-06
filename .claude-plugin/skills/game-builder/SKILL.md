@@ -273,10 +273,123 @@ Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/p
 
 **Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.
 
-## Deliver it
+## Finish the title screen (themed font — always)
 
-1. Save the final file to `worker/public/games/<slug>.html` — use a short, lowercase, hyphenated filename.
-2. Add an entry to `worker/games.json` under the `"games"` array:
+The start/title screen is the game's landing page. Give the title a theme-matched Google Font — cheap and always worth it. (The gameplay-screenshot background and the logo come later, and **only if** the game goes on newtab.party.)
+
+**A theme-matched Google Font for the title.** Pick a font that fits the game's vibe (a pirate
+font for a pirate game, a pixel arcade font for a retro shooter, an elegant script for a card game).
+Load it with a `<link>` in `<head>` (right after `<title>`) and apply it to the start-screen title
+(and optionally the Play button). Examples that work well: `Pirata One` (pirate), `Press Start 2P`
+(retro arcade), `Orbitron` (sci-fi), `Racing Sans One` (racing), `Bangers` (comic/brawler),
+`Playfair Display`/`Cinzel` (elegant/classical), `Monoton` (neon casino), `VT323` (terminal), `Rye`
+(western/wood), `Bebas Neue`/`Teko` (sports). Use a distinct one per game.
+
+At this point the game is playable and self-contained. **Stop and ask before doing anything site-related.**
+
+## Ask: add it to newtab.party?
+
+Once the game plays, use the AskUserQuestion tool to ask whether to **add it to newtab.party** (the daily arcade) or just keep the standalone file. Frame it plainly — e.g. "Want this on newtab.party? I'll generate a logo and a gameplay screenshot, wire it into the arcade, and add it to the rotation." Options: **Add it to newtab.party** / **Just the file for now**.
+
+**If no (just the file):** save the game to `worker/public/games/<slug>.html` (short, lowercase, hyphenated), give one line on how to play plus a line of sass, and stop. Do NOT generate a screenshot or logo, touch `games.json`, or mention deploy — it's a double-click-to-play file.
+
+**If yes:** do everything under "Add to newtab.party" below.
+
+## Add to newtab.party (only when the user says yes)
+
+Save the game to `worker/public/games/<slug>.html` first, then:
+
+### 1. Gameplay-screenshot background
+
+A blown-up gameplay screenshot as the start-screen background. Capture the game mid-play and
+use it, `cover`-sized, behind a legibility scrim.
+
+Capture it with the pre-installed browser (Playwright + `/opt/pw-browsers/chromium`):
+- Load the game, click Play/Start, drive a couple seconds of **actual gameplay**, then screenshot
+  the largest `<canvas>` (or the full page for DOM/board games). Save as
+  `worker/public/games/backgrounds/<slug>.jpg` (JPEG quality ~60).
+- **Avoid capturing a game-over / win screen.** Drive gently — e.g. for a minesweeper do one safe
+  first reveal; for a snake/runner nudge briefly and shoot early; for an unforgiving reflex game
+  capture the very first started frame. A "TIMBER!"/"Game Over" baked into the background looks broken.
+- The `backgrounds/` folder sits next to the game file, so the relative `url('backgrounds/<slug>.jpg')`
+  works both when served (worker serves everything under `public/`) and when the file is opened directly.
+
+Then append an override CSS block at the end of the `<style>`, using the game's actual start-container,
+title, and button selectors:
+
+```css
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {                 /* the start container (id varies per game) */
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)),
+      url('backgrounds/<slug>.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {              /* the title element */
+    font-family: '<Font>', <fallback>;
+    font-size: clamp(36px, 8vw, 72px);   /* keep it moderate — must NOT overflow/clip */
+    line-height: 0.98; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px <accent-rgba>;
+  }
+  #start-overlay p { color: rgba(255,255,255,0.9); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button {         /* the Play button */
+    font-family: '<Font>', <fallback>;
+    margin-top: 22px; padding: 15px 50px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #10100f; background: var(--primary, #fff);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    transition: transform 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+```
+
+Rules that keep it from looking broken:
+- **Legibility first.** If the start screen is text-heavy (long description) or the screenshot is
+  bright/busy, wrap the content in a glassy panel (`background: rgba(10,8,10,0.6); backdrop-filter:
+  blur(7px); border-radius: 18px; padding: 32px; max-width: 560px`) instead of relying on the scrim.
+- **Don't let the title overflow.** Keep `font-size` clamps moderate (roughly `max 60–80px`, less for
+  wide/condensed fonts) so the title never clips horizontally or spills past the container — especially
+  inside a card or a small artbox. Reduce `letter-spacing` for wide script/serif fonts.
+- **Make the overlay opaque enough.** A JPEG background is opaque, but if it fails to load only your
+  scrim remains — so keep the scrim dark enough that any game-over overlay sitting behind the start
+  screen (common) doesn't bleed through.
+- Scope every override to the **start** container only, never the shared game-over overlay.
+- Only new external resource is the Google Font `<link>`. Everything else stays self-contained.
+
+### 2. Logo (transparent, minor-league crest)
+
+Generate a logo with **Nano Banana** (Gemini's image model) at `gemini.google.com` → **Images** (drive it with the Chrome browser tools), then key it to true transparency and save to `worker/public/games/logos/<slug>.png`.
+
+- **Prompt** (one game): *"Create ONE single centered logo (one design only, not a set), refined modern minor-league-baseball-team crest style — a polished characterful cartoon mascot plus a bold athletic wordmark, cohesive limited palette, clean thick outline, die-cut sticker. Game: '&lt;NAME&gt;' — &lt;mascot / scene from the deep-dive&gt;. Wordmark '&lt;NAME&gt;'. Center it on a completely solid flat uniform pure MAGENTA background hex #FF00FF — no gradient, no texture, no glow, no drop shadow."* Vary the emblem shape per game (round badge, shield, banner, ribbon, pennant, playing card, oval cameo…) so games don't all look the same. For a long/made-up wordmark, spell it out letter-by-letter; Nano Banana fumbles those.
+- **Why magenta, not "transparent":** Nano Banana bakes a checkerboard into "transparent" exports instead of real alpha, so generate on flat magenta and chroma-key it out. Download the image (it lands in the user's Downloads — connect that folder if needed), then run this keyer (`pip install pillow scipy`):
+  ```python
+  import numpy as np; from PIL import Image; from scipy import ndimage
+  rgb = np.asarray(Image.open(SRC).convert('RGB')).astype(np.float32)
+  R, G, B = rgb[...,0], rgb[...,1], rgb[...,2]
+  m = np.minimum(R, B) - G                                    # "magenta-ness" (high on #FF00FF)
+  lbl, _ = ndimage.label(m > 30, structure=np.ones((3, 3)))
+  border = set(np.unique(np.concatenate([lbl[0], lbl[-1], lbl[:, 0], lbl[:, -1]]))) - {0}
+  bg = np.isin(lbl, list(border))                             # magenta touching the border = background
+  sl, sn = ndimage.label(ndimage.binary_fill_holes(~bg), structure=np.ones((3, 3)))
+  sizes = ndimage.sum(np.ones_like(sl), sl, range(1, sn + 1))
+  subj = ndimage.binary_fill_holes(sl == (np.argmax(sizes) + 1))   # keep largest blob (drops watermark/specks)
+  alpha = np.clip((ndimage.gaussian_filter(subj.astype(np.float32), 0.7) - 0.35) / 0.4, 0, 1)  # feathered edge
+  spill = np.clip(m, 0, None)                                 # despill magenta fringe
+  out = np.dstack([np.clip(R - spill, 0, 255), G, np.clip(B - spill, 0, 255), alpha * 255]).astype(np.uint8)
+  img = Image.fromarray(out, 'RGBA'); img = img.crop(img.getbbox()); img.save(DEST)   # DEST = logos/<slug>.png
+  ```
+  The result must be a clean transparent cutout with no magenta fringe. Sanity-check it composited on both a light and dark background.
+
+### 3. Wire the logo into the start screen
+
+Replace the start screen's title element (the `<h1>`/`<h2>` on the start overlay — **not** the game-over title) with the logo, so it's the hero of the landing page:
+```html
+<img src="logos/<slug>.png" alt="<NAME>" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+```
+The `/games` calendar and the replay pages pick up `logos/<slug>.png` automatically — no extra wiring.
+
+### 4. games.json entry + schedule
+
+Add an entry to `worker/games.json` under the `"games"` array:
    ```json
    {
      "id": "<slug>",
@@ -287,9 +400,11 @@ Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/p
      "type": "<game-type>"
    }
    ```
-3. Tell the user to run `npm run deploy` from `worker/` to go live.
-4. One sentence on how to play (controls + win condition).
-5. A line of post-game sass. Something like: "Don't @ me when you can't stop playing it."
+Then **append `<slug>` to the end of the `schedule` array** in `worker/games.json` so the game debuts at the end of the current cycle without shifting existing days. Append only — never insert earlier or reorder (see CLAUDE.md rotation rules).
+
+### 5. Ship
+
+Tell the user to run `npm run deploy` from `worker/` to go live (house habit: deploy at midnight UTC). Then one sentence on how to play (controls + win condition), and a line of post-game sass — "Don't @ me when you can't stop playing it."
 
 Do **not** write a long postamble explaining the code. The user wants to play, not read.
 

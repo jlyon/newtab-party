@@ -89,15 +89,13 @@ ${FAVICON}
   .about-link:hover { color: rgba(255,255,255,0.85); text-decoration-color: rgba(255,255,255,0.5); }
   #about-modal ol { padding-left: 18px; }
   #about-modal code { background: rgba(255,255,255,0.09); padding: 2px 7px; border-radius: 4px; font-family: 'SF Mono','Monaco',monospace; font-size: 12px; color: #e2e8f0; }
-  #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin: 4px 0; }
+  #about-game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px,1fr)); gap: 8px; margin: 4px 0; }
   .recent-game-link { text-decoration: none; color: inherit; display: block; }
-  .recent-game-link:hover .about-game-card { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.07); }
-  .about-game-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 14px 16px; transition: background 0.12s, border-color 0.12s; }
-  .about-game-date { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.25); margin-bottom: 4px; }
-  .about-game-name { font-size: 13px; font-weight: 700; margin-bottom: 5px; color: #fff; }
-  .about-game-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
-  .about-game-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.45; }
-  .about-game-controls { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 6px; font-style: italic; }
+  .about-game-card { position: relative; aspect-ratio: 1 / 1; background: #14141f; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
+  .recent-game-link:hover .about-game-card { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); }
+  .about-game-card.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
+  .about-game-logo { position: absolute; inset: 0; margin: auto; max-width: 82%; max-height: 82%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); }
+  .about-game-date { position: absolute; top: 6px; left: 8px; z-index: 2; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
   .modal-links { margin-top: 32px; display: flex; gap: 10px; flex-wrap: wrap; }
   .modal-links a, .modal-links button { color: #e5e7eb; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 9px 16px; text-decoration: none; font-size: 13px; font-weight: 500; transition: background 0.12s; cursor: pointer; font-family: inherit; }
   .modal-links a:hover, .modal-links button:hover { background: rgba(255,255,255,0.16); }
@@ -161,6 +159,7 @@ ${FAVICON}
     <p>Every day at midnight UTC, a brand-new arcade game drops — same one for everyone, 24 hours to post your best score. After that the leaderboard locks and you're just playing for your own ego. You're already here, so you're already winning.</p>
     <div class="modal-section">Recent games</div>
     <div id="about-game-list"></div>
+    <p style="margin-top:10px;"><a class="about-link" href="/games">See more in the Practice Room →</a></p>
     <div class="modal-section">Add your own game</div>
     <p style="margin-bottom:14px;">You don't need to know how to code games. Tell Claude what you want, iterate until it's fun, send a PR. Your game gets its own day on the rotation.</p>
     <ol>
@@ -172,6 +171,7 @@ ${FAVICON}
     <div class="modal-links">
       <a href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener" style="background:rgba(255,215,0,0.14);border-color:rgba(255,215,0,0.38);color:#ffd700;font-weight:700;">+ Add to Chrome</a>
       <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub repo →</a>
+      <a href="/games">Practice room →</a>
       <button id="about-open-lb">Leaderboard →</button>
     </div>
   </div>
@@ -267,12 +267,9 @@ async function loadRecentGames() {
       const link = document.createElement('a');
       link.className = 'recent-game-link';
       link.href = href;
-      link.innerHTML = '<div class="about-game-card">' +
-        '<div class="about-game-date">' + esc(dateLabel) + '</div>' +
-        '<div class="about-game-name">' + esc(g.name) + '</div>' +
-        '<div class="about-game-type">' + esc(g.type||'') + '</div>' +
-        '<div class="about-game-desc">' + esc(g.description||'') + '</div>' +
-        (g.controls ? '<div class="about-game-controls">' + esc(g.controls) + '</div>' : '') +
+      link.innerHTML = '<div class="about-game-card' + (isToday ? ' is-today' : '') + '">' +
+        (g.id ? '<img class="about-game-logo" src="/games/logos/' + esc(g.id) + '.png" alt="' + esc(g.name) + '" loading="lazy">' : '') +
+        '<span class="about-game-date">' + esc(dateLabel) + '</span>' +
         '</div>';
       listEl.appendChild(link);
     }
@@ -389,6 +386,108 @@ function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 init();
 </script>
+</body>
+</html>`;
+}
+
+// ── renderGamesCalendar ──────────────────────────────
+// The (unlinked) /games "practice room" — every game laid out on a calendar,
+// each cell thumbnailed with its own gameplay screenshot. Past days replay for
+// practice; today is the only one that counts toward the leaderboard.
+
+export interface CalCell {
+  date: string;        // YYYY-MM-DD
+  game: Game | null;
+  isToday: boolean;
+  isFuture: boolean;
+}
+
+export function renderGamesCalendar({ today, cells }: { today: string; cells: CalCell[] }): string {
+  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const cellHtml = (c: CalCell): string => {
+    const dayNum = Number(c.date.slice(8, 10));
+    // Empty grid padding — no game scheduled on this day.
+    if (!c.game) {
+      return `<div class="cal-cell is-empty"><span class="cal-day">${dayNum}</span></div>`;
+    }
+    const name = esc(c.game.name);
+    // Upcoming games stay hidden — locked placeholder, no logo or title revealed.
+    if (c.isFuture) {
+      return `<div class="cal-cell is-future"><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
+    }
+    const logo = `<img class="cal-logo" src="/games/logos/${c.game.id}.png" alt="${name}" loading="lazy">`;
+    const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
+    const href = c.isToday ? '/' : `/play/${c.date}`;
+    const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
+    const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
+    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
+  };
+
+  // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
+  let weeks = '';
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
+  }
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newtab.party — the practice room</title>
+${FAVICON}
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 44px 20px 80px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .kicker { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,215,0,0.6); margin-bottom: 10px; }
+  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.5px; margin-bottom: 14px; }
+  .blurb { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.55); max-width: 640px; margin-bottom: 6px; }
+  .blurb b { color: #ffd700; font-weight: 700; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px; color: rgba(255,255,255,0.4); margin: 22px 0 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .dot.today { background: #ffd700; }
+  .dot.past { background: rgba(255,255,255,0.35); }
+  .dot.future { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+  .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+  .cal-head div { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.28); text-align: center; padding-bottom: 2px; }
+  .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background-color: #14141f; border: 1px solid rgba(255,255,255,0.07); display: block; text-decoration: none; color: #fff; transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
+  .cal-logo { position: absolute; inset: 0; margin: auto; max-width: 82%; max-height: 82%; object-fit: contain; z-index: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); transition: transform 0.12s ease; }
+  a.cal-cell:hover { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); z-index: 2; }
+  a.cal-cell:hover .cal-logo { transform: scale(1.05); }
+  .cal-day { position: absolute; top: 6px; left: 8px; z-index: 2; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .cal-badge { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; z-index: 2; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #ffd700; text-shadow: 0 1px 4px rgba(0,0,0,0.95); }
+  .cal-lock { position: absolute; inset: 0; margin: auto; width: 1.4em; height: 1.4em; display: flex; align-items: center; justify-content: center; z-index: 1; font-size: 18px; opacity: 0.4; }
+  .cal-cell.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
+  .cal-cell.is-future { opacity: 0.5; cursor: default; }
+  .cal-cell.is-empty { opacity: 0.3; cursor: default; }
+  .foot { margin-top: 30px; font-size: 12px; color: rgba(255,255,255,0.28); }
+  .foot a { color: rgba(255,255,255,0.5); }
+  @media (max-width: 560px) {
+    .cal-name { font-size: 10px; }
+    .cal-cell { padding: 5px; border-radius: 8px; }
+    .cal-badge { font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">The Practice Room</div>
+  <h1>You found the back room.</h1>
+  <p class="blurb">Recent games, all laid out for you to rehearse until your thumbs give out. Warm up, learn the patterns, run the table.</p>
+  <p class="blurb">One catch: the leaderboard only remembers <b>today's game</b>. Everything else here is strictly you versus your own ego. No pressure. No glory. Just reps.</p>
+  <div class="legend">
+    <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
+    <span><i class="dot past"></i> Past game (practice, scores not saved)</span>
+    <span><i class="dot future"></i> Not aired yet</span>
+  </div>
+  <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
+  ${weeks}
+  <div class="foot"><a href="/">← Back to today's game</a></div>
+</div>
 </body>
 </html>`;
 }

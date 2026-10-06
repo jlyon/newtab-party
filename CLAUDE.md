@@ -19,6 +19,19 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 
+## Arcade shell + About modal — keep the extension and worker in sync
+
+The arcade shell (topbar, About modal, recent-games cards, name prompt) exists in **two places that must mirror each other**:
+
+- **Worker:** `worker/src/render.ts` → `renderArcade()` — the web version served at `newtab.party`.
+- **Extension:** `extension/newtab.html` + `extension/newtab.js` — the Chrome new-tab version.
+
+Any change to the arcade/About UI (About copy, recent-games card design, links, topbar, name prompt, etc.) MUST be made in **both**. Things to watch when porting:
+
+- The extension page is not on the worker origin, so every URL in the extension must be absolute via the `SERVER_URL` const (e.g. `` `${SERVER_URL}/games/logos/<id>.png` ``, `` `${SERVER_URL}/leaderboard` ``), whereas the worker uses root-relative paths (`/games`, `/leaderboard`).
+- The `/games` calendar (`renderGamesCalendar()`) is worker-only; the extension **links** to it (`https://newtab.party/games`, "Practice room") rather than rendering it.
+- Recent-games cards (About modal) and the `/games` calendar cells share one look: the transparent game logo (`/games/logos/<id>.png`) centered on a dark square tile, gold border for today, date/day label top-left, no screenshot thumbnails. Keep that consistent across `renderArcade()`, `renderGamesCalendar()`, and the extension.
+
 ## Daily game algorithm
 
 Both the extension (`newtab.js`) and worker (`index.ts`) use the exact same algorithm — they must stay in sync. The pick is driven by an explicit **`schedule`** array in `games.json` (a list of game ids in air order) anchored at **`scheduleEpoch`** (a `YYYY-MM-DD` date):

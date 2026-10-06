@@ -182,14 +182,11 @@ async function loadRecentGames() {
       link.href = href;
       link.target = "_blank";
       link.innerHTML =
-        `<div class="about-game-card">` +
-        `<div class="about-game-date">${esc(dateLabel)}</div>` +
-        `<div class="about-game-name">${esc(g.name)}</div>` +
-        `<div class="about-game-type">${esc(g.type || "")}</div>` +
-        `<div class="about-game-desc">${esc(g.description || "")}</div>` +
-        (g.controls
-          ? `<div class="about-game-controls">${esc(g.controls)}</div>`
+        `<div class="about-game-card${isToday ? " is-today" : ""}">` +
+        (g.id
+          ? `<img class="about-game-logo" src="${SERVER_URL}/games/logos/${esc(g.id)}.png" alt="${esc(g.name)}" loading="lazy">`
           : "") +
+        `<span class="about-game-date">${esc(dateLabel)}</span>` +
         `</div>`;
       listEl.appendChild(link);
     }
