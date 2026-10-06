@@ -11,7 +11,7 @@
   :root { --primary: #0a1628; --secondary: #aaff00; --bg: #f5e6c8; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: #0d1f0a; color: #e8e8e8;
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; font-weight: 800; color: #aaff00; }
   #hud { display: flex; gap: 14px; font-size: clamp(11px, 3vw, 13px); align-items: center; }
@@ -21,15 +21,29 @@
   .bpip.charged { background: #aaff00; border-color: #aaff00; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 80px) * 0.621)); height: auto; display: block; }
-  #controls { display: none; gap: 8px; max-width: 95vw; width: min(95vw, 420px); }
+  #controls { display: none; gap: 8px; max-width: 95vw; width: min(95vw, 420px); padding-bottom: env(safe-area-inset-bottom); }
   body.touch #controls { display: flex; }
-  @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 150px) * 0.621)); } }
+  /* Touch: keep >= 24px between the canvas and the screen edges so a steering drag never starts the browser's back gesture. */
+  body.touch canvas { width: min(100vw - 48px, calc((100dvh - 150px) * 0.621)); }
+  #touch-hint { display: none; font-size: clamp(11px, 3vw, 13px); color: rgba(255,255,255,0.55); text-align: center; }
+  body.touch #touch-hint { display: block; }
+  /* Landscape touch (tablet / phone sideways): controls float at the bottom corners so the canvas can use the full height. */
+  @media (orientation: landscape) and (max-height: 820px) {
+    body.touch canvas { width: min(100vw - 48px, calc((100dvh - 96px) * 0.621)); }
+    body.touch #controls { position: fixed; inset: 0; width: auto; max-width: none; pointer-events: none; z-index: 5; }
+    body.touch #controls .btn { position: absolute; pointer-events: auto; width: 76px; height: 76px; flex: none; font-size: 26px;
+      background: rgba(30,30,30,0.85); }
+    body.touch #controls #btn-left  { left: 16px;  bottom: calc(16px + env(safe-area-inset-bottom)); }
+    body.touch #controls #btn-right { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); }
+    body.touch #controls #btn-boost { right: 16px; bottom: calc(108px + env(safe-area-inset-bottom)); width: 112px; height: 64px; font-size: 14px; padding: 0; overflow: hidden; }
+    body.touch #touch-hint { display: none; }
+  }
   .btn { height: 56px; min-width: 48px; font-size: 22px; border: 2px solid #444;
     background: #1e1e1e; color: #ccc; cursor: pointer; border-radius: 8px;
     display: flex; align-items: center; justify-content: center; user-select: none;
     -webkit-touch-callout: none; flex: 1; transition: background 0.1s; }
   .btn:active, .btn.held { background: #444; color: #fff; }
-  #btn-boost { border-color: #aaff00; color: #aaff00; flex: 1.2; font-size: 18px; }
+  #btn-boost { border-color: #aaff00; color: #aaff00; flex: 1.2; font-size: clamp(14px, 4vw, 18px); white-space: nowrap; }
   #btn-boost:active, #btn-boost.held { background: #aaff00; color: #000; }
   #btn-boost.empty { opacity: 0.3; }
   #start-overlay {
@@ -52,8 +66,12 @@
     background: rgba(0,0,0,0.88); flex-direction: column; text-align: center; padding: 20px; }
   #overlay h2 { color: #aaff00; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; letter-spacing: 2px; }
   #overlay p { color: #ccc; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay button { margin-top: 18px; padding: 12px 32px; font-size: clamp(14px, 3.5vw, 16px);
-    background: #aaff00; color: #000; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 700; }
+  #overlay button { margin-top: 18px; padding: 14px 32px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
+    background: #aaff00; color: #000; border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px; font-weight: 700;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s, opacity 0.12s; }
+  #overlay button:hover { opacity: 0.9; transform: translateY(-1px); }
+  #overlay button:active { transform: scale(0.97); }
+  #overlay { z-index: 9; }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
@@ -110,11 +128,12 @@
     <button class="btn" id="btn-boost">🌿 BOOST</button>
     <button class="btn" id="btn-right">▶</button>
   </div>
+  <div id="touch-hint">Drag, tilt, or hold a side of the road to steer</div>
 </div>
 <div id="start-overlay">
   <div id="start-card">
     <img src="logos/burnin-glory.png" alt="Burnin' Glory" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 8px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-    <p>← → to steer &nbsp;·&nbsp; Space or button to boost<br>The road sweeps deep into the jungle — stay out of the mud, overtake rivals, dodge the traffic!</p>
+    <p>Steer: ← → keys, or drag / tilt / hold a side of the road<br>Boost: Space or the 🌿 button<br>The road sweeps deep into the jungle. Stay out of the mud, overtake rivals, dodge the traffic!</p>
     <button id="start-btn">▶ Race</button>
   </div>
 </div>
@@ -140,16 +159,35 @@
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
-  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
-  document.getElementById('start-btn').addEventListener('click', () => {
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitCanvas, 0); }, { once: true, passive: true });
+  // Back-swipe guard: a stray edge swipe stays on the page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => {
+    try { history.pushState(null, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+  let loopStarted = false;
+  function startGame() {
     grabFocus();
     startOverlay.style.display = 'none';
-    reset(); requestAnimationFrame(loop);
-  });
+    reset();
+    if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }   // loop runs exactly once per page load
+  }
+  document.getElementById('start-btn').addEventListener('click', startGame);
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();   // dark navy
   const COL2 = css.getPropertyValue('--secondary').trim(); // lime green
-  const W = canvas.width, H = canvas.height;
+  // Logical size for all game math; the backing store is sized to CSS size x DPR
+  // and the context scaled to match, so rendering stays crisp at any size / DPR.
+  const W = 360, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
 
   // ===== GAME-SPECIFIC SECTION =====
   const RIVAL_NAME  = 'jungle racers';
@@ -201,26 +239,39 @@
   addEventListener('keydown', e => {
     keys[e.key] = true;
     if (e.key === ' ') { e.preventDefault(); held.boost = true; }
-    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
+    if (e.key === 'Enter') {
+      if (startOverlay.style.display !== 'none') startGame();
+      else if (overlay.style.display === 'flex') document.getElementById('restart').click();
+    }
   });
   addEventListener('keyup', e => { keys[e.key] = false; if (e.key === ' ') held.boost = false; });
 
-  // Swipe / drag steering on the canvas
-  let dragX = null;
+  // Touch steering on the canvas: tap-and-hold on the left/right half steers that way (no horizontal travel needed);
+  // once the finger moves > 14 logical px it becomes follow-the-finger (the kart tracks the drag from wherever it started).
+  let touch = null;   // { x0, x, px0 } while a finger is on the canvas
   function canvasX(clientX) {
     const rect = canvas.getBoundingClientRect();
     return (clientX - rect.left) * (W / rect.width);
   }
-  canvas.addEventListener('touchstart', e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
-  canvas.addEventListener('touchmove',  e => { dragX = canvasX(e.touches[0].clientX); }, { passive: true });
-  canvas.addEventListener('touchend',   () => { dragX = null; }, { passive: true });
-  canvas.addEventListener('touchcancel',() => { dragX = null; }, { passive: true });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const x = canvasX(e.touches[0].clientX); touch = { x0: x, x, px0: px }; }, { passive: false });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (touch) touch.x = canvasX(e.touches[0].clientX); }, { passive: false });
+  canvas.addEventListener('touchend',   () => { touch = null; }, { passive: true });
+  canvas.addEventListener('touchcancel',() => { touch = null; }, { passive: true });
+  function touchSteer() {
+    if (!touch) return 0;
+    const dx = touch.x - touch.x0;
+    if (Math.abs(dx) < 14) return touch.x0 < W / 2 ? -1 : 1;           // hold a side
+    const target = touch.px0 + dx * 1.6;                                 // follow the finger
+    return Math.max(-1, Math.min(1, (target - px) / 12));
+  }
 
   let px, camX, spd, frame, score, hiScore = 0, running;
   let dashOff, worldDist, rivals, particles, popups, trees, treeAcc;
   let boostCharges, boostT, rechargeT;
   let boosting, nearMissStreak;
   let kmhDisplay, steerVis, wasOffroad;
+  let distAcc = 0;      // fractional distance points (spd * 0.08 per step) carried between steps
+  let shake = 0, flash = 0;   // crash screen shake + hit flash (stepped, rendered in draw)
 
   const CANOPY = ['#1a5c0a','#2a7a14','#0d4008','#3a8a20','#166010'];
 
@@ -241,7 +292,7 @@
     rivals = []; particles = []; popups = [];
     boostCharges = BOOST_MAX; boostT = 0; rechargeT = 0;
     boosting = false; nearMissStreak = 0; kmhDisplay = 60;
-    steerVis = 0; wasOffroad = false;
+    steerVis = 0; wasOffroad = false; distAcc = 0; shake = 0; flash = 0;
     running = true;
     initWorld();
     overlay.style.display = 'none'; updateHud();
@@ -253,22 +304,23 @@
     boostPips.forEach((p, i) => p.classList.toggle('charged', i < boostCharges));
     document.getElementById('btn-boost').classList.toggle('empty', boostCharges === 0 && !boosting);
   }
-  // Normalize raw score so a strong endless run posts ~1000 (raw was ~5000-scale).
-  const SCORE_SCALE = 0.2;
-  let _hi = 0;
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) _hi = v;
-    window.parent.postMessage({ highScore: v }, '*');
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
   function endGame() {
     running = false;
+    shake = 18; flash = 10;
     if (score > hiScore) hiScore = score;
     postHi(score);
     overTitle.textContent = 'WRECKED!';
     overMsg.textContent = CRASH_MSG;
-    overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' — new best!' : '  ·  Best: ' + hiScore);
-    updateHud(); overlay.style.display = 'flex';
+    overScore.textContent = 'Score: ' + score.toLocaleString() + (score >= hiScore && score > 0 ? '  ·  new best!' : '  ·  Best: ' + hiScore.toLocaleString());
+    updateHud();
+    setTimeout(() => { if (!running) overlay.style.display = 'flex'; }, 350);   // let the crash shake play before the overlay
   }
 
   function addPopup(x, y, text, col) { popups.push({ x, y, text, col: col || '#fff', life: 50 }); }
@@ -323,8 +375,8 @@
     let steer = 0;
     if (keys['ArrowLeft'] || keys['a'] || held.left)  steer -= 1;
     if (keys['ArrowRight'] || keys['d'] || held.right) steer += 1;
+    if (steer === 0) steer = touchSteer();
     if (tiltX !== 0 && steer === 0) steer = tiltX;
-    if (dragX !== null && steer === 0) steer = Math.max(-1, Math.min(1, (dragX - W / 2) / 50));
     steerVis += (steer - steerVis) * 0.2;
     px += steer * STEER;
     px = Math.max(rc0 - ROAD_HW - 80, Math.min(rc0 + ROAD_HW + 80, px));
@@ -369,13 +421,21 @@
     rivals = rivals.filter(r => r.d > worldDist - 120 && r.d < worldDist + ZV + 140);
     trees = trees.filter(t => t.d > worldDist - 30);
 
+    fxStep();
+
+    // Distance points: spd * 0.08 per step, accumulated fractionally so slow speeds still count
+    distAcc += spd * 0.08;
+    if (distAcc >= 1) { const n = Math.floor(distAcc); score += n; distAcc -= n; }
+    updateHud();
+  }
+  // Cosmetic state advanced once per fixed step (also runs after a crash so the wreck animates)
+  function fxStep() {
     for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
     particles = particles.filter(p => p.life > 0);
     for (const p of popups) { p.y -= 1.2; p.life--; }
     popups = popups.filter(p => p.life > 0);
-
-    score += Math.floor(spd * 0.08);
-    updateHud();
+    if (shake > 0) shake--;
+    if (flash > 0) flash--;
   }
 
   function rr(x, y, w, h, r) {
@@ -480,9 +540,16 @@
   }
 
   function draw() {
+    ctx.save();
+    if (shake > 0) {
+      const a = shake * 0.4;
+      ctx.translate((Math.random() - 0.5) * a, (Math.random() - 0.5) * a);
+    }
     // Hazy jungle sky
-    ctx.fillStyle = '#d9e6b0';
-    ctx.fillRect(0, 0, W, HY);
+    const sky = ctx.createLinearGradient(0, 0, 0, HY);
+    sky.addColorStop(0, '#c9dd9a'); sky.addColorStop(1, '#e4eec4');
+    ctx.fillStyle = sky;
+    ctx.fillRect(-10, -10, W + 20, HY + 10);
     // Sun
     ctx.fillStyle = '#ffd98a';
     ctx.beginPath(); ctx.arc(W - 64, 52, 22, 0, TAU); ctx.fill();
@@ -625,9 +692,28 @@
       ctx.fillText(p.text, p.x, p.y);
     }
     ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    ctx.restore();
+
+    // Crash flash
+    if (flash > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + (flash / 10 * 0.7) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
-  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); else fxStep(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
   document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
 
   // Tilt support
