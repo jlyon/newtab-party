@@ -285,14 +285,26 @@ Load it with a `<link>` in `<head>` (right after `<title>`) and apply it to the 
 
 ## QA gate (mandatory before showing the game)
 
-Run the house harness from the repo root; both must be clean for the new game:
+**Where the game lives.** Inside a newtab.party checkout (there's a `worker/public/games/` folder), save the game as `worker/public/games/<slug>.html`. Anywhere else, save it as `<slug>.html` in the current folder. `<slug>` is short, lowercase and hyphenated.
+
+Run the house harness; both must be clean for the new game. In a checkout, from the repo root:
 
 ```bash
 node scripts/qa/lint.mjs <slug>              # scoring, fixed-step loop, viewport, touch gating, no 100vh
 SHOTS=1 node scripts/qa/smoke.mjs <slug>     # desktop, iPhone 13, iPhone SE, iPad portrait + landscape
 ```
 
-The smoke test loads the game, clicks Play, feeds generic keyboard and touch input, and reports page errors, overflow, clipped or tiny canvases, off-screen or small buttons, and content that can't be scrolled by touch. Then **look at the screenshots** in `scripts/qa/shots/<slug>-<mode>-*.png` for every mode and fix what you see. (Needs Playwright: `npm i -D playwright` in `scripts/qa`, or the cloud session's global install.) Don't skip this: it's what lets you design freely without shipping a broken phone build.
+Outside a checkout, the same scripts ship with this plugin. Point them at the folder that holds the game:
+
+```bash
+QA="${CLAUDE_PLUGIN_ROOT}/scripts/qa"        # if unset, find it: the scripts/qa folder next to this skill's ../../
+GAMES_DIR="$PWD" node "$QA/lint.mjs" <slug>
+GAMES_DIR="$PWD" SHOTS=1 SHOTS_DIR="$PWD/qa-shots" node "$QA/smoke.mjs" <slug>
+```
+
+If Playwright isn't available and the user doesn't want to install it, still run the lint, then check the game by reading it carefully against the mobile and scoring rules above, and say that the device smoke test was skipped.
+
+The smoke test loads the game, clicks Play, feeds generic keyboard and touch input, and reports page errors, overflow, clipped or tiny canvases, off-screen or small buttons, and content that can't be scrolled by touch. Then **look at the screenshots** (`scripts/qa/shots/` in a checkout, `SHOTS_DIR` otherwise) for every mode and fix what you see. (Needs Playwright: `npm i -D playwright` in `scripts/qa`, or the cloud session's global install.) Don't skip this: it's what lets you design freely without shipping a broken phone build.
 
 At this point the game is playable and self-contained. **Stop and ask before doing anything site-related.**
 
@@ -300,13 +312,13 @@ At this point the game is playable and self-contained. **Stop and ask before doi
 
 Once the game plays, use the AskUserQuestion tool to ask whether to **add it to newtab.party** (the daily arcade) or just keep the standalone file. Frame it plainly — e.g. "Want this on newtab.party? I'll generate a logo and a gameplay screenshot, wire it into the arcade, and add it to the rotation." Options: **Add it to newtab.party** / **Just the file for now**.
 
-**If no (just the file):** save the game to `worker/public/games/<slug>.html` (short, lowercase, hyphenated), give one line on how to play plus a line of sass, and stop. Do NOT generate a screenshot or logo, touch `games.json`, or mention deploy — it's a double-click-to-play file.
+**If no (just the file):** leave the game where you saved it, give one line on how to play plus a line of sass, and stop. Do NOT generate a screenshot or logo, touch `games.json`, or mention deploy — it's a double-click-to-play file.
 
 **If yes:** do everything under "Add to newtab.party" below.
 
 ## Add to newtab.party (only when the user says yes)
 
-Save the game to `worker/public/games/<slug>.html` first, then:
+This part needs a newtab.party checkout. If the user isn't in one, tell them to fork https://github.com/jlyon/newtab-party, copy the game to `worker/public/games/<slug>.html`, and follow the steps below (or the README's "Submit your game" section). In a checkout, make sure the game is at `worker/public/games/<slug>.html`, then:
 
 ### 1. Gameplay-screenshot background
 

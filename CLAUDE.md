@@ -18,6 +18,7 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
+| `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
 | `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
 | `scripts/gen_logos.py` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG). |
 
@@ -52,7 +53,7 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 
 ## Adding a game
 
-1. Build with the `game-builder` Claude Code skill (`/game-builder`); it starts from `.claude-plugin/skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
+1. Build with the `game-builder` Claude Code skill (`/newtab-party:game-builder` once the plugin is installed); it starts from `skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
 2. Copy `.html` to `worker/public/games/` and run the QA gate: `node scripts/qa/lint.mjs <id>` and `SHOTS=1 node scripts/qa/smoke.mjs <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
 4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
@@ -117,6 +118,7 @@ All queries are in `worker/src/db.ts`. D1 uses `db.prepare(sql).bind(...).run/fi
 
 ## URLs
 
+- Docs: `README.md` (skill users), `DEPLOY.md` (running and hosting the site)
 - Production: `https://newtab.party`
 - GitHub: `https://github.com/jlyon/newtab-party`
 - Local dev: `http://localhost:8787` (wrangler dev default)

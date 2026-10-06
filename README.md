@@ -1,201 +1,105 @@
-# newtab.party
+# newtab.party game builder
 
-A Chrome extension that replaces your new tab page with a different arcade game every day — like Wordle, but instead of a word puzzle you get a game. Everyone plays the same game, scores appear on a shared daily leaderboard, and the leaderboard locks at midnight UTC.
+A Claude Code skill that builds you a playable arcade game in about ten minutes. You answer four quick questions, Claude writes a single self-contained HTML file, and you double-click it to play. No engine, no build step, no game-dev experience needed.
 
-**[→ Install the Chrome extension](https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm)** · **[→ Play in your browser](https://newtab.party)**
+The games it makes are the same ones that run on [newtab.party](https://newtab.party), a daily arcade where everyone plays the same game each day. If you build something good, you can submit it and it gets its own day in the rotation.
+
+**[Play today's game](https://newtab.party)** · **[Chrome extension](https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm)**
 
 ---
 
-## 🎮 Build your own game — get it featured
+## Install
 
-You don't need to know how to code games. Tell Claude what you want, iterate until it's fun, send a PR. Your game gets its own day on newtab.party — everyone who opens a new tab that day plays it.
+In Claude Code, add this repo as a plugin marketplace and install the plugin:
 
-1. **Add the newtab.party plugin marketplace to Claude Code:**
+```
+/plugin marketplace add jlyon/newtab-party
+/plugin install newtab-party@newtab-party
+```
 
-   ```
-   /plugin marketplace add jlyon/newtab-party
-   ```
+See the [plugin docs](https://code.claude.com/docs/en/discover-plugins) if you haven't used plugins before.
 
-   ([Plugin marketplace docs](https://code.claude.com/docs/en/discover-plugins))
+## Make a game
 
-2. **Run the skill to build your game:**
+```
+/newtab-party:game-builder
+```
 
-   ```
-   /game-builder
-   ```
+You can also just ask: "make me a game".
 
-   Claude walks you through 4 quick questions (game type, name, colors, theme) and generates a complete, single-file HTML game.
+Claude asks four things, one at a time:
 
-3. **Play until your heart's delight.** Chat with the robot to get your game just right — faster enemies, new colors, better juice, a custom win screen, whatever. Iterate until you love it.
+1. **Game type.** You get five random ideas, but you can ask for anything. Mashups are encouraged ("snake, but it's a conga line").
+2. **Name.** Whatever you want.
+3. **Colors.** Two or three favorites. The first is primary, the second is the accent.
+4. **The juicy details.** A few quick questions about your hero, the enemies, the setting and the jokes.
 
-4. **Open a PR to get your game featured on its special date.** Fork [the repo](https://github.com/jlyon/newtab-party), drop the `.html` into `worker/public/games/`, add an entry to `worker/games.json`, and submit a pull request. Once merged + deployed, your game joins the daily rotation.
+Then it builds the game, checks it on simulated phones, tablets and a desktop, and saves it as `<your-game>.html` in your current folder. Open the file in a browser and play. (The device check needs Playwright; Claude will offer to install it.)
 
-   The `games.json` entry looks like:
+## Make it better
+
+Keep chatting until you love it. Things that work well:
+
+- "Make the enemies faster after 30 seconds."
+- "Add a boss that shows up every 1,000 points."
+- "The death message should roast me harder."
+- "More juice: screen shake, particles, a combo counter."
+- "Make the hero a raccoon in a trench coat."
+
+## What you get
+
+Every game the skill produces follows the same house rules, so it works everywhere without extra effort from you:
+
+- **One file.** All HTML, CSS and JavaScript in a single `.html`. It works offline.
+- **Phones, tablets and desktop.** Touch controls appear automatically on touch screens, keyboard controls on desktop, and the layout fits portrait phones and iPads.
+- **Same speed everywhere.** The game runs at the same pace on a 60 Hz laptop, a 120 Hz iPhone and a 144 Hz monitor.
+- **A title screen.** Every game opens with its name, how to play, and a Play button.
+- **Honest scores.** The score you see at game over is the exact number that would go on the leaderboard.
+
+## Submit your game to newtab.party
+
+Want everyone to play it? Open a pull request.
+
+1. Fork [the repo](https://github.com/jlyon/newtab-party) and put your game in `worker/public/games/<id>.html`.
+2. Add an entry to the `games` array in `worker/games.json`:
 
    ```json
    {
      "id": "my-game",
      "name": "My Game",
      "file": "games/my-game.html",
-     "description": "One sentence description.",
-     "controls": "Arrow keys to move · Space to action",
+     "description": "One sentence about the game.",
+     "controls": "Arrow keys to move · Space to shoot · Swipe on mobile",
      "type": "spaceship-shooter"
    }
    ```
 
-### `postHi()` contract
+3. Append your `id` to the **end** of the `schedule` array in the same file. That's what gives your game a day. Never insert it earlier, since that would move games that are already scheduled.
+4. Run the QA checks from the repo root and fix anything they flag:
 
-Every game must call this when the player sets a new personal best:
+   ```bash
+   node scripts/qa/lint.mjs my-game
+   SHOTS=1 node scripts/qa/smoke.mjs my-game
+   ```
+
+   The smoke test plays your game on a desktop, two iPhones and an iPad, and saves screenshots to `scripts/qa/shots/`. It needs Playwright (`npm i -D playwright` in `scripts/qa`).
+5. Open the PR. A logo gets generated for your game before it airs.
+
+### The one rule games must follow
+
+The arcade learns your score through one message. The skill wires this up for you, but if you edit the game by hand, keep it intact:
 
 ```js
 let _hi = 0;
 function postHi(n) {
-  n = Math.floor(n) || 0;
-  if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  n = Math.max(0, Math.round(Number(n) || 0));
+  if (n > _hi) _hi = n;
+  try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
 }
 ```
 
-Call `postHi(score)` from the game's end-state or whenever the score increases past the previous best.
+Call `postHi(score)` once every time a run ends, whether the player won or lost. Post the same number you show on screen. Don't scale it, and don't call it every frame.
 
 ---
 
-## Running the website locally
-
-```bash
-cd worker
-npm install
-npm run db:init:local          # one-time: create local D1 SQLite
-npm run dev                    # wrangler dev → http://localhost:8787
-```
-
-Open [http://localhost:8787](http://localhost:8787) to play today's game in the browser.
-
-For local extension testing, set `SERVER_URL = 'http://localhost:8787'` in `extension/newtab.js` and update `extension/manifest.json`'s `frame-src` accordingly. Then load the extension via `chrome://extensions` → **Load unpacked** → select the `extension/` folder.
-
----
-
-## Deploying to production
-
-You only need this if you're forking the project and hosting your own copy. The canonical instance lives at [newtab.party](https://newtab.party).
-
-### Prerequisites
-
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) — already in `worker/package.json`
-
-### 1 — Create the D1 database
-
-```bash
-cd worker
-npm install
-npx wrangler d1 create newtab-party
-```
-
-Paste the printed `database_id` into `worker/wrangler.toml`:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "newtab-party"
-database_id = "paste-id-here"
-```
-
-### 2 — Initialize the schema
-
-```bash
-npx wrangler d1 execute newtab-party --remote --file=schema.sql
-```
-
-### 3 — Deploy the worker
-
-```bash
-npm run deploy
-```
-
-Wrangler prints your worker URL (e.g. `https://newtab-party.your-subdomain.workers.dev`). For a custom domain, add to `wrangler.toml`:
-
-```toml
-[[routes]]
-pattern = "yourdomain.com"
-custom_domain = true
-```
-
-### 4 — Point the extension at your worker
-
-In `extension/newtab.js`:
-
-```js
-const SERVER_URL = 'https://your-worker-url';
-```
-
-In `extension/manifest.json`:
-
-```json
-"content_security_policy": {
-  "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://your-worker-url;"
-},
-"host_permissions": ["https://your-worker-url/*"]
-```
-
-Reload the extension in `chrome://extensions`.
-
----
-
-## App structure
-
-Two pieces: a thin Chrome extension that loads today's game in an iframe, and a Cloudflare Worker that serves the games, renders the web UI, and tracks scores.
-
-**Daily rotation.** Both sides compute today's game from the same deterministic algorithm: index into the explicit `schedule` list in `games.json` (game ids in air order) anchored at `scheduleEpoch` — `schedule[((offset % L) + L) % L]` where `offset = dayNumber(today) - dayNumber(scheduleEpoch)`. An append-only schedule (rather than `day % games.length`) means adding a game only appends a future slot, so the current cycle never reshuffles. No round-trip needed, they always agree.
-
-**Score flow.** Game → `postMessage({ highScore: int })` → extension/web player → `POST /api/plays` → Cloudflare D1. The API returns `{ id, rank }` so the player sees their leaderboard position.
-
-### Layout
-
-```
-newtab.party/
-├── extension/
-│   ├── manifest.json         # MV3 manifest, frame-src allows iframing games
-│   ├── newtab.html / .js     # New tab UI (thin client)
-│   └── icons/                # 🥳 extension icons
-└── worker/
-    ├── src/
-    │   ├── index.ts          # Fetch handler + all routes
-    │   ├── db.ts             # D1 async queries
-    │   ├── render.ts         # renderArcade / renderLeaderboard / renderReplay
-    │   └── types.ts          # Game, Play, DailyEntry, Env interfaces
-    ├── public/games/         # Self-contained game HTML files (edge assets)
-    ├── games.json            # Game library index (source of truth)
-    ├── schema.sql            # D1 table + index definitions
-    ├── wrangler.toml         # Worker + D1 + assets + routes config
-    └── package.json
-```
-
-### Stack
-
-| Layer | Tech |
-|---|---|
-| Chrome extension | Manifest V3, vanilla JS, no build step |
-| Backend | [Cloudflare Workers](https://workers.cloudflare.com/) + TypeScript |
-| Database | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite, async) |
-| Static assets | Cloudflare edge (game HTML files) |
-| Games | Self-contained single-file HTML, built with the `game-builder` Claude Code skill |
-
-### API
-
-| Endpoint | Description |
-|---|---|
-| `GET /` | Web arcade player (today's daily game) |
-| `GET /leaderboard` | Daily leaderboard + previous 7 days |
-| `GET /play/:date` | Replay a past game (read-only, scores not saved) |
-| `GET /games.json` | Game library index |
-| `GET /games/:file` | Static game HTML |
-| `GET /api/daily` | Today's game + scores as JSON |
-| `POST /api/plays` | Record a score `{ gameId, gameName, score }` → `{ id, rank }` |
-| `PATCH /api/plays/:id` | Set player name `{ playerName }` (today only) |
-| `GET /api/scores/:gameId` | Today's scores for a game |
-| `GET /api/recent` | 20 most recent plays |
-| `GET /api/recent-days` | Last 4 days' games (deterministic, no DB) |
-
-### Rotation rules
-
-Games are served in `games.json` order. **Always append** new entries to the end — never insert, reorder, or remove. Changing `games.length` shifts `day % N` for every day, so deploys that change game count should land at midnight UTC to avoid swapping the current game mid-session. Past leaderboard records are stored by `game_id` and are unaffected by rotation changes — only the live mapping shifts.
+Running or hosting the website itself? See [DEPLOY.md](DEPLOY.md).
