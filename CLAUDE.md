@@ -73,17 +73,22 @@ To retire a game, remove its id from `schedule` (keep the entry in `games` and t
 
 ### postHi() protocol
 
-Every game must signal high scores to the parent frame. Add this inside the IIFE:
+Every game must report its score to the parent frame. Add this inside the IIFE:
 
 ```js
-let _hi = 0;
+let _hi = 0;   // in-game "best" readout only
 function postHi(n) {
-  n = Math.floor(n) || 0;
-  if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  n = Math.max(0, Math.round(Number(n) || 0));
+  if (n > _hi) _hi = n;
+  try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
 }
 ```
 
-Call `postHi(score)` whenever the player reaches a new personal best. The newtab wrapper listens and forwards it to `POST /api/plays`.
+Call `postHi(finalScore)` once on every game end (win, loss, timeout), never per-frame and never gated on a local best. **Scores are not normalized**: the integer shown on the game-over screen as `Score` is exactly the value posted and saved to the leaderboard (no `SCORE_SCALE`, no remapping). The newtab wrapper listens, checks whether it makes today's top 10, and forwards it to `POST /api/plays`.
+
+### Frame-rate independence
+
+Real-time games must run at the same speed on a 60 Hz laptop, a 144 Hz monitor and a 120 Hz iPhone. Canvas games use a fixed-step accumulator (`STEP_MS = 1000 / 60`, step the simulation in a `while (acc >= STEP_MS)` loop, draw once per frame) or scale every motion by a clamped `dt`. See the game-builder skill for the canonical loop.
 
 ## Database
 

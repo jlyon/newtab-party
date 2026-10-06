@@ -172,28 +172,52 @@ The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block
 
 ### Scoring rubric (mandatory — every game and template must follow this)
 
-Scores are compared across games (the leaderboard's "Previous games" table and the topbar "Best"), so they must be on a **shared scale** and must reward skill **without a ceiling**.
+Scores must reward skill **without a ceiling**, and the leaderboard stores **exactly the number the game shows** — no normalization, no scaling, no "house anchor". If the game-over screen says `Score: 1,240`, the leaderboard says 1,240.
 
 1. **No hard score ceiling.** A game must never *end* at a fixed score that every competent player reaches (the old "win at 300" bug). 
    - If the game currently ends on hitting a target score (a finish line / "win at N"), **remove that score-based ending.** Let play continue endlessly with the existing difficulty ramp; keep the death / timeout / lose condition. A cosmetic "milestone!" toast at the old threshold is fine — just don't stop play or stop scoring.
    - If the game is inherently one finite round (one minesweeper board, one battleship match, one card hand, one CYOA story), that round may end — but the **posted score must be a continuous skill metric** (time, accuracy, efficiency, margin, streak) so results spread out instead of everyone tying at the same number.
 2. **Report a score on loss too — "progress IS the score."** For games with a defined complete state (a clear win AND lose — minesweeper, battleship, memory match, artillery duel, etc.), `postHi` must fire on **every** game end, not only on a win. Base the score on **how far the player got** — the natural progress metric (safe tiles cleared, enemy cells hit, damage dealt, matches made, …). Winning yields the max (plus an optional small completion/speed/efficiency bonus that only applies on a win, so a clean win still edges out a near-miss loss); losing yields proportionally less. Never leave a loss un-scored.
-3. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
+3. **No normalization — what you show is what you post.** Never multiply, scale or remap the score before posting. The integer on the game-over screen (labeled `Score`) and in the HUD is the exact value `postHi` sends. If the game's natural metric isn't the score (Hearts counts points *taken*, Battleship counts shots, Minesweeper counts seconds), keep that metric on screen and *also* show the leaderboard number as `Score: N`; post that N. Money games show whole dollars and post the same integer. There is no `SCORE_SCALE` constant anymore — don't add one.
 4. **Report every game over — not just new bests.** The arcade offers the leaderboard whenever a score lands in the day's **global top 10** (across everyone's plays today), so the game must report the run's final score on **every** game over, even when it's lower than a previous run this page-load. Do NOT gate the `postMessage` on a local "new best" check — that's the old bug where a game only prompted on the highest score of the current page load. Keep `_hi` only for the game's own on-screen "best" display; always post the run's score:
    ```js
-   let _hi = 0;
-   const SCORE_SCALE = 1;   // tune so a great run ≈ 1000
-   // Call once per game over with the run's final score. Always posts so the
-   // arcade can offer the leaderboard on any global-top-10 score, not just a
-   // new local best. _hi is kept only for an in-game "best" readout.
-   function postHi(raw) {
-     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+   let _hi = 0;   // in-game "best" readout only
+   // Call once per game over with the run's final score — exactly the integer
+   // shown on screen. Always posts so the arcade can offer the leaderboard on
+   // any global-top-10 score, not just a new local best.
+   function postHi(n) {
+     n = Math.max(0, Math.round(Number(n) || 0));
      if (n > _hi) _hi = n;
-     window.parent.postMessage({ highScore: n }, '*');
+     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
    }
    ```
    Call `postHi(runScore)` unconditionally at game over — never wrap it in `if (runScore > best)`. Post **only at game over**, never per-frame during play (the arcade would pop the name prompt mid-game and flood the qualify check). The arcade de-dupes identical scores and decides whether to prompt.
 5. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
+
+### Frame-rate independence (mandatory — same speed on every screen)
+
+A loop that steps the simulation once per `requestAnimationFrame` runs twice as fast on a 120 Hz iPhone Pro or a 144 Hz monitor as on a 60 Hz screen. Every real-time game uses a **fixed-step accumulator at 60 steps/s** so per-step constants keep their tuned feel everywhere:
+
+```js
+// Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+const STEP_MS = 1000 / 60;
+let _acc = 0, _lastT = 0;
+function loop(now) {
+  if (!_lastT) _lastT = now;
+  _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab)
+  _lastT = now;
+  let n = 0;
+  while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+  if (n === 4) _acc = 0;
+  draw();
+  requestAnimationFrame(loop);
+}
+```
+
+- Every per-frame mutation (positions, timers, `frame++`, shake, particle updates) lives in `step()`; `draw()` is pure rendering.
+- Start the loop exactly once per page load. A restart handler that calls `requestAnimationFrame(loop)` again doubles the speed.
+- A game that scales everything by a `dt` in seconds (clamped to ≤ 0.05) is also fine — mark the loop with `// FRAME_INDEPENDENT_DT`.
+- Board/DOM games driven by `setInterval` / `Date.now()` are already frame-rate independent.
 
 ### Mobile requirements (mandatory — every game must pass these)
 
