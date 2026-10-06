@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>__GAME_NAME__</title>
+<!-- Optional: one theme-matched Google Font for the title / Play button. -->
+<style>
+  :root { --primary: __PRIMARY_COLOR__; --secondary: __SECONDARY_COLOR__; --bg: __BACKGROUND_COLOR__; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  /* Logical size is W x H (below); CSS scales it to fit the viewport minus the HUD/controls (~150px reserved). */
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (__W__ / __H__))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  /* On-screen controls: hidden until the first touch, so desktop stays clean. */
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 120px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="__W__" height="__H__"></canvas>
+  <!-- Touch-only: buttons for every keyboard action, or a one-line gesture hint. -->
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-fire">●</button>
+    <button class="btn" id="btn-right">▶</button>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <h2>__GAME_NAME__</h2>
+  <p>__HOW_TO_PLAY__</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    // Back-swipe guard: a stray edge swipe would leave the arcade; re-push so it lands back here.
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = __W__, H = __H__;                       // logical resolution: ALL game math uses these
+  function fitCanvas() {                            // crisp at any devicePixelRatio; CSS decides the size
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  // Screen → logical coordinates for pointer/touch input.
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};                       // keyboard state + on-screen button state
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {                       // mouse + touch, multi-touch safe
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-fire', 'fire');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || held.right;
+  const fire  = () => keys[' '] || held.fire;
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);            // clamp long stalls (hidden tab)
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION: design the mechanic, art and HUD here =====
+  let score = 0;
+  function reset() {                                // fresh state for a new run
+    score = 0;
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  function step(now) {                              // ONE 1/60 s tick of simulation; all motion/timers live here
+    // read left()/right()/fire(), move things, spawn, collide, score++, call gameOver(...) when the run ends
+  }
+  function draw() {                                 // pure rendering of current state (no mutations here)
+    ctx.clearRect(0, 0, W, H);
+  }
+  // Optional input helpers: canvas.addEventListener('pointerdown', e => { const p = toLogical(e.clientX, e.clientY); ... });
+  // Touch steering: swipe/drag on the canvas; tilt via DeviceOrientationEvent (request permission on first touch on iOS).
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);                      // started exactly once per page load
+})();
+</script>
+</body>
+</html>

@@ -18,6 +18,8 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
+| `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
+| `scripts/gen_logos.py` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG). |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
 
@@ -50,11 +52,12 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 
 ## Adding a game
 
-1. Build with the `game-builder` Claude Code skill (`/game-builder`)
-2. Copy `.html` to `worker/public/games/`
+1. Build with the `game-builder` Claude Code skill (`/game-builder`); it starts from `.claude-plugin/skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
+2. Copy `.html` to `worker/public/games/` and run the QA gate: `node scripts/qa/lint.mjs <id>` and `SHOTS=1 node scripts/qa/smoke.mjs <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
 4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
-5. `npm run deploy` from `worker/` — live immediately, no extension update needed
+5. Logo: `python3 scripts/gen_logos.py <id>` (Gemini key in `.env`, see `.env.example`; batch with `--missing`)
+6. `npm run deploy` from `worker/` — live immediately, no extension update needed
 
 Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
 

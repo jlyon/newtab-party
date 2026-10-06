@@ -44,7 +44,7 @@ export function renderArcade(): string {
 ${FAVICON}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
   #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -178,6 +178,13 @@ ${FAVICON}
 </div>
 
 <script>
+// Back-swipe guard: a stray edge swipe on a phone would leave the arcade mid-game.
+// Push one history entry on first touch and re-push whenever the gesture pops it,
+// so the swipe lands back on this page instead of navigating away.
+window.addEventListener('touchstart', function () {
+  try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {}
+  window.addEventListener('popstate', function () { try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {} });
+}, { once: true, passive: true });
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
 let games = [], schedule = [], scheduleEpoch = null, currentGame = null, sessionHighScore = 0;
 let sessionPlayId = null;
@@ -655,7 +662,7 @@ export function renderReplay(
 ${FAVICON}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  html, body { height: 100%; background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
   #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -752,6 +759,13 @@ ${FAVICON}
 </div>
 
 <script>
+// Back-swipe guard: a stray edge swipe on a phone would leave the arcade mid-game.
+// Push one history entry on first touch and re-push whenever the gesture pops it,
+// so the swipe lands back on this page instead of navigating away.
+window.addEventListener('touchstart', function () {
+  try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {}
+  window.addEventListener('popstate', function () { try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {} });
+}, { once: true, passive: true });
 let hi = 0;
 window.addEventListener('message', function(e) {
   const d = e.data;
