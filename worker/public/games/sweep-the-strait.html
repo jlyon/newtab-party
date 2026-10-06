@@ -12,17 +12,36 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; min-height: 100%;
     background: linear-gradient(180deg, #0a2530 0%, #0e3340 60%, #0a2530 100%);
-    color: var(--primary); font-family: system-ui, sans-serif; touch-action: manipulation; }
+    color: var(--primary); font-family: system-ui, sans-serif; touch-action: none; overscroll-behavior: none; }
+  * { -webkit-touch-callout: none; }
   #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 100vh; padding: 16px 8px; gap: 10px; position: relative; z-index: 1; }
+  /* #wrap is the one vertical scroller (touch pan-y) in case a short viewport cannot fit the board;
+     children are centred with auto margins so overflow never clips the top. */
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    height: 100dvh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 12px 8px calc(12px + env(safe-area-inset-bottom)); gap: 8px; position: relative; z-index: 1; }
+  #wrap > :first-child { margin-top: auto; }
+  #wrap > :last-child { margin-bottom: auto; }
   h1 { margin: 0; font-size: clamp(15px, 4vw, 22px); letter-spacing: 2px; text-transform: uppercase; }
   .tagline { margin: 0 0 2px; font-size: clamp(11px, 2.8vw, 13.5px); color: var(--secondary);
     text-align: center; max-width: 440px; font-style: italic; letter-spacing: .3px; line-height: 1.45; }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; flex-wrap: wrap; justify-content: center; align-items: center; }
+  #hud { display: flex; gap: 14px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; flex-wrap: wrap; justify-content: center; align-items: center; }
+  #score { color: #fff; font-weight: 700; }
+  /* Fit / Zoom toggle: only on narrow touch screens where fitted cells get small */
+  #zoom-btn { display: none; min-height: 40px; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 700;
+    font-size: clamp(11px, 3vw, 13px); color: var(--bg); background: var(--secondary); border: none; user-select: none; }
+  @media (max-width: 600px) { body.touch #zoom-btn { display: inline-flex; align-items: center; } }
+  /* the board is its own scroller (pans both ways when zoomed); phones keep >= 24px from the screen edges */
+  #board { max-width: 100%; max-height: calc(100dvh - 190px); overflow: auto; touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch; overscroll-behavior: contain; border-radius: 8px; scrollbar-width: thin; }
+  #board { flex-shrink: 0; }
+  /* only the zoomed board pans sideways, so only then keep the swipe-back edge margin */
+  @media (max-width: 600px) { #board.zoomed { max-width: calc(100vw - 48px); } }
+  @keyframes hitShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  #board.shake { animation: hitShake 0.45s ease-out; }
   #hud .ic { display: inline-flex; align-items: center; gap: 5px; }
   #hud svg { width: 15px; height: 15px; vertical-align: middle; }
-  #grid { display: grid; gap: 3px; padding: 8px; border-radius: 8px;
+  #grid { display: grid; gap: 2px; padding: 6px; border-radius: 8px; width: max-content;
     background: rgba(31,162,166,0.10); border: 1px solid rgba(31,162,166,0.25); }
   .cell {
     display: flex; align-items: center; justify-content: center;
@@ -31,15 +50,24 @@
   }
   .cell svg { width: 72%; height: 72%; display: block; }
   .cell.hidden { background: var(--primary); color: var(--bg); font-size: 0;
-    background-image: linear-gradient(135deg, #e3b35a 0%, #c9942f 100%); }
-  .cell.hidden:hover { filter: brightness(1.08); }
+    background-image: linear-gradient(135deg, #e3b35a 0%, #c9942f 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 3px rgba(0,0,0,0.35); }
+  .cell.hidden:hover { filter: brightness(1.1); }
+  .cell.hidden:active { filter: brightness(0.92); transform: scale(0.94); }
+  @keyframes popIn { from { transform: scale(0.6); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+  .cell.pop { animation: popIn 0.22s ease-out; }
   .cell.flagged { background-image: linear-gradient(135deg, #e3b35a 0%, #c9942f 100%); }
   .cell.revealed { border-color: rgba(31,162,166,0.25); cursor: default; background: rgba(31,162,166,0.10); }
   .cell.mine-hit { background: #cc2200 !important; border-color: #ff4400; }
   .cell.mine-shown { background: rgba(255,40,0,0.18); }
   .n1{color:#5fb6ff} .n2{color:#3fd6a0} .n3{color:#ff6a4d} .n4{color:#b98bff}
   .n5{color:#ffb347} .n6{color:#2fd0d6} .n7{color:var(--primary)} .n8{color:#9aa}
-  #hint { font-size: clamp(10px, 2.5vw, 12px); opacity: 0.5; text-align: center; max-width: 360px; }
+  #hint { font-size: clamp(10px, 2.5vw, 12px); opacity: 0.6; text-align: center; max-width: 400px; }
+  #overlay .final-score { color: #fff; font-size: clamp(22px, 6vw, 34px); font-weight: 800; margin: 10px 0 2px; letter-spacing: 1px; }
+  #overlay .sub, #overlay .formula { font-size: clamp(11px, 2.8vw, 13px); opacity: 0.75; }
+  #overlay button, #start-overlay button { min-height: 52px; user-select: none; }
+  #overlay button:active, #start-overlay button:active { transform: translateY(1px); }
+  #start-overlay { touch-action: none; } #overlay { touch-action: none; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(4,16,22,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
   #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; letter-spacing: 1px; }
@@ -168,19 +196,23 @@
     <span class="ic" id="mines-left"></span>
     <span class="ic" id="timer">&#9201; 0s</span>
     <span class="ic" id="hi">Record: &mdash;</span>
+    <span class="ic" id="score">Score: 0</span>
+    <button id="zoom-btn" type="button">Zoom in</button>
   </div>
-  <div id="grid"></div>
-  <div id="hint">Tap a tile to sweep it &middot; right-click or long-press to drop a ship marker over a suspected mine. Clear every safe tile without detonating a mine.</div>
+  <div id="board"><div id="grid"></div></div>
+  <div id="hint">Tap / click a tile to sweep it &middot; long-press or right-click to drop a ship marker over a suspected mine. Clear every safe tile without detonating a mine.</div>
 </div>
 <div id="start-overlay">
-  <img src="logos/sweep-the-strait.png" alt="Sweep the Strait" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-  <p>Tap a tile to sweep it. Right-click or long-press to drop a ship marker on a suspected mine. Clear every safe tile without detonating one of the 40 mines.</p>
+  <img src="logos/sweep-the-strait.png" alt="Sweep the Strait" style="display:block;width:min(82%,400px);max-height:min(40dvh,240px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <p>Tap or click a tile to sweep it. Long-press or right-click to drop a ship marker on a suspected mine. Clear every safe tile without detonating one of the 40 mines. Score grows with every safe tile; a clean clear earns a speed bonus.</p>
   <button id="start-btn">&#9875; Set sail</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Mine hit.</h2>
   <p id="overMsg"></p>
-  <p id="overScore"></p>
+  <p class="final-score" id="overScore">Score: 0</p>
+  <p class="formula">700 x tiles cleared / 216 &middot; clean clear adds a speed bonus (300 x 60 / (seconds + 60))</p>
+  <p class="sub" id="overRecord"></p>
   <button id="restart">Set sail again</button>
 </div>
 <script>
@@ -224,9 +256,14 @@
     + '</svg>';
   // ==================================
 
-  // Scoring: progress IS the score — round(safeRevealed/totalSafe * 700), posted on
-  // BOTH win and loss (how far you cleared). A win adds a speed bonus so a clean fast
-  // clear ≈ 1000; a loss posts proportional progress.
+  // Scoring (shown as "Score: N" in the HUD and on game over; the same integer is posted):
+  //   progress = round(safeRevealed / totalSafe * 700)            (loss posts how far you got)
+  //   win adds a speed bonus: round(300 * 60 / (seconds + 60))
+  const scoreEl = document.getElementById('score');
+  const boardEl = document.getElementById('board');
+  const zoomBtn = document.getElementById('zoom-btn');
+  let zoomed = false;
+  const GAP = 2, GRID_PAD = 6;
 
   let board, flagged, revealed, done, firstClick, started = false;
   let timerStart, timerVal, timerTick, hiTime = null;
@@ -248,6 +285,7 @@
     clearInterval(timerTick); timerVal = 0;
     timerEl.innerHTML = '&#9201; 0s';
     minesHud(MINES);
+    seenRevealed.clear(); showScore(0);
     overlay.style.display = 'none';
     render();
   }
@@ -284,10 +322,17 @@
     if (board[r][c] === 0) adj(r, c).forEach(([nr, nc]) => flood(nr, nc));
   }
 
-  let _hi = 0;
-  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
+  function progressScore(){ const totalSafe = ROWS*COLS - MINES; return Math.round((totalSafe ? safeRevealed()/totalSafe : 0) * 700); }
+  function showScore(n){ scoreEl.textContent = 'Score: ' + n.toLocaleString(); }
 
   function endGame(won, hitR, hitC) {
     if (done) return;
@@ -297,18 +342,20 @@
       for (let c = 0; c < COLS; c++)
         if (board[r][c] === -1 && !flagged[r][c]) revealed[r][c] = true;
     render(hitR, hitC);
-    const totalSafe = ROWS*COLS - MINES;
-    const frac = totalSafe ? safeRevealed()/totalSafe : 0;
-    let outScore = Math.round(frac * 700);                          // progress: how far you got (≈700 at full clear)
-    if (won) outScore += Math.round(300 * 60 / (timerVal + 60));    // speed bonus on a clean clear → win ≈ 750..1000
+    if (!won) { boardEl.classList.remove('shake'); void boardEl.offsetWidth; boardEl.classList.add('shake'); }
+    let outScore = progressScore();                                   // how far you cleared
+    if (won) outScore += Math.round(300 * 60 / (timerVal + 60));    // speed bonus on a clean clear
+    showScore(outScore);
     postHi(outScore);
+    let newRecord = false;
     if (won) {
-      if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; }
+      if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; newRecord = true; }
       hiEl.textContent = 'Record: ' + timerVal + 's';
     }
     overTitle.textContent = won ? 'Strait cleared!' : 'Mine hit.';
-    overMsg.textContent = won ? WIN_MSG + ' (' + timerVal + 's)' : LOSE_MSG;
-    overScore.textContent = won && hiTime === timerVal ? 'New record!' : '';
+    overMsg.textContent = (won ? WIN_MSG : LOSE_MSG) + ' Time: ' + timerVal + 's · tiles cleared: ' + safeRevealed() + '/' + (ROWS*COLS - MINES) + '.';
+    overScore.textContent = 'Score: ' + outScore.toLocaleString();
+    document.getElementById('overRecord').textContent = newRecord ? 'New fastest clear!' : '';
     overlay.style.display = 'flex';
   }
 
@@ -326,6 +373,7 @@
     if (board[r][c] === -1) { revealed[r][c] = true; endGame(false, r, c); return; }
     flood(r, c);
     render();
+    showScore(progressScore());
     const safe = ROWS * COLS - MINES;
     if (revealed.flat().filter(Boolean).length >= safe) endGame(true);
   }
@@ -337,9 +385,21 @@
     render();
   }
 
-  let pressTimer = null;
+  let pressTimer = null, longPressed = false;
+  const seenRevealed = new Set();   // cells already shown revealed (so only new reveals animate)
 
-  function cellSize() { return Math.min(40, Math.floor((Math.min(window.innerWidth - 20, 380)) / COLS) - 3); }
+  // Cell size from BOTH axes so the 16x16 board fits the viewport (desktop height-limited, phones width-limited).
+  // Zoomed (touch toggle): 32px cells inside the pannable #board.
+  function cellSize() {
+    const edge = (zoomed && window.innerWidth <= 600) ? 48 : 16;
+    const availW = Math.min(window.innerWidth - edge, 820) - GRID_PAD*2 - (COLS - 1) * GAP;
+    // measure the real height of everything around the board (title, tagline, HUD, hint, gaps, padding)
+    const others = ['h1', '.tagline', '#hud', '#hint'].reduce((a, q) => a + (document.querySelector(q)?.getBoundingClientRect().height || 0), 0);
+    const availH = window.innerHeight - others - 60 - GRID_PAD*2 - (ROWS - 1) * GAP;
+    const fit = Math.floor(Math.min(availW, availH) / COLS);
+    if (zoomed) return Math.max(32, fit);
+    return Math.max(14, Math.min(42, fit));
+  }
 
   function render(hitR, hitC) {
     const sz = cellSize();
@@ -359,28 +419,43 @@
           else if (isMine) el.classList.add('mine-shown');
           if (isMine) el.innerHTML = MINE_SVG;
           else if (board[r][c] > 0) { el.textContent = board[r][c]; el.classList.add('n' + board[r][c]); }
+          const key = r * COLS + c;
+          if (!seenRevealed.has(key)) { seenRevealed.add(key); el.classList.add('pop'); }
         } else if (flagged[r][c]) {
           el.classList.add('flagged'); el.innerHTML = SHIP_SVG;
         } else {
           el.classList.add('hidden');
         }
-        el.addEventListener('click', e => { e.preventDefault(); onReveal(r, c); });
-        el.addEventListener('contextmenu', e => { e.preventDefault(); onFlag(r, c); });
+        // A long-press flags/unflags; the click that follows it must not also reveal the tile.
+        el.addEventListener('click', e => { e.preventDefault(); if (longPressed) { longPressed = false; return; } onReveal(r, c); });
+        el.addEventListener('contextmenu', e => { e.preventDefault(); if (!longPressed) onFlag(r, c); });
         el.addEventListener('touchstart', () => {
-          pressTimer = setTimeout(() => { onFlag(r, c); pressTimer = null; }, 480);
+          longPressed = false;
+          clearTimeout(pressTimer);
+          pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; onFlag(r, c); }, 420);
         }, { passive: true });
-        el.addEventListener('touchend', e => {
-          if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-        });
-        el.addEventListener('touchmove', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+        const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+        el.addEventListener('touchend', cancelPress, { passive: true });
+        el.addEventListener('touchcancel', cancelPress, { passive: true });
+        el.addEventListener('touchmove', () => { cancelPress(); longPressed = false; }, { passive: true });
         gridEl.appendChild(el);
       }
     }
   }
 
   addEventListener('keydown', e => {
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+    if (e.key !== 'Enter') return;
+    const so = document.getElementById('start-overlay');
+    if (so.style.display !== 'none') document.getElementById('start-btn').click();
+    else if (overlay.style.display !== 'none') document.getElementById('restart').click();
   });
+  gridEl.addEventListener('contextmenu', e => e.preventDefault());
+  zoomBtn.addEventListener('click', () => { zoomed = !zoomed; boardEl.classList.toggle('zoomed', zoomed); zoomBtn.textContent = zoomed ? 'Fit board' : 'Zoom in'; render(); });
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    // A stray edge swipe-back (the zoomed board pans sideways) stays on the page instead of leaving the arcade.
+    try { history.pushState(null, '', location.href); window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} }); } catch (e) {}
+  }, { once: true, passive: true });
   addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
   document.getElementById('restart').addEventListener('click', reset);
   document.getElementById('start-btn').addEventListener('click', () => {

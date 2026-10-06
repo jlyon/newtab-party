@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Moonslayer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,9 @@
   :root { --primary: #cdd6f4; --secondary: #e0314b; --bg: #0a0e24; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--primary);
-    font-family: system-ui, sans-serif; touch-action: manipulation; }
+    font-family: system-ui, sans-serif; touch-action: none; overscroll-behavior: none; }
+  body { background: transparent; }   /* lets the fixed #sky (z-index -1) show through */
+  button { -webkit-touch-callout: none; user-select: none; }
 
   /* ===== Lunar background graphic ===== */
   #sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
@@ -23,16 +25,25 @@
   .cloud.slow { animation-duration: 40s; }
   .halo { animation: haloPulse 7s ease-in-out infinite; transform-origin: 50% 22%; }
 
-  #wrap { display: flex; flex-direction: column; align-items: center;
-    min-height: 100vh; padding: 10px 8px; gap: 8px; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100dvh; padding: 10px 8px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
+  /* if the table ever overflows a short viewport, it scrolls by touch rather than clipping */
+  #wrap { height: 100dvh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 12px); opacity: 0.6; text-align: center; }
+  body.touch #touch-hint { display: block; }
   h1 { margin: 0; font-size: clamp(18px, 4.4vw, 26px); letter-spacing: 5px; font-weight: 800;
     background: linear-gradient(180deg, #ffffff 0%, #cdd6f4 55%, #8b97c4 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     text-shadow: 0 0 22px rgba(205,214,244,0.45); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
+  /* translucent pill behind the title so it stays readable over the moon (a wrapper, because the
+     background-clip:text lettering is the h1's own background layer) */
+  .title-pill { padding: 4px 18px; border-radius: 30px; background: rgba(10,14,36,0.86); box-shadow: 0 0 24px rgba(10,14,36,0.7); }
   #scores-bar { display: flex; gap: 10px; font-size: clamp(10px, 2.5vw, 13px); flex-wrap: wrap; justify-content: center; opacity: 0.9; }
-  .score-chip { padding: 3px 8px; border: 1px solid var(--primary); border-radius: 12px; background: rgba(10,14,36,0.55); }
+  .score-chip { padding: 3px 8px; border: 1px solid var(--primary); border-radius: 12px; background: rgba(10,14,36,0.82); }
   .score-chip.you { border-color: var(--secondary); color: var(--secondary); }
-  #table { position: relative; width: min(390px, 95vw); height: 210px;
+  /* Table scales with the viewport (desktop fills the available height, phones get ~95vw) */
+  #table { position: relative; width: min(95vw, 540px, calc((100dvh - 340px) * 13 / 7));
+    min-width: 280px; aspect-ratio: 13 / 7; height: auto;
     border-radius: 50% / 30%;
     background:
       radial-gradient(ellipse at 50% 45%, rgba(224,49,75,0.10), rgba(224,49,75,0) 60%),
@@ -40,21 +51,26 @@
     box-shadow: inset 0 0 40px rgba(0,0,0,0.55), 0 0 0 2px rgba(205,214,244,0.18),
       0 0 0 7px rgba(10,14,36,0.6), 0 0 28px rgba(205,214,244,0.12);
     display: flex; align-items: center; justify-content: center; }
-  .ai-area { position: absolute; display: flex; gap: -4px; align-items: center; }
-  #ai-top    { top: 0;    left: 50%; transform: translateX(-50%); }
-  #ai-left   { left: 0;  top: 50%;  transform: translateY(-50%); }
-  #ai-right  { right: 0; top: 50%;  transform: translateY(-50%); }
-  .ai-card { width: clamp(22px, 6vw, 30px); height: clamp(32px, 9vw, 42px);
+  /* opponents' hands: tightly overlapped card backs; side players are stacked vertically */
+  :root { --aiw: clamp(20px, 5vw, 28px); --aih: clamp(26px, 7vw, 40px); --aistep: 9px; }
+  .ai-area { position: absolute; display: flex; align-items: center; pointer-events: none; }
+  #ai-top    { top: 4px;  left: 50%; transform: translateX(-50%); }
+  #ai-left   { left: 8px;  top: 50%; transform: translateY(-50%); flex-direction: column; }
+  #ai-right  { right: 8px; top: 50%; transform: translateY(-50%); flex-direction: column; }
+  .ai-card { width: var(--aiw); height: var(--aih);
     border-radius: 4px; border: 1px solid rgba(205,214,244,0.5);
     background:
       repeating-linear-gradient(45deg, rgba(224,49,75,0.35) 0 4px, transparent 4px 8px),
       linear-gradient(160deg, #283372 0%, #1a2350 100%);
     background-color: #1c2658;
-    box-shadow: 1px 2px 4px rgba(0,0,0,0.4); margin-left: -4px; }
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.4); }
+  #ai-top .ai-card + .ai-card { margin-left: calc(var(--aistep) - var(--aiw)); }
+  #ai-left .ai-card, #ai-right .ai-card { width: var(--aih); height: var(--aiw); }
+  #ai-left .ai-card + .ai-card, #ai-right .ai-card + .ai-card { margin-top: calc(var(--aistep) - var(--aiw)); }
   #trick-area { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-    gap: 4px; width: 100px; }
-  .trick-slot { width: 44px; height: 62px; border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); }
+    display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+    gap: 4px; }
+  .trick-slot { width: clamp(36px, 10vw, 44px); height: clamp(50px, 14vw, 62px); border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); }
   .card {
     width: clamp(40px, 11vw, 52px); height: clamp(56px, 16vw, 74px);
     background: linear-gradient(160deg, #ffffff 0%, #eef1fb 100%);
@@ -65,7 +81,17 @@
     box-shadow: 1px 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
     transition: transform 0.12s, box-shadow 0.12s;
   }
-  #player-hand .card:hover { transform: translateY(-6px); box-shadow: 0 8px 16px rgba(0,0,0,0.45); }
+  #player-hand .card:not(.unplayable):hover { transform: translateY(-6px); box-shadow: 0 8px 16px rgba(0,0,0,0.45); }
+  #player-hand .card:not(.unplayable):active { transform: translateY(-2px) scale(0.97); }
+  /* cards landing on the table pop in; the trick winner's pile flashes */
+  @keyframes cardIn { from { transform: translateY(-14px) scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
+  .trick-slot .card { animation: cardIn 0.18s ease-out; }
+  @keyframes takeFlash { 0% { box-shadow: 0 0 0 0 rgba(224,49,75,0.0); } 30% { box-shadow: 0 0 0 6px rgba(224,49,75,0.55); } 100% { box-shadow: 0 0 0 0 rgba(224,49,75,0); } }
+  .trick-slot.won { animation: takeFlash 0.7s ease-out; border-color: rgba(224,49,75,0.6); }
+  @keyframes msgPop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  #msg.pop { animation: msgPop 0.35s ease-out; }
+  @keyframes chipPulse { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .score-chip.bump { animation: chipPulse 0.45s ease-out; }
   .card.red { color: #d11f3a; }
   .card.sel { transform: translateY(-10px); box-shadow: 0 6px 14px var(--secondary);
     outline: 2px solid var(--secondary); outline-offset: 2px; }
@@ -76,26 +102,28 @@
   #msg { font-size: clamp(12px, 3.5vw, 15px); font-weight: 600; color: var(--secondary);
     min-height: 22px; text-align: center; }
   #action-area { display: flex; gap: 8px; }
-  .act-btn { padding: 10px 20px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
+  .act-btn { padding: 10px 20px; min-height: 48px; min-width: 120px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
     border: 2px solid var(--primary); background: rgba(10,14,36,0.55); color: var(--primary);
-    cursor: pointer; border-radius: 6px; user-select: none; }
+    cursor: pointer; border-radius: 6px; user-select: none; transition: background 0.12s, color 0.12s, transform 0.12s; }
   .act-btn:disabled { opacity: 0.3; cursor: default; }
-  .act-btn:active:not(:disabled) { background: var(--primary); color: var(--bg); }
+  .act-btn:hover:not(:disabled) { background: rgba(205,214,244,0.18); }
+  .act-btn:active:not(:disabled) { background: var(--primary); color: var(--bg); transform: translateY(1px); }
   /* help button */
   #help-btn { position: fixed; top: 10px; right: 12px; z-index: 30;
-    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
     border: 1px solid rgba(205,214,244,0.6); background: rgba(10,14,36,0.55); color: var(--primary);
     font-size: 16px; font-weight: 800; line-height: 1; }
   #help-btn:active { background: var(--primary); color: var(--bg); }
 
   /* intro / lore page — translucent so the moon scene shows behind it */
   #intro { position: fixed; inset: 0; z-index: 25; display: flex;
-    align-items: center; justify-content: center; padding: 18px 12px;
+    align-items: center; justify-content: center; padding: 18px 12px; overscroll-behavior: contain;
     background: radial-gradient(ellipse at 50% 12%, rgba(10,14,36,0.35), rgba(5,7,20,0.78) 75%);
     -webkit-backdrop-filter: blur(1.5px); backdrop-filter: blur(1.5px);
     overflow-y: auto; }
   #intro.hidden { display: none; }
-  .lore-panel { width: min(560px, 95vw); max-height: 92vh; overflow-y: auto;
+  /* the lore panel is the one element allowed to scroll on touch */
+  .lore-panel { width: min(560px, 95vw); max-height: 92dvh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
     background: linear-gradient(160deg, rgba(20,28,66,0.62), rgba(10,14,36,0.72));
     border: 1px solid rgba(224,49,75,0.45); border-radius: 14px;
     box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 30px rgba(205,214,244,0.05);
@@ -119,7 +147,11 @@
   .hunter { flex: 1 1 150px; background: rgba(10,14,36,0.5); border: 1px solid rgba(205,214,244,0.18);
     border-radius: 8px; padding: 8px 10px; }
   .hunter b { color: var(--primary); }
-  .begin-row { text-align: center; margin-top: 22px; }
+  /* Begin button stays pinned to the bottom of the panel so it is always visible without scrolling */
+  .begin-row { text-align: center; position: sticky; bottom: 0; margin: 14px -22px -26px;
+    padding: 14px 22px calc(18px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(12,17,44,0.98) 65%, rgba(12,17,44,0)); }
+  body:has(#intro:not(.hidden)) #help-btn { display: none; }
   #begin-btn { padding: 13px 34px; font-size: clamp(14px, 3.8vw, 17px); font-weight: 800; letter-spacing: 2px;
     color: var(--bg); border: none; border-radius: 8px; cursor: pointer;
     background: linear-gradient(160deg, #fff, #cdd6f4 60%, #9aa6c8);
@@ -131,8 +163,13 @@
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; }
   #overlay h2 { color: var(--secondary); font-size: clamp(20px, 5vw, 32px); margin: 0 0 8px; }
   #overlay p { color: var(--primary); margin: 3px 0; font-size: clamp(12px, 3vw, 14px); }
-  #overlay button { margin-top: 16px; padding: 10px 26px; font-size: clamp(13px, 3.5vw, 15px);
-    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #overlay .final-score { font-size: clamp(20px, 5.5vw, 30px); font-weight: 800; color: #fff; margin: 10px 0 2px; letter-spacing: 1px; }
+  #overlay .final-score small { display: block; font-size: clamp(11px, 2.8vw, 13px); font-weight: 500; opacity: 0.7; letter-spacing: 1px; }
+  #overlay button { margin-top: 16px; padding: 12px 28px; min-height: 52px; min-width: 160px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 6px; letter-spacing: 1px;
+    transition: transform 0.12s, filter 0.12s; }
+  #overlay button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  #overlay button:active { transform: translateY(1px); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #intro {
@@ -155,7 +192,7 @@
   #begin-btn {
     font-family: 'Cinzel', serif; font-weight: 900;
     letter-spacing: 3px; text-transform: uppercase;
-    padding: 15px 44px; border-radius: 40px;
+    padding: 15px clamp(22px, 7vw, 44px); border-radius: 40px; white-space: nowrap;
     box-shadow: 0 12px 44px rgba(0,0,0,0.5), 0 0 26px rgba(205,214,244,0.35);
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
@@ -164,7 +201,8 @@
 </head>
 <body>
 <div id="sky">
-  <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <!-- 16:9 scene, bottom-anchored: on every phone/tablet/desktop size it covers the viewport without extending below it -->
+  <svg viewBox="0 0 800 450" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <radialGradient id="skyGrad" cx="50%" cy="18%" r="85%">
         <stop offset="0%" stop-color="#1b2456"/>
@@ -197,14 +235,14 @@
       </linearGradient>
     </defs>
 
-    <rect width="800" height="600" fill="url(#skyGrad)"/>
-    <rect width="800" height="600" fill="url(#bloodGlow)"/>
+    <rect width="800" height="450" fill="url(#skyGrad)"/>
+    <rect width="800" height="450" fill="url(#bloodGlow)"/>
 
     <!-- stars -->
     <g id="stars" fill="#ffffff"></g>
 
     <!-- moon + halo -->
-    <g transform="translate(400,150)">
+    <g transform="translate(400,135)">
       <circle class="halo" r="160" fill="url(#haloGrad)"/>
       <circle r="92" fill="url(#moonGrad)"/>
       <!-- shaded limb -->
@@ -220,20 +258,20 @@
 
     <!-- drifting cloud wisps -->
     <g opacity="0.5" fill="#171f4d">
-      <ellipse class="cloud" cx="250" cy="210" rx="150" ry="22" filter="url(#soft)"/>
-      <ellipse class="cloud slow" cx="560" cy="120" rx="120" ry="16" filter="url(#soft)"/>
-      <ellipse class="cloud" cx="430" cy="250" rx="170" ry="20" filter="url(#soft)"/>
+      <ellipse class="cloud" cx="250" cy="190" rx="150" ry="22" filter="url(#soft)"/>
+      <ellipse class="cloud slow" cx="560" cy="100" rx="120" ry="16" filter="url(#soft)"/>
+      <ellipse class="cloud" cx="430" cy="225" rx="170" ry="20" filter="url(#soft)"/>
     </g>
 
     <!-- mountain ridge silhouette -->
-    <path d="M0,520 L90,430 L170,500 L260,400 L360,500 L470,410 L560,500 L660,440 L760,510 L800,470 L800,600 L0,600 Z"
+    <path d="M0,390 L90,322 L170,375 L260,300 L360,375 L470,308 L560,375 L660,330 L760,383 L800,353 L800,450 L0,450 Z"
           fill="url(#ridge)"/>
-    <path d="M0,560 L120,500 L240,560 L380,490 L520,560 L660,500 L800,555 L800,600 L0,600 Z"
+    <path d="M0,420 L120,375 L240,420 L380,368 L520,420 L660,375 L800,416 L800,450 L0,450 Z"
           fill="#04061380" opacity="0.9"/>
   </svg>
 </div>
 <div id="wrap">
-  <h1>MOONSLAYER</h1>
+  <div class="title-pill"><h1>MOONSLAYER</h1></div>
   <div id="scores-bar">
     <span class="score-chip you" id="s0">You: 0</span>
     <span class="score-chip" id="s1">Diana: 0</span>
@@ -256,12 +294,13 @@
   <div id="action-area">
     <button class="act-btn" id="pass-btn" style="display:none">Pass 3 cards →</button>
   </div>
+  <div id="touch-hint">Tap a card to select or play it</div>
 </div>
 <button id="help-btn" title="Story &amp; rules">?</button>
 
 <div id="intro">
   <div class="lore-panel">
-    <img src="logos/moonslayer.png" alt="Moonslayer" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <img src="logos/moonslayer.png" alt="Moonslayer" style="display:block;width:min(82%,400px);max-height:min(40dvh,180px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
     <p class="tagline">Take the fewest souls. Or take them all.</p>
 
     <div class="story">
@@ -270,7 +309,7 @@
 
     <h3>How to Play</h3>
     <ul>
-      <li>Pass <b>3 cards</b> to a neighbor, then follow the led suit if you can.</li>
+      <li><b>Tap or click a card</b> to select it. Pass <b>3 cards</b> to a neighbor, then follow the led suit if you can.</li>
       <li>Highest card of the led suit wins the trick.</li>
       <li><span class="moon-key">Each ♥ = 1 point. Q♠ = 13.</span> Points are bad — <b>low score wins.</b></li>
       <li><b>Slay the Moon:</b> take all 13 hearts + Q♠ and everyone else eats 26 instead.</li>
@@ -287,6 +326,7 @@
   <h2 id="overTitle">Game Over</h2>
   <p id="overMsg"></p>
   <p id="overScores"></p>
+  <div class="final-score" id="overFinal">Score: 0<small>100 minus the points you took</small></div>
   <button id="restart">Play again</button>
 </div>
 <script>
@@ -297,7 +337,7 @@
     const NS = 'http://www.w3.org/2000/svg';
     for (let i = 0; i < 90; i++) {
       const c = document.createElementNS(NS, 'circle');
-      const x = Math.random()*800, y = Math.random()*360;
+      const x = Math.random()*800, y = Math.random()*270;
       c.setAttribute('cx', x.toFixed(1));
       c.setAttribute('cy', y.toFixed(1));
       c.setAttribute('r', (Math.random()*1.4 + 0.4).toFixed(2));
@@ -313,6 +353,17 @@
   const msgEl     = document.getElementById('msg');
   const handEl    = document.getElementById('player-hand');
   const passBtn   = document.getElementById('pass-btn');
+  const overFinal = document.getElementById('overFinal');
+
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+  // Leaderboard score (higher is better): 100 minus the points you took, floored at 0.
+  const leaderboardScore = () => Math.max(0, GAME_OVER_SCORE - totalScores[0]);
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'You';
@@ -486,6 +537,9 @@
     trickLeader = winner;
     trickCards = [null,null,null,null];
     msgEl.textContent = nameOf(winner) + ' takes the trick' + (pts>0?` (+${pts})`:'') + '.';
+    flash(msgEl, 'pop');
+    flash(document.getElementById('trick-'+winner), 'won');
+    if (pts > 0) flash(document.getElementById('s'+winner), 'bump');
     if (hands[0].length === 0) {
       finishRound();
     } else {
@@ -513,12 +567,21 @@
     const min = Math.min(...totalScores);
     const winner = totalScores.findIndex(s=>s===min);
     const youWon = winner === 0;
-    // higher is better for the leaderboard: how far under the limit you finished
-    window.parent.postMessage({ highScore: Math.max(0, GAME_OVER_SCORE - totalScores[0]) }, '*');
+    // Leaderboard score = 100 minus the points you took (higher is better). Shown and posted as the same integer.
+    const score = leaderboardScore();
+    postHi(score);
     overTitle.textContent = youWon ? 'You win!' : nameOf(winner) + ' wins!';
     overMsg.textContent = youWon ? WIN_MSG : LOSE_MSG;
-    overScores.textContent = NAMES.map((n,i)=>n+': '+totalScores[i]).join('  ·  ');
+    overScores.textContent = 'Points taken: ' + NAMES.map((n,i)=>n+' '+totalScores[i]).join('  ·  ');
+    overFinal.innerHTML = 'Score: ' + score.toLocaleString() + '<small>100 minus the points you took</small>';
     overlay.style.display = 'flex';
+  }
+
+  // restart a CSS animation class on an element
+  function flash(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
   }
 
   function updateScoreChips() {
@@ -579,6 +642,7 @@
   }
 
   passBtn.addEventListener('click', doPass);
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
   const intro = document.getElementById('intro');
   document.getElementById('begin-btn').addEventListener('click', () => intro.classList.add('hidden'));
