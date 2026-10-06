@@ -25,15 +25,14 @@
     --accent:#c0291f;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{touch-action:manipulation;margin:0;height:100%;}
+  html,body{touch-action:none;margin:0;height:100%;overflow:hidden;overscroll-behavior:none;}
   body{
     background:radial-gradient(circle at 50% 0%, var(--bg2), var(--bg));
     color:var(--ink);
     font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
-    min-height:100%;
-    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-    padding:14px 10px 30px;
-    user-select:none;-webkit-user-select:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   }
   h1{
     font-size:clamp(28px,8vw,48px);
@@ -56,7 +55,8 @@
     display:grid;
     grid-template-columns:repeat(10, 1fr);
     grid-template-rows:repeat(10, 1fr);
-    width:min(330px, 92vw);
+    /* scales with the viewport on desktop: two boards side by side, filling the available height */
+    width:min(40vw, calc(100dvh - 300px), 420px);
     aspect-ratio:1/1;
     gap:2px;
     background:var(--line);
@@ -80,6 +80,15 @@
   .cell svg{width:64%;height:64%;display:block;pointer-events:none;}
   .enemy .cell{cursor:crosshair;}
   .enemy .cell:not(.hit):not(.miss):not(.sunk):hover{background:var(--water-hover);}
+  body.touch .enemy .cell:hover{background:var(--water);}   /* no sticky hover on touch */
+  .enemy .cell{cursor:pointer;}
+  @keyframes pop{0%{transform:scale(.3);opacity:.3}60%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
+  .cell.pop svg{animation:pop .28s ease-out;}
+  @keyframes flash{0%{box-shadow:inset 0 0 0 40px rgba(244,239,230,.85)}100%{box-shadow:inset 0 0 0 0 rgba(244,239,230,0)}}
+  .cell.pop.hit,.cell.pop.sunk{animation:flash .35s ease-out;}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,1px)}80%{transform:translate(3px,-1px)}}
+  .grid.shake{animation:shake .32s ease-out;}
+  .grid{box-shadow:0 10px 30px rgba(0,0,0,.5);}
   .cell.ship{background:var(--brown);box-shadow:inset 0 0 0 1px var(--brown-dk);}
   .cell.hit{background:var(--red);}
   .cell.miss{background:var(--water-miss);}
@@ -92,23 +101,58 @@
     padding:11px 18px;min-height:48px;cursor:pointer;
     user-select:none;-webkit-touch-callout:none;
   }
-  .btn:active,.btn.held{background:var(--primary);color:var(--bg);}
+  .btn{min-height:52px;transition:filter .12s, transform .1s;}
+  .btn:hover{filter:brightness(1.18);}
+  .btn:active,.btn.held{background:var(--primary);color:var(--bg);transform:scale(.96);}
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
   .btn.primary:active{background:#e0503f;}
-  .fleet{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;max-width:380px;}
+  .fleet{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;max-width:560px;}
   .ship-chip{font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);color:rgba(234,246,248,.8);letter-spacing:.5px;}
   .ship-chip.dead{text-decoration:line-through;color:var(--accent);border-color:var(--accent);}
   .overlay{
-    position:absolute;inset:0;min-height:100%;
+    position:fixed;inset:0;
     background:rgba(6,22,27,.93);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:24px;z-index:10;border-radius:10px;
+    text-align:center;padding:16px;z-index:10;
+    overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   }
+  .overlay .controls{margin:8px 0 4px;}
+  @media (min-width: 700px) and (pointer: coarse){ .btn{min-height:60px;padding:14px 26px;} }
+  @media (orientation: landscape) and (max-height: 500px){ h1{font-size:22px;margin:0;} .tag{display:none;} #status{margin:2px 0;} .grid{width:min(40vw, calc(100dvh - 170px));} .fleet{margin-top:4px;} .controls{margin:6px 0 0;} }
   .overlay h1{margin-bottom:4px;}
   .overlay p{max-width:440px;font-size:clamp(14px,4vw,17px);line-height:1.55;color:var(--ink);}
   .overlay .big{font-size:clamp(24px,7vw,36px);color:var(--primary);font-weight:800;margin:6px 0;}
   .best{color:var(--primary);font-weight:bold;margin-top:2px;font-size:13px;}
-  .wrap{position:relative;z-index:1;width:100%;max-width:760px;display:flex;flex-direction:column;align-items:center;min-height:440px;}
+  .wrap{position:relative;z-index:1;width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;}
+  #enemyFleet h3{display:none;}
+  /* ── Phone layout: enemy board big, own fleet as a mini-map beside the enemy-ship chips; everything fits 100dvh ── */
+  @media (max-width: 700px){
+    body{padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
+    .tag{display:none;}
+    h1{font-size:26px;margin:0;letter-spacing:2px;}
+    #status{font-size:clamp(12px,3.6vw,14px);margin:4px 0;min-height:1.3em;}
+    .wrap{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:4px;justify-items:center;align-items:center;
+      grid-template-areas:"h1 h1" "status status" "enemy enemy" "own fleet" "setup setup" "battle battle";}
+    .boards{display:contents;}
+    h1{grid-area:h1;} #status{grid-area:status;}
+    .panel.enemy-panel{grid-area:enemy;} .panel.own-panel{grid-area:own;}
+    #enemyFleet{grid-area:fleet;justify-self:start;margin:0;gap:5px;justify-content:flex-start;max-width:none;}
+    #enemyFleet h3{display:block;width:100%;margin:0 0 2px;font-size:11px;color:var(--primary);letter-spacing:1.5px;}
+    .ship-chip{font-size:10px;padding:3px 7px;}
+    #setupControls{grid-area:setup;} #battleControls{grid-area:battle;}
+    .controls{margin:6px 0 0;}
+    .grid.enemy{width:min(92vw, calc(100dvh - 300px));}
+    .grid.own{width:112px;gap:1px;padding:1px;border-width:1px;}
+    .grid.own .cell svg{width:80%;height:80%;}
+    .panel h2{font-size:11px;margin-bottom:2px;}
+    .panel small{margin-top:1px;height:12px;font-size:10px;}
+    #ownHint{display:none;}
+  }
+  @media (max-height: 700px){
+    .overlay img{max-height:24vh !important;margin-bottom:6px !important;}
+    .overlay p{margin:6px 0;line-height:1.4;}
+    #startOverlay h1{font-size:clamp(34px,10vw,60px);}
+  }
   #bgart{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;z-index:0;pointer-events:none;opacity:.18;}
   #bgart svg{width:min(720px,96vw);height:auto;display:block;}
 
@@ -130,7 +174,7 @@
   }
   #playBtn {
     font-family: 'Pirata One', cursive;
-    margin-top: 8px; padding: 14px 48px;
+    margin-top: 4px; padding: 14px 48px;
     font-size: clamp(16px,4.5vw,24px); letter-spacing: 1.5px;
     border: none; border-radius: 40px; cursor: pointer;
     color: #fff; background: var(--accent, #c0291f);
@@ -201,19 +245,19 @@
   <div id="status">Plot yer cannon fire, captain.</div>
 
   <div class="boards">
-    <div class="panel">
+    <div class="panel enemy-panel">
       <h2>ENEMY WATERS</h2>
       <div class="grid enemy" id="enemyGrid"></div>
       <small id="enemyHint">Tap to fire</small>
     </div>
-    <div class="panel">
+    <div class="panel own-panel">
       <h2>YER FLEET</h2>
       <div class="grid own" id="ownGrid"></div>
       <small id="ownHint"></small>
     </div>
   </div>
 
-  <div class="fleet" id="enemyFleet"></div>
+  <div class="fleet" id="enemyFleet"><h3>ENEMY SHIPS</h3></div>
 
   <div class="controls" id="setupControls">
     <button class="btn" id="reroll">Re-roll fleet</button>
@@ -269,8 +313,19 @@
 
   function getBest(){ try{ return parseInt(localStorage.getItem('yarrmada_best')||'0',10)||0; }catch(e){ return 0; } }
   function setBest(v){ try{ localStorage.setItem('yarrmada_best', String(v)); }catch(e){} }
-  let _hi = 0;
-  function postHi(score){ const n = Math.round(Number(score)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+  // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+
+  document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.grid')) e.preventDefault(); });
 
   function makeBoard(){
     return {
@@ -353,7 +408,7 @@
 
   function renderFleet(){
     const wrap=document.getElementById('enemyFleet');
-    wrap.innerHTML='';
+    wrap.innerHTML='<h3>ENEMY SHIPS</h3>';
     enemy.ships.forEach(s=>{
       const chip=document.createElement('span');
       const dead=s.hits.size===s.size;
@@ -368,16 +423,19 @@
     if(enemy.shotsAt[r][c]) return;
     enemy.shotsAt[r][c]=true;
     playerShots++;
+    updateShots();
     const ship=enemy.occupied[r][c];
     if(ship){
       ship.hits.add(r+','+c);
       const sunk=ship.hits.size===ship.size;
       setStatus(sunk?('Ye sank their '+ship.name+'!'):'Direct hit!');
       renderEnemy(); renderFleet();
+      cellAt(enemyGrid,r,c).classList.add('pop');
       if(enemy.ships.every(s=>s.hits.size===s.size)){ endGame(true); return; }
     } else {
       setStatus('Splash! Ye missed.');
       renderEnemy();
+      cellAt(enemyGrid,r,c).classList.add('pop');
     }
     busy=true;
     setTimeout(aiTurn, 600);
@@ -453,15 +511,19 @@
         refineToLine();
       }
       renderOwn();
+      cellAt(ownGrid,r,c).classList.add('pop');
+      ownGrid.classList.remove('shake'); void ownGrid.offsetWidth; ownGrid.classList.add('shake');
       if(player.ships.every(s=>s.hits.size===s.size)){ endGame(false); return; }
     } else {
       setStatus('Their shot splashes harmlessly. Yer turn.');
       renderOwn();
+      cellAt(ownGrid,r,c).classList.add('pop');
     }
     busy=false;
   }
 
   function setStatus(t){ statusEl.textContent=t; }
+  function updateShots(){ document.getElementById('enemyHint').textContent='Tap a square to fire · Shots: '+playerShots; }
 
   function newSetup(){
     player=makeBoard(); enemy=makeBoard();
@@ -482,7 +544,7 @@
     phase='battle';
     document.getElementById('setupControls').style.display='none';
     document.getElementById('battleControls').style.display='flex';
-    document.getElementById('enemyHint').textContent='Tap to fire';
+    updateShots();
     document.getElementById('ownHint').textContent='Yer waters';
     setStatus('Fire when ready, captain!');
   }
@@ -490,26 +552,20 @@
   function endGame(won){
     phase='over'; busy=false;
     renderEnemy(); renderOwn();
-    let score=0;
-    if(won){
-      // Efficiency score: rewards fewer shots continuously (no flat win value).
-      // posted = round(SCORE_SCALE * totalShipCells / shots). A perfect game (every shot a
-      // hit, shots == cells) ≈ 1000; each wasted shot drops it smoothly. Fewer shots = much higher.
-      const SCORE_SCALE = 1000;
-      const shipCells = SHIPS.reduce((s, sh) => s + sh.size, 0);  // 17 cells across 5 ships
-      score = Math.round(SCORE_SCALE * shipCells / Math.max(playerShots, shipCells));
-      if(score>getBest()){ setBest(score); }
-      postHi(score);
-    } else {
-      const enemyCells = enemy.ships.reduce((s, sh) => s + sh.size, 0) || 1;
-      const enemyHits  = enemy.ships.reduce((s, sh) => s + sh.hits.size, 0);
-      postHi(Math.round(enemyHits / enemyCells * 700)); // progress toward sinking their fleet
-    }
+    // Score (shown and posted as the same integer):
+    //   Win:  Score = 117 - shots fired. Every shot not wasted is a point; a perfect 17-shot game
+    //         (one hit per ship cell) scores 100, the sloppiest possible win (100 shots) scores 17.
+    //   Loss: Score = enemy ship cells hit (0..16), so any win always outranks any loss.
+    const shipCells = SHIPS.reduce((s, sh) => s + sh.size, 0);   // 17
+    const enemyHits = enemy.ships.reduce((s, sh) => s + sh.hits.size, 0);
+    const score = won ? Math.max(0, 100 + shipCells - playerShots) : enemyHits;
+    if(score>getBest()){ setBest(score); }
+    postHi(score);
     document.getElementById('overTitle').textContent = won?'VICTORY!':'SUNK!';
     document.getElementById('overMsg').textContent = won
       ? ('Ye sent their whole fleet to Davy Jones in '+playerShots+' shots. The plunder be yers!')
-      : 'Yer fleet sleeps with the fishes. The sea be cruel, captain.';
-    document.getElementById('overScore').textContent = won?('Score: '+score):'';
+      : ('Yer fleet sleeps with the fishes after '+playerShots+' shots. Ye landed '+enemyHits+' of '+shipCells+' hits on theirs. The sea be cruel, captain.');
+    document.getElementById('overScore').textContent = 'Score: '+score;
     document.getElementById('overBest').textContent = 'Best: '+getBest();
     document.getElementById('overOverlay').style.display='flex';
   }
@@ -517,11 +573,11 @@
   document.getElementById('reroll').addEventListener('click', ()=>{ if(phase==='setup'){ placeFleet(player); renderOwn(); setStatus('New layout, fresh start.'); }});
   document.getElementById('setsail').addEventListener('click', ()=>{ if(phase==='setup') startBattle(); });
   document.getElementById('surrender').addEventListener('click', ()=>{ newSetup(); });
-  document.getElementById('playBtn').addEventListener('click', ()=>{ document.getElementById('startOverlay').style.display='none'; newSetup(); });
+  document.getElementById('playBtn').addEventListener('click', ()=>{ document.getElementById('startOverlay').style.display='none'; try{ window.focus(); }catch(e){} newSetup(); });
   document.getElementById('againBtn').addEventListener('click', ()=>{ document.getElementById('overOverlay').style.display='none'; newSetup(); });
 
   document.addEventListener('keydown',(e)=>{
-    if(e.key!=='Enter') return;
+    if(e.key!=='Enter' || e.repeat) return;
     if(document.getElementById('startOverlay').style.display!=='none'){ document.getElementById('playBtn').click(); }
     else if(document.getElementById('overOverlay').style.display==='flex'){ document.getElementById('againBtn').click(); }
     else if(phase==='setup'){ startBattle(); }

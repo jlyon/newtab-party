@@ -15,11 +15,24 @@
     --white: #FFFFFF;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; height: 100%; touch-action: none;
+  html, body { margin: 0; padding: 0; height: 100%; touch-action: none; overscroll-behavior: none;
     font-family: system-ui, -apple-system, sans-serif; color: var(--secondary);
     overflow: hidden; background: #0A3161; }
   #wrap { display: flex; flex-direction: column; align-items: center; height: 100%; gap: 7px;
-    padding: 8px 8px 10px; max-width: 540px; margin: 0 auto; }
+    padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); max-width: 540px; margin: 0 auto; }
+  /* Phones: keep tray drags starting >= 24px from the screen edge (browser back gesture). */
+  @media (max-width: 600px) { body.touch #wrap { padding-left: 24px; padding-right: 24px; } }
+  /* Wide screens (desktop, tablet landscape): tray beside the canvas so the park can use the full height. */
+  @media (min-width: 900px) and (orientation: landscape) {
+    #wrap { max-width: none; display: grid; grid-template-columns: auto 400px; grid-template-rows: auto auto auto auto;
+      column-gap: 24px; justify-content: center; align-content: center; align-items: start; }
+    h1, #hud, #hint { grid-column: 1 / -1; justify-self: center; }
+    #hud { max-width: 540px; }
+    canvas { grid-column: 1; grid-row: 3; }
+    #shop { grid-column: 2; grid-row: 3; max-width: 400px; }
+    .item { min-height: 64px; }
+    .item .nm { font-size: 12px; } .item .pr { font-size: 13px; } .item .ic { font-size: 24px; }
+  }
   h1 { margin: 0; font-size: clamp(16px, 4.6vw, 24px); color: var(--white);
     letter-spacing: 1px; text-align: center; }
   #hud { display: flex; gap: 8px; width: 100%; justify-content: center; }
@@ -29,15 +42,18 @@
   #cash .v { color: #1a7a36; }
   #crowd .v { color: var(--secondary); }
   #timer .v { color: var(--primary); }
-  canvas { width: min(94vw, 56vh, 460px); height: auto; display: block; border-radius: 12px;
-    border: 3px solid var(--secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.4); touch-action: none; }
-  #shop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; max-width: 480px; }
+  /* Square canvas: JS (fitLayout) sets the exact width so title + HUD + canvas + shop + hint fit in the viewport. */
+  canvas { width: min(94vw, calc(100dvh - 350px), 520px); height: auto; display: block; border-radius: 12px; cursor: pointer;
+    border: 3px solid var(--secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.4); touch-action: none; flex: none; }
+  #shop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; max-width: 480px; flex: none; }
   .item { background: var(--white); border: 2px solid var(--secondary); border-radius: 8px; padding: 3px 2px;
-    cursor: grab; user-select: none; -webkit-touch-callout: none; touch-action: none; text-align: center; min-height: 40px;
+    cursor: grab; user-select: none; -webkit-touch-callout: none; touch-action: none; text-align: center; min-height: 46px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; transition: all 0.1s; }
+  .item:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+  .item:active { transform: scale(0.97); }
   .item .ic { font-size: clamp(15px, 4.4vw, 21px); line-height: 1.05; }
-  .item .nm { font-size: 8.5px; font-weight: 700; line-height: 1; }
-  .item .pr { font-size: 9.5px; font-weight: 800; color: #1a7a36; }
+  .item .nm { font-size: clamp(8.5px, 2.4vw, 11px); font-weight: 700; line-height: 1; }
+  .item .pr { font-size: clamp(9.5px, 2.6vw, 12px); font-weight: 800; color: #1a7a36; }
   .item.sel { border-color: var(--primary); background: #fff3f4; box-shadow: 0 0 0 2px var(--primary) inset; }
   .item.broke { opacity: 0.4; }
   #hint { font-size: 12px; font-weight: 600; color: var(--white); opacity: 0.85; text-align: center; min-height: 15px; }
@@ -47,9 +63,12 @@
   .card h2 { color: var(--white); font-size: clamp(24px, 7vw, 40px); margin: 0 0 10px; letter-spacing: 1px; }
   .card p { color: #d7e6f5; font-size: clamp(13px, 3.6vw, 16px); line-height: 1.6; margin: 0 0 20px; }
   .card .big { color: #FFD166; font-size: clamp(30px, 10vw, 52px); font-weight: 800; margin: 4px 0 14px; }
-  .card button { padding: 13px 38px; font-size: 17px; font-weight: 800; letter-spacing: 1px;
-    background: var(--primary); color: var(--white); border: none; cursor: pointer; border-radius: 8px; font-family: inherit; }
+  .card button { padding: 13px 38px; min-height: 52px; font-size: 17px; font-weight: 800; letter-spacing: 1px;
+    background: var(--primary); color: var(--white); border: none; cursor: pointer; border-radius: 8px; font-family: inherit;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s, opacity 0.12s; }
   .card button:hover { opacity: 0.9; }
+  .card button:active { transform: scale(0.97); }
+  .card .score { color: #d7e6f5; font-size: clamp(13px, 3.6vw, 16px); font-weight: 700; margin: -6px 0 14px; }
   #endOverlay { display: none; }
   .item.dragging { opacity: 0.5; }
   #dragGhost { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 30; display: none;
@@ -116,6 +135,7 @@
   <div class="card">
     <h2 id="endTitle">Park's closed!</h2>
     <div class="big" id="endCash">$0</div>
+    <div class="score" id="endScore">Score: 0</div>
     <p id="endMsg"></p>
     <button id="restartBtn">Run it back</button>
   </div>
@@ -165,6 +185,41 @@
   const fmt = n => '$' + Math.floor(n).toLocaleString('en-US');
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  // Logical size W x H for all game math; the backing store is sized to CSS size x DPR
+  // and the context scaled to match, so rendering stays crisp at any size / DPR.
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = cv.getBoundingClientRect().width || W;
+    cv.width  = Math.max(1, Math.round(cssW * dpr));
+    cv.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  }
+  // Fit the square canvas into whatever height the title, HUD, shop and hint leave over (no page scroll).
+  const wideMQ = matchMedia('(min-width: 900px) and (orientation: landscape)');
+  function fitLayout() {
+    const cs = getComputedStyle(wrap);
+    const wide = wideMQ.matches;   // tray sits beside the canvas (see the CSS grid rule)
+    let used = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const gap = parseFloat(cs.rowGap) || 0;
+    const shop = document.getElementById('shop');
+    for (const el of wrap.children) if (el !== cv && !(wide && el === shop)) used += el.getBoundingClientRect().height;
+    used += gap * (wrap.children.length - (wide ? 2 : 1));
+    const availH = window.innerHeight - used;
+    const availW = wide ? window.innerWidth - 400 - 24 - 32 : wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const size = Math.max(140, Math.floor(Math.min(availW, availH, wide ? 720 : 520)));
+    cv.style.width = size + 'px';
+    fitCanvas();
+  }
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitLayout, 0); }, { once: true, passive: true });
+  // Back-swipe guard: a stray edge swipe stays on the page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => {
+    try { history.pushState(null, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+  addEventListener('resize', fitLayout);
+  addEventListener('orientationchange', () => setTimeout(fitLayout, 50));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLayout).catch(() => {});
   const shop = document.getElementById('shop');
   const cashV = document.querySelector('#cash .v');
   const crowdV = document.querySelector('#crowd .v');
@@ -188,11 +243,11 @@
     selected = TYPES[0].id;
     running = true; timeLeft = GAME_SECONDS;
     tourists = []; floats = []; spawnAcc = 0; t0 = 0;
-    lastT = performance.now();
+    lastT = 0;
     buildShop();
     endOverlay.style.display = 'none';
     renderHud();
-    requestAnimationFrame(loop);
+    fitLayout();
   }
 
   function buildShop() {
@@ -356,7 +411,13 @@
   function draw(now) {
     // sea
     const seaH = OCEAN_ROWS * TILE;
-    ctx.fillStyle = '#2E86C1'; ctx.fillRect(0, 0, W, seaH);
+    const sea = ctx.createLinearGradient(0, 0, 0, seaH);
+    sea.addColorStop(0, '#1f6fa8'); sea.addColorStop(1, '#3f9bd4');
+    ctx.fillStyle = sea; ctx.fillRect(0, 0, W, seaH);
+    // sun glint on the water
+    const glint = ctx.createRadialGradient(W * 0.78, seaH * 0.35, 4, W * 0.78, seaH * 0.35, seaH * 0.9);
+    glint.addColorStop(0, 'rgba(255,245,200,0.45)'); glint.addColorStop(1, 'rgba(255,245,200,0)');
+    ctx.fillStyle = glint; ctx.fillRect(0, 0, W, seaH);
     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
     for (let k = 0; k < 4; k++) {
       ctx.beginPath();
@@ -456,42 +517,52 @@
   function flashHint(msg) { hint.textContent = msg; clearTimeout(hintTimer);
     hintTimer = setTimeout(() => { hint.textContent = 'Tap the sand to build. Tap a ride to upgrade it.'; }, 2600); }
 
-  // Score normalization: final cash is large & continuous (can reach tens of thousands),
-  // so scale it down so a great run (~20k cash) ≈ 1000 and a weak run = low hundreds.
-  // posted = round(cash * SCORE_SCALE). On-screen $ readout is unaffected.
-  const SCORE_SCALE = 0.05;
-  function postHi(s) { window.parent.postMessage({ highScore: Math.floor(s) || 0 }, '*'); }
+  // Score = final cash in whole dollars (the $ readout on screen), posted as that integer.
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
   function endGame() {
     running = false;
-    const score = Math.round(cash * SCORE_SCALE);
+    const score = Math.floor(cash);
     if (score > hiScore) hiScore = score;
     if (cash > bestCash) bestCash = cash;
     postHi(score);
     document.getElementById('endCash').textContent = fmt(cash);
+    document.getElementById('endScore').textContent = 'Score: ' + score.toLocaleString('en-US');
     document.getElementById('endMsg').textContent =
       endLines[Math.floor(Math.random()*endLines.length)] + `  (Best: ${fmt(bestCash)})`;
     endOverlay.style.display = 'flex';
   }
 
+  // FRAME_INDEPENDENT_DT: every motion, spawn timer and animation is scaled by dt (clamped to 0.05 s),
+  // so the game runs at the same speed on 60 / 120 / 144 Hz displays. The loop starts once per page
+  // load and keeps rendering (idle waves) while not running; sim steps only while `running`.
   let hudAcc = 0;
   function loop(now) {
-    if (!running) return;
-    const dt = Math.min(0.05, (now - lastT) / 1000);
+    if (!lastT) lastT = now;
+    const dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
     lastT = now;
-    timeLeft -= dt;
-    // spawn pacing scales with how much draw the park has
-    const drawAmt = totalDraw();
-    if (drawAmt > 0) {
-      const interval = Math.max(0.03, 0.85 / (1 + drawAmt * 0.16));
-      spawnAcc += dt;
-      while (spawnAcc >= interval) { spawnAcc -= interval; spawnTourist(); }
+    if (running) {
+      timeLeft -= dt;
+      // spawn pacing scales with how much draw the park has
+      const drawAmt = totalDraw();
+      if (drawAmt > 0) {
+        const interval = Math.max(0.03, 0.85 / (1 + drawAmt * 0.16));
+        spawnAcc += dt;
+        while (spawnAcc >= interval) { spawnAcc -= interval; spawnTourist(); }
+      }
+      stepTourists(dt); stepFloats(dt);
+      hudAcc += dt; if (hudAcc >= 0.1) { renderHud(); renderShop(); hudAcc = 0; }
+      if (timeLeft <= 0) { timeLeft = 0; renderHud(); endGame(); }
     }
-    stepTourists(dt); stepFloats(dt);
     draw(now);
-    hudAcc += dt; if (hudAcc >= 0.1) { renderHud(); renderShop(); hudAcc = 0; }
-    if (timeLeft <= 0) { timeLeft = 0; renderHud(); draw(now); endGame(); return; }
     requestAnimationFrame(loop);
   }
+  requestAnimationFrame(loop);
 
   document.getElementById('startBtn').addEventListener('click', () => { startOverlay.style.display = 'none'; init(); });
   document.getElementById('restartBtn').addEventListener('click', init);
@@ -502,7 +573,9 @@
     }
   });
 
-  // initial idle frame on canvas behind start overlay
+  // Build the tray now so the layout (and the canvas size) is right before the first game starts.
+  buildShop();
+  fitLayout();
   draw(0);
 })();
 </script>

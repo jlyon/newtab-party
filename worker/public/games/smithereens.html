@@ -11,32 +11,47 @@
 <style>
   :root { --primary: #6B8E23; --secondary: #C3B091; --bg: #1a2410; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* play-area width: fill the viewport height; --aspect (W/H) is set from JS; touch layout reserves
+     room for the buttons. Vars live on body so body.touch can override. 100vw - 48px keeps a 24px
+     margin from the screen edges on phones so drags don't start in the back-swipe zone. */
+  body { --reserved: 60px; --aspect: 2; --cw: min(calc(100vw - 48px), 1100px, calc((100dvh - var(--reserved)) * var(--aspect))); }
+  body.touch { --reserved: 230px; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px;
+    padding-bottom: env(safe-area-inset-bottom); }
   h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
   canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
-    width: min(900px, 98vw); height: auto; display: block; }
-  #controls { display: flex; gap: 6px; align-items: center; width: min(600px, 98vw); flex-wrap: wrap; }
-  body:not(.touch) #controls { display: none; }
-  .ctrl-group { display: flex; gap: 5px; }
-  .btn { padding: 8px 12px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
-    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 6px;
-    user-select: none; -webkit-touch-callout: none; white-space: nowrap; }
-  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
-  #btn-fire { border-color: var(--secondary); color: var(--secondary); padding: 8px 20px; font-weight: 700; }
+    width: var(--cw); height: auto; display: block; }
+  #controls { display: none; flex-direction: column; gap: 8px; width: var(--cw); }
+  body.touch #controls { display: flex; }
+  .row { display: flex; gap: 6px; align-items: center; width: 100%; }
+  .btn { flex: 1; min-height: 52px; min-width: 48px; padding: 0 8px; font-size: clamp(12px, 3vw, 15px); border: 2px solid var(--primary);
+    background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; white-space: nowrap;
+    transition: transform 0.06s, background 0.06s; }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); transform: scale(0.96); }
+  #btn-fire { flex: 1.3; border-color: var(--secondary); color: var(--secondary); font-weight: 700; }
   #btn-fire:active, #btn-fire.held { background: var(--secondary); color: var(--bg); }
-  .wpn-btn { font-size: clamp(10px, 2.5vw, 12px); padding: 6px 8px; }
+  .wpn-btn { min-height: 48px; font-size: clamp(10px, 2.6vw, 13px); padding: 0 4px; }
   .wpn-btn.active { background: var(--secondary); color: var(--bg); border-color: var(--secondary); }
-  #power-bar-wrap { flex: 1; height: 16px; border: 2px solid var(--primary); border-radius: 4px; min-width: 60px; }
+  #power-bar-wrap { flex: 1.2; height: 20px; border: 2px solid var(--primary); border-radius: 4px; min-width: 50px; }
   #power-bar { height: 100%; width: 0%; background: var(--secondary); border-radius: 2px; transition: background 0.1s; }
+  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 13px); opacity: 0.7; text-align: center; margin-top: 2px; }
+  body.touch #touch-hint { display: block; }
+  @media (min-width: 700px) { .btn { min-height: 60px; font-size: 17px; } .wpn-btn { min-height: 54px; font-size: 15px; } }
   #overlay, #start-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; }
+    background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
+  #overScore { font-size: clamp(20px, 6vw, 32px) !important; font-weight: 800; color: #fff !important; margin: 10px 0 !important; }
   #start-overlay { display: flex; }
   #overlay h2, #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
   #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
   #overlay button, #start-overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; min-height: 48px;
+    transition: transform 0.12s, filter 0.12s; }
+  #overlay button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  #overlay button:active, #start-overlay button:active { transform: scale(0.97); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
@@ -56,7 +71,7 @@
   }
   #start-overlay button {
     font-family: 'Black Ops One', system-ui, sans-serif;
-    margin-top: 24px; padding: 15px 50px;
+    margin-top: 24px; padding: 15px clamp(22px, 8vw, 50px); white-space: nowrap;
     font-size: clamp(15px,4vw,20px); letter-spacing: 2px; text-transform: uppercase;
     border: none; border-radius: 6px; cursor: pointer;
     color: #10100f; background: var(--secondary, #C3B091);
@@ -71,34 +86,38 @@
   <h1>SMITHEREENS</h1>
   <canvas id="game" width="600" height="300"></canvas>
   <div id="controls">
-    <div class="ctrl-group">
-      <button class="btn" id="btn-left">← Angle</button>
-      <button class="btn" id="btn-right">Angle →</button>
+    <div class="row">
+      <button class="btn" id="btn-left">◀ Angle</button>
+      <button class="btn" id="btn-right">Angle ▶</button>
+      <div id="power-bar-wrap"><div id="power-bar"></div></div>
+      <button class="btn" id="btn-fire">⚡ FIRE</button>
     </div>
-    <button class="btn" id="btn-fire">⚡ FIRE</button>
-    <div id="power-bar-wrap"><div id="power-bar"></div></div>
-    <div class="ctrl-group" id="wpn-group"></div>
+    <div class="row" id="wpn-group"></div>
   </div>
+  <div id="touch-hint">Hold FIRE to charge, release to launch &middot; or drag on the field to aim and set power, release to fire</div>
 </div>
 <div id="start-overlay">
   <img src="logos/smithereens.png" alt="Smithereens" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
   <p>BRAVO vs TANGO — a backyard artillery duel.</p>
-  <p>← / → (or A/D) to aim &nbsp;·&nbsp; hold FIRE / Space to charge, release to launch &nbsp;·&nbsp; 1-4 to switch weapons. Blast TANGO to bits.</p>
+  <p>← / → (or A/D) to aim &nbsp;·&nbsp; hold Space (or FIRE) to charge, release to launch &nbsp;·&nbsp; 1-4 or the buttons to switch weapons. On touch you can also drag on the field to aim, release to fire. Blast TANGO to bits.</p>
+  <p style="opacity:0.8">Score: win = 400 + 4 per HP left + a bonus for fewer shots; lose = 4 per HP you knocked off TANGO.</p>
   <button id="start-btn">Play</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">Victory!</h2>
   <p id="overMsg"></p>
+  <p id="overScore">Score: 0</p>
   <button id="restart">Play again</button>
 </div>
 <script>
 (() => {
-  // SCORE_SCALE tuned so a strong win (~3 shots, high hp) lands near 1000.
-  // raw = 400 (win) + hp*4 (0..400) + shotBonus (fewer shots = more, ~0..250).
-  const SCORE_SCALE = 1;
-  let _hi = 0;
+  // Score (shown on the game-over screen and posted, same integer):
+  //   win  = 400 + hp*4 (0..400) + max(0, 250 - (shots-1)*35)   (fewer shots = more)
+  //   loss = 4 * damage dealt to TANGO (0..400)
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    n = Math.round(n) || 0;
+    n = Math.max(0, Math.round(Number(n) || 0));
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
@@ -113,11 +132,31 @@
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();
   const COL2 = css.getPropertyValue('--secondary').trim();
-  const SCALE = 2;
-  const W = 600, H = 300;
-  canvas.width = W * SCALE;
-  canvas.height = H * SCALE;
-  ctx.scale(SCALE, SCALE);
+  // Logical size. Portrait phones get a taller canvas (more sky; terrain, tanks and physics are
+  // identical, just lower on the canvas) so the battlefield isn't a thin strip.
+  const W = 600;
+  const H = (window.innerHeight > window.innerWidth) ? 420 : 300;
+  canvas.height = H;
+  document.documentElement.style.setProperty('--aspect', (W / H).toFixed(4));
+  // Crisp at any devicePixelRatio: backing store = CSS size x DPR, context scaled to logical W/H.
+  // The CSS aspect ratio is pinned so the displayed height never depends on the (rounded)
+  // backing-store size; otherwise a ResizeObserver refit loop can occur at DPR 1.
+  canvas.style.aspectRatio = W + ' / ' + H;
+  let _fitW = 0;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    const bw = Math.max(1, Math.round(cssW * dpr));
+    if (bw === _fitW) return;
+    _fitW = bw;
+    canvas.width  = bw;
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);
+
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'BRAVO';
@@ -159,6 +198,10 @@
     document.querySelectorAll('.wpn-btn').forEach((b, j) => b.classList.toggle('active', j === i));
   }
 
+  // Stray back-swipe guard: a horizontal swipe from the screen edge is the browser's back
+  // gesture; keep a history entry under us so it stays on the arcade page.
+  window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
   const held = { left: false, right: false, fire: false };
   function holdBtn(id, key) {
     const el = document.getElementById(id);
@@ -176,16 +219,55 @@
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
   const keys = {};
+  const startOverlay = document.getElementById('start-overlay');
   addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
+    if (e.key === 'Enter' && !e.repeat) {
+      if (startOverlay.style.display !== 'none') document.getElementById('start-btn').click();
+      else if (overlay.style.display !== 'none') document.getElementById('restart').click();
+      return;
+    }
     keys[e.key] = true;
-    if (e.key === ' ') e.preventDefault();
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
     if (e.key >= '1' && e.key <= '4') selectWeapon(parseInt(e.key) - 1);
   });
   addEventListener('keyup', e => {
     if (keys[e.key] && e.key === ' ') releaseFireBtn();
     keys[e.key] = false;
   });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  // Touch aim on the canvas: drag sets the angle (direction of the drag) and power (its length);
+  // release fires. Uses the same fire() as the buttons/keys.
+  let aimTouch = null;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (phase !== 'aim') return;
+    const t = e.changedTouches[0];
+    aimTouch = { id: t.identifier, sx: t.clientX, sy: t.clientY, dragging: false };
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    if (!aimTouch) return; e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== aimTouch.id) continue;
+      const k = W / canvas.getBoundingClientRect().width;
+      const dx = (t.clientX - aimTouch.sx) * k, dy = (t.clientY - aimTouch.sy) * k;
+      const d = Math.hypot(dx, dy);
+      if (d < 8) continue;
+      aimTouch.dragging = true;
+      angle = Math.max(5, Math.min(85, Math.atan2(-dy, Math.abs(dx)) * 180 / Math.PI));
+      power = Math.min(100, d / (W * 0.4) * 100); charging = true;
+    }
+  }, { passive: false });
+  const endAim = e => {
+    if (!aimTouch) return;
+    for (const t of e.changedTouches) {
+      if (t.identifier !== aimTouch.id) continue;
+      if (aimTouch.dragging) releaseFireBtn(); else { charging = false; power = 0; }
+      aimTouch = null;
+    }
+  };
+  canvas.addEventListener('touchend', endAim, { passive: true });
+  canvas.addEventListener('touchcancel', endAim, { passive: true });
 
   function releaseFireBtn() {
     if (phase === 'aim' && charging && power > 2) fire(player, angle, power);
@@ -213,13 +295,15 @@
   }
   function terrainY(x) { return terrain[Math.max(0, Math.min(N-1, Math.round(x)))]; }
 
+  let trail = [], pops = [], shake = 0;
   function reset() {
     makeTerrain();
     wind = (Math.random() * 2 - 1) * WIND_MAX;
     angle = 45; power = 0; charging = false; wpnIdx = 0; phase = 'aim';
     particles = []; explosions = []; aiThinkTimer = 0; playerShots = 0;
-    player = { x: 70,     y: 0, hp: 100, maxHp: 100, facing:  1 };
-    ai     = { x: W - 70, y: 0, hp: 100, maxHp: 100, facing: -1 };
+    trail = []; pops = []; shake = 0; aimTouch = null;
+    player = { x: 70,     y: 0, hp: 100, maxHp: 100, facing:  1, aimAngle: 45 };
+    ai     = { x: W - 70, y: 0, hp: 100, maxHp: 100, facing: -1, aimAngle: 45 };
     settleTanks();
     proj = null;
     selectWeapon(0);
@@ -231,10 +315,12 @@
     ai.y     = terrainY(ai.x) - TANK_H;
   }
 
-  function fire(tank, ang, pwr) {
+  function fire(tank, ang, pwr, wIdx) {
     // accept either 'aim' (player) or 'ai-think' (AI takes its shot)
     if (phase !== 'aim' && phase !== 'ai-think') return;
+    if (wIdx == null) wIdx = wpnIdx;
     if (tank === player) playerShots++;
+    tank.aimAngle = ang;
     const rad = ang * Math.PI / 180;
     const facing = tank === player ? 1 : -1;
     const spd = pwr * 0.12;
@@ -242,9 +328,11 @@
       x: tank.x + facing * TANK_W / 2, y: tank.y,
       vx: Math.cos(rad) * spd * facing,
       vy: -Math.sin(rad) * spd,
-      type: wpnIdx, bounces: WEAPONS[wpnIdx].bounces || 0,
+      type: wIdx, bounces: WEAPONS[wIdx].bounces || 0,
       owner: tank,
     };
+    trail = [];
+    addParticles(proj.x, proj.y, '#ffd27a', 5);
     phase = 'fire';
   }
 
@@ -263,8 +351,10 @@
         const dmg = Math.round(wpn.damage * (1 - d / (r + TANK_W + 10)));
         tank.hp = Math.max(0, tank.hp - dmg);
         addParticles(tank.x, tank.y, '#ff4400', 8);
+        if (dmg > 0) pops.push({ x: tank.x, y: tank.y - 28, text: '-' + dmg, life: 50 });
       }
     }
+    shake = Math.min(14, 4 + r * 0.3);
     decor = decor.filter(d => Math.hypot(d.x - ex, terrainY(d.x) - ey) > r * 0.9);
     addParticles(ex, ey, wpn.color, 18);
     explosions.push({ x: ex, y: ey, r: 0, maxR: r * 1.4, col: wpn.color });
@@ -288,17 +378,18 @@
     phase = 'gameover';
     overTitle.textContent = playerWon ? 'BRAVO wins!' : 'TANGO wins!';
     overMsg.textContent = playerWon ? WIN_MSG_P : WIN_MSG_AI;
-    // Continuous skill score (only on a win): base + hp remaining + speed/cleanliness bonus.
-    // Losing posts nothing (0). A flawless 1-shot win tops out ~1050; a sloppy win ~450.
+    let score;
     if (playerWon) {
-      const hpBonus = player.hp * 4;                       // 0..400
+      const hpBonus = player.hp * 4;                              // 0..400
       const shotBonus = Math.max(0, 250 - (playerShots - 1) * 35); // fewer shots = more
-      const raw = 400 + hpBonus + shotBonus;
-      postHi(raw * SCORE_SCALE);
+      score = 400 + hpBonus + shotBonus;
     } else {
-      const dmg = Math.max(0, ai.maxHp - ai.hp);  // 0..100 — how far you wore TANGO down
-      postHi(dmg * 4 * SCORE_SCALE);              // 0..400; a near-kill loss ≈ 400, an early loss low
+      const dmg = Math.max(0, ai.maxHp - ai.hp);  // 0..100: how far you wore TANGO down
+      score = dmg * 4;
     }
+    postHi(score);
+    document.getElementById('overScore').textContent = 'Score: ' + score.toLocaleString() +
+      (playerWon ? '  (' + player.hp + ' HP left, ' + playerShots + ' shot' + (playerShots === 1 ? '' : 's') + ')' : '');
     overlay.style.display = 'flex';
   }
 
@@ -308,12 +399,13 @@
     const dist = Math.hypot(dx, Math.abs(dy));
     const idealAngle = Math.atan2(Math.abs(dy) + dist * 0.2, Math.abs(dx)) * 180 / Math.PI;
     const jitter = (1 - AI_ACCURACY) * 30;
-    angle = Math.max(5, Math.min(85, idealAngle + (Math.random() - 0.5) * jitter));
+    // AI aim/weapon are local: they used to clobber the player's angle and weapon choice.
+    const aiAngle = Math.max(5, Math.min(85, idealAngle + (Math.random() - 0.5) * jitter));
     const idealPwr = Math.min(95, dist * 0.55 + 20);
     const gremlin = Math.random() < 0.18 ? (0.3 + Math.random() * 1.2) : (0.85 + Math.random() * 0.3);
     const pwr = idealPwr * gremlin;
-    wpnIdx = Math.random() < 0.5 ? Math.floor(Math.random() * WEAPONS.length) : 0;
-    fire(ai, angle, Math.min(100, pwr));
+    const aiWpn = Math.random() < 0.5 ? Math.floor(Math.random() * WEAPONS.length) : 0;
+    fire(ai, aiAngle, Math.min(100, pwr), aiWpn);
   }
 
   function step() {
@@ -321,11 +413,15 @@
       if (keys['ArrowLeft'] || keys['a'] || held.left)  angle = Math.max(5,  angle - 1.5);
       if (keys['ArrowRight'] || keys['d'] || held.right) angle = Math.min(85, angle + 1.5);
       if (keys[' '] || held.fire) { charging = true; power = Math.min(100, power + 1.4); }
-      powerBar.style.width = power + '%';
-      powerBar.style.background = power > 70 ? '#ff4400' : COL2;
+      player.aimAngle = angle;
     }
+    powerBar.style.width = (phase === 'aim' ? power : 0) + '%';
+    powerBar.style.background = power > 70 ? '#ff4400' : COL2;
+    for (const q of pops) { q.y -= 0.6; q.life--; } pops = pops.filter(q => q.life > 0);
+    if (shake > 0) shake--;
 
     if (phase === 'fire' && proj) {
+      trail.push({ x: proj.x, y: proj.y, life: 18 }); if (trail.length > 40) trail.shift();
       proj.x += proj.vx + wind; proj.y += proj.vy; proj.vy += GRAVITY;
       if (proj.y >= terrainY(proj.x)) {
         if (proj.bounces > 0) {
@@ -359,6 +455,7 @@
 
     for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life--; }
     particles = particles.filter(p => p.life > 0);
+    for (const t of trail) t.life--; trail = trail.filter(t => t.life > 0);
     for (const e of explosions) { e.r += (e.maxR - e.r) * 0.2; }
     explosions = explosions.filter(e => e.r < e.maxR * 0.98);
   }
@@ -367,7 +464,7 @@
     const tx = tank.x, ty = tank.y;
     ctx.fillStyle = col; ctx.fillRect(tx - TANK_W/2, ty, TANK_W, TANK_H);
     ctx.fillRect(tx - 6, ty - 8, 12, 8);
-    const ang = tank === player ? angle : (180 - angle);
+    const ang = tank === player ? angle : (180 - tank.aimAngle);
     const bRad = ang * Math.PI / 180;
     const facing = tank === player ? 1 : -1;
     ctx.strokeStyle = col; ctx.lineWidth = 4;
@@ -385,16 +482,22 @@
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     const grad = ctx.createLinearGradient(0, 0, 0, H * 0.7);
     grad.addColorStop(0, '#3b5a2b'); grad.addColorStop(0.5, '#7b8a55'); grad.addColorStop(1, '#c9b888');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = grad; ctx.fillRect(-20, -20, W + 40, H + 40);
+    // soft sun + haze
+    ctx.fillStyle = 'rgba(255,240,200,0.35)';
+    ctx.beginPath(); ctx.arc(W * 0.8, H * 0.12, 26, 0, Math.PI * 2); ctx.fill();
 
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     for (let x = 0; x < W; x += 14) ctx.fillRect(x, H * 0.45, 10, 18);
     ctx.fillRect(0, H * 0.45 + 16, W, 3);
 
-    ctx.fillStyle = COL1;
+    const ground = ctx.createLinearGradient(0, H * 0.3, 0, H);
+    ground.addColorStop(0, COL1); ground.addColorStop(1, '#2f4312');
+    ctx.fillStyle = ground;
     ctx.beginPath(); ctx.moveTo(0, H);
     for (let x = 0; x < N; x++) ctx.lineTo(x, terrain[x]);
     ctx.lineTo(N, H); ctx.closePath(); ctx.fill();
@@ -409,9 +512,9 @@
     }
     ctx.textAlign = 'left';
 
-    ctx.fillStyle = COL2; ctx.globalAlpha = 0.85; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = COL2; ctx.globalAlpha = 0.85; ctx.font = '11px system-ui'; ctx.textAlign = 'right';
     const windStr = wind > 0 ? '→' : '←';
-    ctx.fillText('Breeze ' + windStr + ' ' + Math.abs(wind * 1000).toFixed(0), W/2, 16);
+    ctx.fillText('Breeze ' + windStr + ' ' + Math.abs(wind * 1000).toFixed(0), W - 8, 16);
     ctx.globalAlpha = 1; ctx.textAlign = 'left';
 
     for (const e of explosions) {
@@ -427,7 +530,10 @@
     ctx.globalAlpha = 1;
 
     if (proj) {
-      ctx.fillStyle = WEAPONS[proj.type].color; ctx.shadowColor = WEAPONS[proj.type].color; ctx.shadowBlur = 10;
+      ctx.fillStyle = WEAPONS[proj.type].color;
+      for (const t of trail) { ctx.globalAlpha = (t.life / 18) * 0.5; ctx.beginPath(); ctx.arc(t.x, t.y, 2.5, 0, Math.PI*2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = WEAPONS[proj.type].color; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.arc(proj.x, proj.y, 4, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -435,17 +541,42 @@
     drawTank(player, COL1, PLAYER_NAME);
     drawTank(ai, COL2, AI_NAME);
 
+    // damage pops
+    ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    for (const q of pops) { ctx.globalAlpha = Math.min(1, q.life / 15); ctx.fillStyle = '#ff4400'; ctx.fillText(q.text, q.x, q.y); }
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+
+    // power meter next to the player while charging (visible on desktop too)
+    if (phase === 'aim' && charging) {
+      const bx = player.x - 20, by = player.y - 34;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(bx, by, 40, 6);
+      ctx.fillStyle = power > 70 ? '#ff4400' : COL2; ctx.fillRect(bx, by, 40 * power / 100, 6);
+    }
+
     if (phase === 'aim') {
       ctx.fillStyle = COL1; ctx.font = 'bold 12px system-ui';
-      ctx.fillText('Angle: ' + Math.round(angle) + '°  |  ' + WEAPONS[wpnIdx].name + '  |  keys 1-4 to switch', 8, 16);
+      ctx.fillText('Angle ' + Math.round(angle) + '°  ·  ' + WEAPONS[wpnIdx].name + (document.body.classList.contains('touch') ? '' : '  ·  1-4 to switch'), 8, 16);
     } else if (phase === 'ai-think' || (phase === 'fire' && proj?.owner === ai)) {
       ctx.fillStyle = COL2; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(AI_NAME + " is squinting at the sun...", W/2, 30);
       ctx.textAlign = 'left';
     }
+    ctx.restore();
   }
 
-  function loop() { step(); draw(); requestAnimationFrame(loop); }
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { step(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
   document.getElementById('restart').addEventListener('click', () => { reset(); grabFocus(); });
   document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('start-overlay').style.display = 'none';

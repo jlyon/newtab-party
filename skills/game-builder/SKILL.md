@@ -29,38 +29,7 @@ Keep replies short and punchy. One or two lines of reaction, then the next quest
 
 Ask these **in order**, one at a time. Don't batch them — the back-and-forth IS the fun. Use the AskUserQuestion tool when one is available; otherwise just ask in chat.
 
-**1. Game type.** Each time the skill runs, **randomly pick 5 game types from the full list below** and offer only those 5 — with a one-line tease each. Pick a different 5 every session so the menu stays surprising for repeat users. If the user names a specific game type that isn't in your current 5, go with it anyway.
-
-Full list of available game types:
-- Spaceship shooter — "fly, shoot, don't die"
-- Brick-breaker — "paddle, ball, bricks, vibes"
-- Choose-your-own-adventure — "text, choices, consequences, drama"
-- Card game: Memory match — "flip, match, look smart"
-- Dinosaur run — "jump, dodge, don't stop"
-- Beat-em-up — "walk right, punch everything"
-- Racing — "neon speed, rival cars, boost button"
-- Lemmings — "guide your little idiots to safety"
-- Snake — "eat, grow, don't eat yourself"
-- Ski — "dodge the trees, hit the gates, go fast"
-- Minesweeper — "click carefully. very carefully."
-- Pocket Tanks — "aim, charge, fire, watch the crater"
-- Blackjack — "beat the dealer without going bust"
-- Video Poker — "hold your best cards, pray for the rest"
-- Solitaire — "Klondike patience, one card at a time"
-- Hearts — "avoid the queen of spades at all costs"
-- Catcher — "dodge or catch what falls, move left and right"
-- Lumberjack — "tap to chop, switch sides, beat the clock"
-- Canyon shooter — "fly, dodge, blast your way through"
-- Beer pong — "aim, set power, sink the shots"
-- Penalty kicks — "pick your spot, time your shot, score"
-- Tycoon — "drag, build, upgrade, watch the money roll in"
-- Battleship — "hunt the grid, sink the fleet, fewer shots win"
-- Deal or No Deal — "open cases, dodge the banker, hold your nerve"
-- Match-3 — "swap, match three, chase the cascade"
-- Tower Defense — "place towers, hold the line, survive the waves"
-- Falling blocks — "rotate, drop, clear the line, don't top out"
-- Word Unscramble — "the letters are all there. mostly."
-- Maze Muncher — "gobble the dots, dodge the chasers"
+**1. Game type.** Each time the skill runs, **randomly pick 5 ideas from the genre notes below** (under "Genre notes") and offer them with a one-line tease each. Pick a different 5 every session so the menu stays surprising. The list is **inspiration, not a menu**: if the user names something else, or their answers suggest a mashup ("snake, but the snake is a conga line", "minesweeper on a battleship grid"), go with that and say so with enthusiasm. Propose a mashup yourself when the deep-dive makes one obvious.
 
 **2. Game name.** Just: "Name it. Whatever you want. I'm not your editor."
 
@@ -104,54 +73,51 @@ If the user goes off-script and just describes their game freeform, don't force 
 
 ## Build the game
 
-You have templates in `assets/templates/`:
+There are no per-genre templates anymore (they made every game look and feel the same). You **design the mechanic, the art, the HUD and the feel yourself** for this user, this theme, this joke. What you do get is one small engine scaffold with the boring parts already right:
 
-- `spaceship-shooter.html`
-- `brick-breaker.html`
-- `cyoa.html`
-- `card-game.html` (memory match)
-- `dinosaur-run.html`
-- `beat-em-up.html`
-- `racing.html`
-- `lemmings.html`
-- `snake.html`
-- `ski.html`
-- `minesweeper.html`
-- `pocket-tanks.html`
-- `blackjack.html`
-- `poker.html`
-- `solitaire.html`
-- `hearts.html`
-- `catcher.html`
-- `lumberjack.html`
-- `canyon-shooter.html`
-- `beer-pong.html`
-- `penalty-kicks.html`
-- `tycoon.html` (drag-to-build management)
-- `battleship.html` (grid-hunt naval combat)
-- `deal-or-no-deal.html` (case-opening / banker offers)
-- `match-3.html` (gem-swap, cascading clears)
-- `tower-defense.html` (place towers, survive waves)
-- `falling-block.html` (tetromino line-stacker)
-- `word-unscramble.html` (timed anagram solving)
-- `maze-muncher.html` (pac-style dot muncher)
+- `assets/scaffold.html` — viewport/touch CSS, DPR-crisp responsive canvas, keyboard + on-screen `holdBtn` controls (touch-only), fixed-step 60 Hz loop, `postHi`, title screen with Play and game-over overlay with Enter-to-restart. **No game logic.** Read it, copy it to the game file, replace the placeholders, then build the game inside the `GAME-SPECIFIC SECTION` (`reset`, `step`, `draw`, plus whatever input handlers the design needs). Keep the boilerplate intact; it's what passes the QA harness.
 
-Each is a complete, working single-file game. Pick the one that matches the user's choice, **read it**, then customize. Don't rewrite from scratch — these are tuned to work, and reinventing the game loop wastes the user's 10 minutes.
+For DOM/board games (cards, minesweeper, CYOA, word games, tycoon) the canvas parts of the scaffold don't apply: keep its CSS rules, focus/touch detection, `postHi`, overlays and Enter handling, and build the board in HTML. Scrolling content goes in a container with `overflow-y: auto; touch-action: pan-y` (the body is `touch-action: none`).
 
-### Placeholders to replace
+### Placeholders in the scaffold
 
-Every template uses these placeholders. Replace ALL instances:
+- `__GAME_NAME__` — the title (browser tab, title screen)
+- `__PRIMARY_COLOR__` / `__SECONDARY_COLOR__` / `__BACKGROUND_COLOR__` — the user's colors (third defaults to a sensible dark)
+- `__W__` / `__H__` — logical canvas size (pick for the game: portrait ~360x580 for steering/falling games, landscape ~640x400 for runners/shooters, square ~440x440 for grids)
+- `__HOW_TO_PLAY__` — one or two lines of instructions, phrased for keyboard **and** touch ("Tap / Space to jump")
 
-- `__GAME_NAME__` — the title (shown in browser tab and in-game)
-- `__PRIMARY_COLOR__` — first favorite color (CSS color: hex, name, or rgb)
-- `__SECONDARY_COLOR__` — second favorite color
-- `__BACKGROUND_COLOR__` — third color if provided, else a sensible dark color
-- `__PLAYER_NAME__` — the hero / player character name
-- `__ENEMY_NAME__` — what they're fighting or avoiding (where applicable)
+Rename the three default buttons (◀ ● ▶) to whatever the game needs, add or remove some, or delete the whole `#touch-controls` row for tap/drag games. **Escaping watch-out:** names and colors land inside JS strings; a single quote (`D'Artagnan`) needs backticks or escaping.
 
-The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block — that's where you customize the game's content based on the deep-dive answers. Don't be afraid to add silly flavor text, custom messages, or little jokes the user will recognize.
+### Genre notes — what makes each one fun (design cues, not code)
 
-**Escaping watch-out.** Placeholders appear inside JS strings. If the user's name or color contains a single quote (e.g., `D'Artagnan`), swap surrounding quotes to backticks or escape the inner quote.
+Use these to design the mechanic; invent your own art, HUD and twists. Combine freely.
+
+- **Spaceship / canyon shooter** — fly, shoot, don't die. Fun comes from bullet feel (muzzle flash, recoil), waves that escalate, and one twist (bouncing shots, a boss every 30 s).
+- **Brick-breaker** — paddle, ball, bricks. Fun: ball speed that creeps up, power-ups that fall, bricks that fight back. Drag-to-move on touch.
+- **Choose-your-own-adventure** — text, choices, consequences. Fun: a voice, 3–4 beats, multiple endings, hidden bonuses (clickable gems). Score = progress + secrets, shown on every ending.
+- **Memory match** — flip, match, look smart. Fun: a heckler, a timer that drains, a mean shuffle on a miss.
+- **Runner (dino run)** — jump, dodge, don't stop. Fun: speed ramp, double jump, obstacle variety, a death message with personality. Tap anywhere to jump.
+- **Beat-em-up** — walk right, punch everything. Fun: hit stop, knockback, enemies that approach from both sides, a combo counter.
+- **Racing** — pseudo-3D road, rivals, boost. Fun: curves that pull you off, overtaking, boost pads, off-road slowdown. Swipe/tilt plus hold-halves on touch.
+- **Lemmings** — guide little idiots to the exit with a few skills. Fun: planning under pressure, skills that run out.
+- **Snake** — eat, grow, don't eat yourself. Fun: speed-up, obstacles that accumulate, a themed "food". Swipe or D-pad on touch.
+- **Ski** — dodge trees, hit gates, go fast. Fun: ramps for air, gates for bonus, something chasing you. Drag/tilt steering, never long edge swipes.
+- **Minesweeper** — click carefully. Fun: a theme that makes the numbers funny, a timer, long-press to flag. Score = safe tiles revealed + speed bonus on a win.
+- **Artillery (pocket tanks)** — aim, charge, fire, watch the crater. Fun: wind, terrain deformation, a few distinct weapons, an AI with a personality.
+- **Blackjack / video poker / solitaire / hearts** — card tables. Fun: pacing, a dealer/opponent voice, a visible bankroll or trick count. Score is the number shown at the end (chips, points, headroom) — never scaled.
+- **Catcher** — move left/right, catch the good stuff, dodge the bad. Fun: item variety, combo multipliers, a reason to miss on purpose.
+- **Lumberjack** — tap to chop, switch sides, beat the stamina bar. Fun: branches labeled with in-jokes, the bar that drains faster.
+- **Beer pong / penalty kicks** — aim, set power, shoot. Fun: a wobble on the aim, an opponent that adapts, a crowd.
+- **Tycoon** — drag to build, watch money roll in. Fun: a timer, upgrades, placement that matters, the number going up.
+- **Battleship** — hunt the grid, fewer shots win. Fun: an AI that hunts smartly after a hit, ship names, a sinking animation.
+- **Deal or No Deal** — open cases, dodge the banker. Fun: the banker's voice, a tense offer screen, hold-your-nerve math.
+- **Match-3** — swap, match, cascade. Fun: cascades that feel earned, a move or time limit, special tiles.
+- **Tower defense** — place towers, survive waves. Fun: a path with choke points, tower synergies, waves that escalate.
+- **Falling blocks** — rotate, drop, clear lines. Fun: hold, ghost piece, a twist on gravity or shapes.
+- **Word unscramble** — the letters are all there, mostly. Fun: a theme, a timer, a payout that scales with word length.
+- **Maze muncher** — gobble dots, dodge chasers. Fun: power pellets, chasers with distinct behaviors, speed that creeps.
+- **Doodle-jump** — auto-bounce upward, you steer. Fun: platform types (icy, moving, breakable), power-ups, how far you fell.
+- **First-person sweep / 3D aisles** — raycast corridors, grab things from a list. Fun: hazards that cost time, a checklist that shrinks.
 
 ### Engineering rules
 
@@ -159,9 +125,9 @@ The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block
 - **Vanilla JS only.** No build step, no React, no npm, no `import`.
 - **Test it mentally before delivering.** Walk through the win condition, lose condition, and one full play loop. If it can't be played, fix it.
 - **Keep it small.** A 200–500 line game is great. A 2000-line game is a way to miss the 10-minute target.
-- **Enter key.** All templates handle Enter to confirm the game-over overlay / restart. Keep it.
-- **High score postMessage.** Every game calls `window.parent.postMessage({ highScore: <int> }, '*')` on every game over via the `postHi()` helper (see the scoring rubric below — it always posts the run's score so the arcade can offer the leaderboard on any global-top-10 score, not just a new local best). Already wired in every template — do not remove it.
-- **Title screen with instructions (every game).** Every game must open on a start/title screen that shows the game name AND a one- or two-line instructions/controls hint, with a Play button. The game loop must NOT start (no spawning, no timer, no input) until the player clicks Play. This is mandatory for **all** game types — keyboard, click, drag, and card games alike — so the player always knows how to play before anything happens. For inherently narrative games (CYOA) the opening screen serves as the title screen; make sure it still states how to play (e.g. "Click a choice to continue"). Templates already include this pattern — keep it and fill in the real instructions.
+- **Enter key.** The scaffold handles Enter to start and to restart from the game-over overlay. Keep it.
+- **High score postMessage.** Every game calls `window.parent.postMessage({ highScore: <int> }, '*')` on every game over via the `postHi()` helper (see the scoring rubric below — it always posts the run's score so the arcade can offer the leaderboard on any global-top-10 score, not just a new local best). Already wired in the scaffold; do not remove it.
+- **Title screen with instructions (every game).** Every game must open on a start/title screen that shows the game name AND a one- or two-line instructions/controls hint, with a Play button. The game loop must NOT start (no spawning, no timer, no input) until the player clicks Play. This is mandatory for **all** game types — keyboard, click, drag, and card games alike — so the player always knows how to play before anything happens. For inherently narrative games (CYOA) the opening screen serves as the title screen; make sure it still states how to play (e.g. "Click a choice to continue"). The scaffold already has this pattern; keep it and fill in the real instructions.
 - **Keyboard self-focus.** So keyboard games respond without a mouse click first, the game must grab focus for its own window. Add this near the top of the IIFE and call `grabFocus()` on load and when the start overlay's Play button is clicked:
   ```js
   function grabFocus() { try { window.focus(); } catch (e) {} }
@@ -170,30 +136,54 @@ The templates also have a clearly-marked **GAME-SPECIFIC SECTION** comment block
   ```
   (The arcade wrapper also focuses the iframe, but the fresh-Chrome-new-tab case where focus sits in the address bar can't be overridden by script — that's a browser limitation, not a bug.)
 
-### Scoring rubric (mandatory — every game and template must follow this)
+### Scoring rubric (mandatory — every game must follow this)
 
-Scores are compared across games (the leaderboard's "Previous games" table and the topbar "Best"), so they must be on a **shared scale** and must reward skill **without a ceiling**.
+Scores must reward skill **without a ceiling**, and the leaderboard stores **exactly the number the game shows** — no normalization, no scaling, no "house anchor". If the game-over screen says `Score: 1,240`, the leaderboard says 1,240.
 
 1. **No hard score ceiling.** A game must never *end* at a fixed score that every competent player reaches (the old "win at 300" bug). 
    - If the game currently ends on hitting a target score (a finish line / "win at N"), **remove that score-based ending.** Let play continue endlessly with the existing difficulty ramp; keep the death / timeout / lose condition. A cosmetic "milestone!" toast at the old threshold is fine — just don't stop play or stop scoring.
    - If the game is inherently one finite round (one minesweeper board, one battleship match, one card hand, one CYOA story), that round may end — but the **posted score must be a continuous skill metric** (time, accuracy, efficiency, margin, streak) so results spread out instead of everyone tying at the same number.
 2. **Report a score on loss too — "progress IS the score."** For games with a defined complete state (a clear win AND lose — minesweeper, battleship, memory match, artillery duel, etc.), `postHi` must fire on **every** game end, not only on a win. Base the score on **how far the player got** — the natural progress metric (safe tiles cleared, enemy cells hit, damage dealt, matches made, …). Winning yields the max (plus an optional small completion/speed/efficiency bonus that only applies on a win, so a clean win still edges out a near-miss loss); losing yields proportionally less. Never leave a loss un-scored.
-3. **Normalize the magnitude.** Post `Math.round(rawSkillMetric * SCORE_SCALE)`, with `SCORE_SCALE` chosen so a **strong/expert run posts ≈ 1000 points** and a typical decent run lands in the low hundreds. Define `SCORE_SCALE` as a clearly-commented constant next to `postHi`. (1000 is the house "great score" anchor — keep new games consistent with it.)
+3. **No normalization — what you show is what you post.** Never multiply, scale or remap the score before posting. The integer on the game-over screen (labeled `Score`) and in the HUD is the exact value `postHi` sends. If the game's natural metric isn't the score (Hearts counts points *taken*, Battleship counts shots, Minesweeper counts seconds), keep that metric on screen and *also* show the leaderboard number as `Score: N`; post that N. Money games show whole dollars and post the same integer. There is no `SCORE_SCALE` constant anymore — don't add one.
 4. **Report every game over — not just new bests.** The arcade offers the leaderboard whenever a score lands in the day's **global top 10** (across everyone's plays today), so the game must report the run's final score on **every** game over, even when it's lower than a previous run this page-load. Do NOT gate the `postMessage` on a local "new best" check — that's the old bug where a game only prompted on the highest score of the current page load. Keep `_hi` only for the game's own on-screen "best" display; always post the run's score:
    ```js
-   let _hi = 0;
-   const SCORE_SCALE = 1;   // tune so a great run ≈ 1000
-   // Call once per game over with the run's final score. Always posts so the
-   // arcade can offer the leaderboard on any global-top-10 score, not just a
-   // new local best. _hi is kept only for an in-game "best" readout.
-   function postHi(raw) {
-     const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+   let _hi = 0;   // in-game "best" readout only
+   // Call once per game over with the run's final score — exactly the integer
+   // shown on screen. Always posts so the arcade can offer the leaderboard on
+   // any global-top-10 score, not just a new local best.
+   function postHi(n) {
+     n = Math.max(0, Math.round(Number(n) || 0));
      if (n > _hi) _hi = n;
-     window.parent.postMessage({ highScore: n }, '*');
+     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
    }
    ```
    Call `postHi(runScore)` unconditionally at game over — never wrap it in `if (runScore > best)`. Post **only at game over**, never per-frame during play (the arcade would pop the name prompt mid-game and flood the qualify check). The arcade de-dupes identical scores and decides whether to prompt.
 5. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
+
+### Frame-rate independence (mandatory — same speed on every screen)
+
+A loop that steps the simulation once per `requestAnimationFrame` runs twice as fast on a 120 Hz iPhone Pro or a 144 Hz monitor as on a 60 Hz screen. Every real-time game uses a **fixed-step accumulator at 60 steps/s** so per-step constants keep their tuned feel everywhere:
+
+```js
+// Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+const STEP_MS = 1000 / 60;
+let _acc = 0, _lastT = 0;
+function loop(now) {
+  if (!_lastT) _lastT = now;
+  _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab)
+  _lastT = now;
+  let n = 0;
+  while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+  if (n === 4) _acc = 0;
+  draw();
+  requestAnimationFrame(loop);
+}
+```
+
+- Every per-frame mutation (positions, timers, `frame++`, shake, particle updates) lives in `step()`; `draw()` is pure rendering.
+- Start the loop exactly once per page load. A restart handler that calls `requestAnimationFrame(loop)` again doubles the speed.
+- A game that scales everything by a `dt` in seconds (clamped to ≤ 0.05) is also fine — mark the loop with `// FRAME_INDEPENDENT_DT`.
+- Board/DOM games driven by `setInterval` / `Date.now()` are already frame-rate independent.
 
 ### Mobile requirements (mandatory — every game must pass these)
 
@@ -271,6 +261,14 @@ window.addEventListener('touchstart', () => document.body.classList.add('touch')
 The default-hidden + `body.touch` reveal is the canonical form. If you instead default to visible and hide with `body:not(.touch)`, the result must be identical (hidden on desktop) — but prefer the default-hidden form.
 Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/penalty drag-aim) need no on-screen buttons at all — the canvas/grid taps work on both, so there's nothing to hide.
 
+**Swipe-back is a real hazard.** On phones a horizontal swipe that starts near a screen edge triggers the browser's back gesture. For steering games prefer drag/follow-the-finger and tilt over long swipes, add tap-and-hold on the left/right halves of the canvas as a third steering input, keep ≥ 24px of non-game margin at the screen's left/right edges, set `overscroll-behavior: none` on `html, body`, and on first touch push a history entry that gets re-pushed on `popstate` (the scaffold does this) so a stray swipe stays on the page.
+
+**Vertical scrolling in DOM games.** `touch-action: none` on the body must never block scrolling a game needs (a long case grid, a picker, a story page). Either fit `100dvh` at phone sizes or scroll inside a container with `overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain`.
+
+**Every game explains itself on touch.** With `body.touch` the player sees on-screen buttons for every action, or a one-line gesture hint ("Swipe or tilt to steer · tap to jump", "Drag to aim, release to throw", "Long-press to flag") under the canvas. The title screen instructions are phrased for both inputs.
+
+**Tablet too.** At iPad portrait (810x1080) and landscape (1080x810) the canvas scales up with the same CSS formula, buttons stay ≥ 56px within thumb reach, and landscape still fits `100dvh` (move controls beside or over the canvas with an `(orientation: landscape)` media query if needed).
+
 **Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.
 
 ## Finish the title screen (themed font — always)
@@ -285,19 +283,42 @@ Load it with a `<link>` in `<head>` (right after `<title>`) and apply it to the 
 `Playfair Display`/`Cinzel` (elegant/classical), `Monoton` (neon casino), `VT323` (terminal), `Rye`
 (western/wood), `Bebas Neue`/`Teko` (sports). Use a distinct one per game.
 
+## QA gate (mandatory before showing the game)
+
+**Where the game lives.** Inside a newtab.party checkout (there's a `worker/public/games/` folder), save the game as `worker/public/games/<slug>.html`. Anywhere else, save it as `<slug>.html` in the current folder. `<slug>` is short, lowercase and hyphenated.
+
+Run the house harness; both must be clean for the new game. In a checkout, from the repo root:
+
+```bash
+node scripts/qa/lint.mjs <slug>              # scoring, fixed-step loop, viewport, touch gating, no 100vh
+SHOTS=1 node scripts/qa/smoke.mjs <slug>     # desktop, iPhone 13, iPhone SE, iPad portrait + landscape
+```
+
+Outside a checkout, the same scripts ship with this plugin. Point them at the folder that holds the game:
+
+```bash
+QA="${CLAUDE_PLUGIN_ROOT}/scripts/qa"        # if unset, find it: the scripts/qa folder next to this skill's ../../
+GAMES_DIR="$PWD" node "$QA/lint.mjs" <slug>
+GAMES_DIR="$PWD" SHOTS=1 SHOTS_DIR="$PWD/qa-shots" node "$QA/smoke.mjs" <slug>
+```
+
+If Playwright isn't available and the user doesn't want to install it, still run the lint, then check the game by reading it carefully against the mobile and scoring rules above, and say that the device smoke test was skipped.
+
+The smoke test loads the game, clicks Play, feeds generic keyboard and touch input, and reports page errors, overflow, clipped or tiny canvases, off-screen or small buttons, and content that can't be scrolled by touch. Then **look at the screenshots** (`scripts/qa/shots/` in a checkout, `SHOTS_DIR` otherwise) for every mode and fix what you see. (Needs Playwright: `npm i -D playwright` in `scripts/qa`, or the cloud session's global install.) Don't skip this: it's what lets you design freely without shipping a broken phone build.
+
 At this point the game is playable and self-contained. **Stop and ask before doing anything site-related.**
 
 ## Ask: add it to newtab.party?
 
 Once the game plays, use the AskUserQuestion tool to ask whether to **add it to newtab.party** (the daily arcade) or just keep the standalone file. Frame it plainly — e.g. "Want this on newtab.party? I'll generate a logo and a gameplay screenshot, wire it into the arcade, and add it to the rotation." Options: **Add it to newtab.party** / **Just the file for now**.
 
-**If no (just the file):** save the game to `worker/public/games/<slug>.html` (short, lowercase, hyphenated), give one line on how to play plus a line of sass, and stop. Do NOT generate a screenshot or logo, touch `games.json`, or mention deploy — it's a double-click-to-play file.
+**If no (just the file):** leave the game where you saved it, give one line on how to play plus a line of sass, and stop. Do NOT generate a screenshot or logo, touch `games.json`, or mention deploy — it's a double-click-to-play file.
 
 **If yes:** do everything under "Add to newtab.party" below.
 
 ## Add to newtab.party (only when the user says yes)
 
-Save the game to `worker/public/games/<slug>.html` first, then:
+This part needs a newtab.party checkout. If the user isn't in one, tell them to fork https://github.com/jlyon/newtab-party, copy the game to `worker/public/games/<slug>.html`, and follow the steps below (or the README's "Submit your game" section). In a checkout, make sure the game is at `worker/public/games/<slug>.html`, then:
 
 ### 1. Gameplay-screenshot background
 
@@ -357,27 +378,18 @@ Rules that keep it from looking broken:
 
 ### 2. Logo (transparent, minor-league crest)
 
-Generate a logo with **Nano Banana** (Gemini's image model) at `gemini.google.com` → **Images** (drive it with the Chrome browser tools), then key it to true transparency and save to `worker/public/games/logos/<slug>.png`.
+Logos are generated in batches by a script, not by browsing. It calls the Gemini image API with a key from `.env`, renders the crest on flat magenta, chroma-keys it to real transparency and writes `worker/public/games/logos/<slug>.png`.
 
-- **Prompt** (one game): *"Create ONE single centered logo (one design only, not a set), refined modern minor-league-baseball-team crest style — a polished characterful cartoon mascot plus a bold athletic wordmark, cohesive limited palette, clean thick outline, die-cut sticker. Game: '&lt;NAME&gt;' — &lt;mascot / scene from the deep-dive&gt;. Wordmark '&lt;NAME&gt;'. Center it on a completely solid flat uniform pure MAGENTA background hex #FF00FF — no gradient, no texture, no glow, no drop shadow."* Vary the emblem shape per game (round badge, shield, banner, ribbon, pennant, playing card, oval cameo…) so games don't all look the same. For a long/made-up wordmark, spell it out letter-by-letter; Nano Banana fumbles those.
-- **Why magenta, not "transparent":** Nano Banana bakes a checkerboard into "transparent" exports instead of real alpha, so generate on flat magenta and chroma-key it out. Download the image (it lands in the user's Downloads — connect that folder if needed), then run this keyer (`pip install pillow scipy`):
-  ```python
-  import numpy as np; from PIL import Image; from scipy import ndimage
-  rgb = np.asarray(Image.open(SRC).convert('RGB')).astype(np.float32)
-  R, G, B = rgb[...,0], rgb[...,1], rgb[...,2]
-  m = np.minimum(R, B) - G                                    # "magenta-ness" (high on #FF00FF)
-  lbl, _ = ndimage.label(m > 30, structure=np.ones((3, 3)))
-  border = set(np.unique(np.concatenate([lbl[0], lbl[-1], lbl[:, 0], lbl[:, -1]]))) - {0}
-  bg = np.isin(lbl, list(border))                             # magenta touching the border = background
-  sl, sn = ndimage.label(ndimage.binary_fill_holes(~bg), structure=np.ones((3, 3)))
-  sizes = ndimage.sum(np.ones_like(sl), sl, range(1, sn + 1))
-  subj = ndimage.binary_fill_holes(sl == (np.argmax(sizes) + 1))   # keep largest blob (drops watermark/specks)
-  alpha = np.clip((ndimage.gaussian_filter(subj.astype(np.float32), 0.7) - 0.35) / 0.4, 0, 1)  # feathered edge
-  spill = np.clip(m, 0, None)                                 # despill magenta fringe
-  out = np.dstack([np.clip(R - spill, 0, 255), G, np.clip(B - spill, 0, 255), alpha * 255]).astype(np.uint8)
-  img = Image.fromarray(out, 'RGBA'); img = img.crop(img.getbbox()); img.save(DEST)   # DEST = logos/<slug>.png
-  ```
-  The result must be a clean transparent cutout with no magenta fringe. Sanity-check it composited on both a light and dark background.
+```bash
+cp .env.example .env            # once: paste GEMINI_API_KEY=... (https://aistudio.google.com/apikey)
+pip install pillow numpy        # once
+python3 scripts/gen_logos.py <slug>                 # one game (reads name + description from games.json)
+python3 scripts/gen_logos.py --missing              # every game that has no logo yet
+python3 scripts/gen_logos.py <slug> --force --hint "a smug goose in a tuxedo, oval cameo"
+python3 scripts/gen_logos.py <slug> --from-file ~/Downloads/raw.png   # key an image you made elsewhere
+```
+
+So the `games.json` entry (step 4) should exist **before** you run it; add an optional `"logo": "<mascot / scene hint>"` field there when the description alone wouldn't give a good mascot. Open the result and sanity-check it on a light and a dark background; if the wordmark is garbled, re-run with `--force` (the prompt already spells out unusual words letter by letter). Never read or print the `.env` file; the script loads the key itself. The script can't run without a key, so if there is none, tell the user to add one and continue with the rest of the steps.
 
 ### 3. Wire the logo into the start screen
 

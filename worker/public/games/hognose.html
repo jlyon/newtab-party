@@ -11,18 +11,30 @@
   :root { --primary: #d4a373; --secondary: #ff6b9d; --bg: #1f1611; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
-  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; }
-  #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
+  h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; user-select: none; -webkit-touch-callout: none; }
+  #hud { display: flex; gap: 4px 20px; flex-wrap: wrap; justify-content: center; font-size: clamp(11px, 3vw, 14px); opacity: 0.85;
+    user-select: none; -webkit-touch-callout: none; }
+  /* Square board: fills the available height on desktop, 95vw on phones */
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(440px, 92vw); height: auto; display: block; }
-  #dpad { display: none; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(2, 50px); gap: 6px; }
+    width: min(95vw, calc(100dvh - 80px)); height: auto; aspect-ratio: 1 / 1; display: block; touch-action: none; }
+  /* Phones: >= 24px side margin so swipes never start at the screen edge (browser back gesture). */
+  body.touch canvas { width: min(100vw - 48px, calc(100dvh - 225px)); }
+  #touch-hint { display: none; font-size: clamp(10px, 2.6vw, 12px); opacity: 0.65; text-align: center; max-width: 95vw;
+    user-select: none; -webkit-touch-callout: none; }
+  body.touch #touch-hint { display: block; }
+  .touch-only { display: none; } body.touch .touch-only { display: inline; }
+  .kb-only { display: inline; } body.touch .kb-only { display: none; }
+  /* On-screen D-pad: only shown once a real touch happens (body.touch) */
+  #dpad { display: none; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 56px); gap: 6px;
+    padding-bottom: env(safe-area-inset-bottom); }
   body.touch #dpad { display: grid; }
-  @media (pointer: coarse) { canvas { width: min(440px, 92vw, calc(100dvh - 200px)); } }
-  .dp { width: 50px; height: 50px; font-size: 22px; border: 2px solid var(--primary);
+  .dp { width: 60px; height: 56px; font-size: 22px; border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-touch-callout: none; }
+    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    transition: background 0.08s, color 0.08s; }
+  .dp:hover { background: rgba(212,163,115,0.25); }
   .dp:active, .dp.held { background: var(--primary); color: var(--bg); }
   #dp-up    { grid-column: 2; grid-row: 1; }
   #dp-left  { grid-column: 1; grid-row: 2; }
@@ -34,8 +46,12 @@
   #start-overlay { display: flex; }
   .overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
   .overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  .overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  .overlay #overScore { font-size: clamp(18px, 5vw, 26px); font-weight: 800; color: #fff; margin-top: 10px; }
+  .overlay button { margin-top: 18px; padding: 14px 28px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s, filter 0.12s; }
+  .overlay button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .overlay button:active { transform: scale(0.97); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
@@ -79,7 +95,7 @@
   <h1>HOGNOSE</h1>
   <div id="hud">
     <span>Snake: Hognose</span>
-    <span id="score">Caps: 0</span>
+    <span id="score">Score: 0</span>
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="440" height="440"></canvas>
@@ -89,11 +105,12 @@
     <button class="dp" id="dp-down">▼</button>
     <button class="dp" id="dp-right">▶</button>
   </div>
+  <div id="touch-hint">Swipe, tap beside the head, or use the D-pad to steer</div>
 </div>
 <div id="start-overlay" class="overlay">
   <img src="logos/hognose.png" alt="Hognose" style="display:block;width:min(80%,380px);max-height:40vh;margin:0 auto 10px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
   <p>Slither, eat graduation caps, and grow. Don't hit the walls or your own tail.</p>
-  <p>Arrows / WASD &middot; swipe &middot; or D-pad to steer.</p>
+  <p><span class="kb-only">Arrows / WASD to steer.</span><span class="touch-only">Swipe, tap beside the head, or use the D-pad to steer.</span></p>
   <button id="startBtn">Play</button>
 </div>
 <div id="overlay" class="overlay">
@@ -116,7 +133,18 @@
   const css = getComputedStyle(document.documentElement);
   const COL1 = css.getPropertyValue('--primary').trim();
   const COL2 = css.getPropertyValue('--secondary').trim();
-  const W = canvas.width;
+  const W = canvas.width;   // logical size: all game math uses W
+
+  // Crisp rendering at any devicePixelRatio: backing store = displayed CSS size x DPR.
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / W, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'Hognose';
@@ -135,7 +163,15 @@
 
   let snake, food, dir, next, score, hiScore = 0, running, started, lastStep, hitWall;
   let playing = false;   // false until the player clicks Play on the title screen
+  let particles = [], popups = [], shake = 0, eatFlash = 0;   // visual fx state (advanced in step, drawn in draw)
   const startOverlay = document.getElementById('start-overlay');
+  function addParticles(x, y, col, count) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, v = 0.8 + Math.random() * 2.2;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.6, life: 22 + Math.random() * 16, col });
+    }
+  }
+  function addPopup(x, y, text, col) { popups.push({ x, y, text, col, life: 40 }); }
 
   function randFree() {
     const free = [];
@@ -149,27 +185,29 @@
     snake = [[c,c],[c-1,c],[c-2,c]];
     dir = 'right'; next = 'right'; score = 0; running = true; started = false; lastStep = 0; hitWall = false;
     food = randFree();
+    particles = []; popups = []; shake = 0; eatFlash = 0;
     overlay.style.display = 'none'; updateHud();
   }
+  // Score = graduation caps eaten (1 point per cap). Shown in the HUD, on game over, and posted as-is.
   function updateHud() {
-    scoreEl.textContent = 'Caps: ' + score;
+    scoreEl.textContent = 'Score: ' + score;
     hiEl.textContent = 'Best: ' + hiScore;
   }
-  // Normalize caps eaten so a strong run (~30+ caps) posts ~1000.
-  const SCORE_SCALE = 30;
-  let _hi = 0;
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    const v = Math.round((Math.floor(n) || 0) * SCORE_SCALE);
-    if (v > _hi) _hi = v;
-    try { window.parent.postMessage({ highScore: v }, '*'); } catch (e) {}
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
   function endGame(won) {
     running = false;
+    shake = 12;
     if (score > hiScore) hiScore = score;
     postHi(score);
     overTitle.textContent = won ? 'GRADUATED.' : 'Playing dead.';
-    overMsg.textContent = won ? WIN_MSG : (hitWall ? DIE_WALL_MSG : DIE_SELF_MSG);
-    overScore.textContent = 'Caps: ' + score + (score >= hiScore && score > 0 ? ' · new best!' : '  ·  Best: ' + hiScore);
+    overMsg.textContent = (won ? WIN_MSG : (hitWall ? DIE_WALL_MSG : DIE_SELF_MSG)) + ' (' + score + ' cap' + (score === 1 ? '' : 's') + ')';
+    overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' · new best!' : '  ·  Best: ' + hiScore);
     updateHud(); overlay.style.display = 'flex';
   }
   function setDir(d) {
@@ -178,17 +216,35 @@
     if (d !== OPP[dir]) next = d;
   }
 
+  // Visual fx advance once per fixed step (also after game over, behind the overlay).
+  function fxStep() {
+    if (shake > 0) shake = Math.max(0, shake - 1);
+    if (eatFlash > 0) eatFlash = Math.max(0, eatFlash - 0.1);
+    for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life--; }
+    particles = particles.filter(p => p.life > 0);
+    for (const p of popups) { p.y -= 0.8; p.life--; }
+    popups = popups.filter(p => p.life > 0);
+  }
+
+  // Snake movement is clocked by real time (MOVE_MS), so it is display-rate independent.
   function step(now) {
+    fxStep();
     if (!started || now - lastStep < MOVE_MS) return;
     lastStep = now;
     dir = next;
     const [dx, dy] = DIRS[dir];
     const head = [snake[0][0] + dx, snake[0][1] + dy];
-    if (head[0] < 0 || head[0] >= GRID || head[1] < 0 || head[1] >= GRID) { hitWall = true; endGame(false); return; }
-    if (snake.some(s => s[0] === head[0] && s[1] === head[1])) { hitWall = false; endGame(false); return; }
+    if (head[0] < 0 || head[0] >= GRID || head[1] < 0 || head[1] >= GRID) {
+      hitWall = true; addParticles(snake[0][0]*CELL + CELL/2, snake[0][1]*CELL + CELL/2, COL2, 18); endGame(false); return;
+    }
+    if (snake.some(s => s[0] === head[0] && s[1] === head[1])) {
+      hitWall = false; addParticles(head[0]*CELL + CELL/2, head[1]*CELL + CELL/2, COL2, 18); endGame(false); return;
+    }
     snake.unshift(head);
     if (head[0] === food[0] && head[1] === food[1]) {
       score++;
+      const fx = head[0]*CELL + CELL/2, fy = head[1]*CELL + CELL/2;
+      addParticles(fx, fy, COL2, 10); addPopup(fx, fy - CELL * 0.6, '+1', COL2); eatFlash = 1;
       if (WIN_SCORE > 0 && score >= WIN_SCORE) { updateHud(); endGame(true); return; }
       food = randFree();
     } else { snake.pop(); }
@@ -227,8 +283,16 @@
   }
 
   function draw() {
+    // draw() is pure rendering: all state advances in step()/fxStep().
     ctx.clearRect(0, 0, W, W);
-    ctx.fillStyle = COL1; ctx.globalAlpha = 0.05;
+    ctx.save();
+    if (shake > 0) ctx.translate(Math.sin(shake * 2.3) * shake * 0.5, Math.cos(shake * 1.7) * shake * 0.4);
+    // Layered board background: soft vignette + grid dots
+    const bgGrad = ctx.createRadialGradient(W/2, W/2, W*0.1, W/2, W/2, W*0.75);
+    bgGrad.addColorStop(0, 'rgba(212,163,115,0.07)');
+    bgGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = bgGrad; ctx.fillRect(-W, -W, W*3, W*3);
+    ctx.fillStyle = COL1; ctx.globalAlpha = 0.07;
     for (let x = 0; x < GRID; x++)
       for (let y = 0; y < GRID; y++)
         ctx.fillRect(x * CELL + CELL/2 - 1, y * CELL + CELL/2 - 1, 2, 2);
@@ -269,10 +333,30 @@
       }
     }
     ctx.globalAlpha = 1;
+    // Particles + score pop-ups
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 20));
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold ' + Math.round(W * 0.045) + 'px system-ui';
+    for (const p of popups) {
+      ctx.globalAlpha = Math.max(0, p.life / 40);
+      ctx.fillStyle = p.col;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    if (eatFlash > 0) {
+      ctx.fillStyle = 'rgba(255,107,157,' + (eatFlash * 0.12).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, W);
+    }
+    ctx.restore();
     if (!started) {
       ctx.fillStyle = COL1; ctx.globalAlpha = 0.65;
       ctx.font = Math.round(W * 0.038) + 'px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('Arrows · swipe · D-pad to slither', W/2, W/2);
+      ctx.fillText('Arrows · swipe · D-pad to slither', W/2, W/2 - CELL * 2.2);
       ctx.globalAlpha = 1; ctx.textAlign = 'left';
     }
   }
@@ -292,23 +376,57 @@
     el.addEventListener('mousedown', go);
     el.addEventListener('touchstart', go, { passive: false });
   });
+  // Touch on the board: a short swipe steers in the swipe direction; a plain tap turns the snake
+  // toward the tapped side of the head (no horizontal travel needed, so no edge swipe-back).
   let swipeStart = null;
   canvas.addEventListener('touchstart', e => { swipeStart = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
   canvas.addEventListener('touchend', e => {
     if (!swipeStart) return;
-    const dx = e.changedTouches[0].clientX - swipeStart[0];
-    const dy = e.changedTouches[0].clientY - swipeStart[1];
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeStart[0];
+    const dy = t.clientY - swipeStart[1];
     swipeStart = null;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
-    setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
-  });
+    if (Math.max(Math.abs(dx), Math.abs(dy)) >= 20) {
+      setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+      return;
+    }
+    if (!playing || !running || !snake) return;
+    const rect = canvas.getBoundingClientRect();
+    const tx = (t.clientX - rect.left) * (W / rect.width), ty = (t.clientY - rect.top) * (W / rect.height);
+    const hx = snake[0][0] * CELL + CELL / 2, hy = snake[0][1] * CELL + CELL / 2;
+    const horizontal = dir === 'left' || dir === 'right';
+    if (horizontal) { if (Math.abs(ty - hy) > CELL * 0.5) setDir(ty > hy ? 'down' : 'up'); }
+    else            { if (Math.abs(tx - hx) > CELL * 0.5) setDir(tx > hx ? 'right' : 'left'); }
+  }, { passive: true });
+  // A stray edge swipe-back must not leave the arcade mid-game.
+  window.addEventListener('touchstart', () => {
+    try { history.pushState(null, '', location.href); } catch (e) {}
+  }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
-  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');          // reveals the D-pad, which resizes the canvas
+    requestAnimationFrame(() => fitCanvas());
+  }, { once: true, passive: true });
+  // Touch-first devices get the touch wording on the title screen before the first tap.
+  try { if (matchMedia('(pointer: coarse)').matches) { document.body.classList.add('touch'); requestAnimationFrame(() => fitCanvas()); } } catch (e) {}
 
-  function loop(now) { if (playing && running) step(now); draw(); requestAnimationFrame(loop); }
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (playing && running) step(now); else fxStep(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
   document.getElementById('startBtn').addEventListener('click', () => {
     grabFocus(); startOverlay.style.display = 'none'; reset(); playing = true;
   });

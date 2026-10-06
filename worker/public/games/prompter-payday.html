@@ -8,13 +8,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&display=swap" rel="stylesheet" />
 <style>
-  *{ margin:0; padding:0; box-sizing:border-box; }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   :root{
     --primary: #16a34a;
     --secondary: #fbbf24;
     --bg: #0b1226;
   }
-  html,body{ touch-action:manipulation; }
+  html,body{ touch-action:none; overscroll-behavior:none; }
+  /* Tablets / desktop: a wider column with bigger tiles */
+  @media (min-width: 768px){
+    #game{ max-width:640px; gap:18px; }
+    .tile, .slot{ width:58px; height:64px; font-size:30px; }
+  }
   html,body{
     width:100%; height:100%;
     background:var(--bg);
@@ -88,6 +93,12 @@
   #scramble .tile{
     background:var(--primary); color:#fff;
     box-shadow:0 3px 0 rgba(0,0,0,0.25);
+    -webkit-touch-callout:none;
+  }
+  @media (hover:hover){
+    #scramble .tile:hover{ transform:translateY(-2px); filter:brightness(1.1); }
+    .slot.filled:hover{ background:rgba(255,255,255,0.22); }
+    button.btn:hover:not(:disabled){ filter:brightness(1.12); }
   }
   #scramble .tile.used{ visibility:hidden; }
 
@@ -117,14 +128,18 @@
   }
   button.btn:active{ transform:scale(0.96); }
   #submitBtn{ background:var(--primary); }
-  #submitBtn:disabled{ opacity:0.4; }
+  #submitBtn:disabled{ opacity:0.4; cursor:default; }
+  /* keyboard tip: desktop only (hidden once the page is touched) */
+  #kbdHint{ font-size:clamp(11px,3vw,13px); opacity:0.55; text-align:center; }
+  body.touch #kbdHint{ display:none; }
 
   /* overlays */
   .overlay{
     position:fixed; inset:0; background:rgba(0,0,0,0.85);
-    display:flex; overflow-y:auto;
+    display:flex; overflow-y:auto; touch-action:pan-y;   /* the only scrollable panels */
     text-align:center; padding:24px; z-index:10;
   }
+  .panel .score{ font-size:clamp(16px,4.5vw,20px); font-weight:800; color:var(--secondary); margin-bottom:18px; }
   .overlay > *{ margin:auto; }
   .overlay.hidden{ display:none; }
   .panel{ max-width:380px; }
@@ -172,6 +187,15 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #startBtn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* Short screens (phones): keep the Play button above the fold */
+  @media (max-height: 720px) {
+    .overlay { padding: 12px; }
+    #startOverlay .panel { padding: 16px 18px 18px; }
+    #startOverlay .panel img { max-height: 22vh !important; margin-bottom: 8px !important; }
+    #startOverlay .panel p { font-size: clamp(12px, 3.4vw, 14px); line-height: 1.4; margin-bottom: 12px; }
+    #startOverlay .flavor { display: none; }
+    #startOverlay .panel .fine { margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -189,13 +213,14 @@
       <button class="btn" id="shuffleBtn">Shuffle</button>
       <button class="btn" id="submitBtn">Prompt It</button>
     </div>
+    <div id="kbdHint">Type the letters &nbsp;·&nbsp; Backspace to undo &nbsp;·&nbsp; Enter to prompt it</div>
   </div>
 
   <div class="overlay" id="startOverlay">
     <div class="panel">
       <img src="logos/prompter-payday.png" alt="Prompter Payday" style="display:block;width:min(82%,420px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-      <p>You run the teleprompter. You also, allegedly, run a prediction-market
-         account betting on which words appear in tonight's speech.<br><br>
+      <p><span class="flavor">You run the teleprompter. You also, allegedly, run a prediction-market
+         account betting on which words appear in tonight's speech.<br><br></span>
          Unscramble each word and feed it to the prompter before airtime runs out.
          Every word you land pays out your position. The odds are the hint.<br><br>
          Tap letters to build the word, tap a placed letter to send it back.
@@ -211,6 +236,7 @@
       <div class="big" id="finalWords">0 words hit</div>
       <p>The speech ended and the ethics office froze your account.<br>
          Total payout: <span id="finalScore">$0</span></p>
+      <div class="score" id="finalPosted">Score: 0</div>
       <button class="play" id="restartBtn">Appeal (Play Again)</button>
     </div>
   </div>
@@ -259,21 +285,26 @@ const WRONG_PENALTY = 2;      // seconds lost when the speech goes off-script
 
 // ---- Scoring ----
 // Payout per word: (10 + length + speed bonus + streak bonus) * $5.
-// A strong 60s run solves ~12 words at ~$100-135 each => ~= 1000-1600.
-// Displayed dollars ARE the posted score, so SCORE_SCALE stays 1.
+// Score = total payout in whole dollars; the "$N" on screen is exactly the integer posted.
 const PAYOUT_MULT = 5;
-const SCORE_SCALE = 1;   // tuned so a great run ≈ 1000
-let _hi = 0;
-function postHi(raw){
-  const n = Math.round((Number(raw)||0) * SCORE_SCALE);
-  if(n > _hi){ _hi = n; }
-  try{ window.parent.postMessage({highScore:n},'*'); }catch(e){}
+let _hi = 0;   // in-game "best" readout only
+// Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+function postHi(n) {
+  n = Math.max(0, Math.round(Number(n) || 0));
+  if (n > _hi) _hi = n;
+  try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
 }
 
 // ---- Keyboard self-focus ----
 function grabFocus(){ try{ window.focus(); }catch(e){} }
 window.addEventListener('load', grabFocus);
 window.addEventListener('pointerdown', grabFocus);
+window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+// Back-swipe guard: a stray edge swipe stays on the page instead of leaving the arcade.
+window.addEventListener('touchstart', () => {
+  try { history.pushState(null, '', location.href); } catch (e) {}
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+}, { once: true, passive: true });
 
 // ---- Elements ----
 const scrambleEl = document.getElementById('scramble');
@@ -298,6 +329,7 @@ let rawScore = 0;
 let wordsSolved = 0;
 let streak = 0;
 let timeLeft = TIME_LIMIT;
+let deadline = 0;       // wall-clock ms when airtime ends (timer is clock-based, so it never drifts)
 let running = false;
 let timerId = null;
 let deck = [];          // shuffled queue of word indices
@@ -444,13 +476,14 @@ function submit(){
     answerEl.classList.remove('shake');
     void answerEl.offsetWidth; // reflow to restart animation
     answerEl.classList.add('shake');
-    timeLeft = Math.max(0, timeLeft - WRONG_PENALTY);
-    updateTime();
+    deadline -= WRONG_PENALTY * 1000;
+    tick();
   }
 }
 
+const fmt = n => '$' + Math.floor(n).toLocaleString('en-US');
 function updateHud(){
-  scoreValEl.textContent = '$' + rawScore;
+  scoreValEl.textContent = fmt(rawScore);
   streakValEl.textContent = streak;
 }
 
@@ -464,9 +497,9 @@ function updateTime(){
 }
 
 function tick(){
-  timeLeft -= 0.1;
+  if(!running) return;
+  timeLeft = Math.max(0, (deadline - Date.now()) / 1000);
   if(timeLeft <= 0){
-    timeLeft = 0;
     updateTime();
     endGame();
     return;
@@ -477,6 +510,7 @@ function tick(){
 function startGame(){
   rawScore = 0; wordsSolved = 0; streak = 0;
   timeLeft = TIME_LIMIT;
+  deadline = Date.now() + TIME_LIMIT * 1000;
   running = true;
   buildDeck();
   updateHud();
@@ -493,7 +527,8 @@ function endGame(){
   running = false;
   if(timerId){ clearInterval(timerId); timerId = null; }
   postHi(rawScore); // always posts; 0 words => $0
-  finalScoreEl.textContent = '$' + rawScore;
+  finalScoreEl.textContent = fmt(rawScore);
+  document.getElementById('finalPosted').textContent = 'Score: ' + Math.floor(rawScore).toLocaleString('en-US');
   finalWordsEl.textContent = wordsSolved + (wordsSolved === 1 ? ' word hit' : ' words hit');
   overOverlay.classList.remove('hidden');
 }

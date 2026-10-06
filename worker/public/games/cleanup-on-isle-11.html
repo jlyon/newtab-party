@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Cleanup on isle 11</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,7 @@
   :root { --primary: #e32a36; --secondary: #ffffff; --bg: #5e0a12; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--secondary);
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
     height: 100%; gap: 5px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; color: var(--secondary); }
@@ -23,23 +23,28 @@
   #list span.got { opacity: 0.35; text-decoration: line-through; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
     width: min(95vw, calc((100dvh - 120px) * 1.5)); height: auto; display: block; }
-  #controls { display: flex; gap: 14px; align-items: center; justify-content: center;
-    max-width: 95vw; padding: 4px 0; }
-  @media (pointer: fine) { #controls { display: none; } }
-  @media (pointer: coarse) { canvas { width: min(95vw, calc((100dvh - 200px) * 1.5)); } }
+  #controls { display: none; gap: 14px; align-items: center; justify-content: center;
+    max-width: 95vw; padding: 4px 0 calc(4px + env(safe-area-inset-bottom)); }
+  body.touch #controls { display: flex; }
+  /* phones: keep >= 24px of non-game margin at the screen edges so look-drags don't start the browser back gesture */
+  body.touch canvas { width: min(100vw - 48px, calc((100dvh - 230px) * 1.5)); }
+  #touch-hint { display: none; font-size: clamp(10px, 2.8vw, 13px); opacity: 0.7; text-align: center; padding: 0 8px; }
+  body.touch #touch-hint { display: block; }
+  @media (min-width: 700px) { body.touch .btn { width: 76px; height: 64px; font-size: 26px; } body.touch canvas { width: min(95vw, calc((100dvh - 250px) * 1.5)); } }
+  @media (orientation: landscape) and (max-height: 500px) { body.touch canvas { width: min(100vw - 48px, calc((100dvh - 150px) * 1.5)); } h1 { display: none; } }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
     padding: 0; width: 56px; height: 52px; font-size: 22px; border: 2px solid var(--secondary);
     background: rgba(0,0,0,0.3); color: var(--secondary); cursor: pointer; border-radius: 8px;
     user-select: none; display: flex; align-items: center; justify-content: center;
-    -webkit-touch-callout: none;
+    -webkit-touch-callout: none; transition: background 0.08s, transform 0.08s;
   }
-  .btn:active, .btn.held { background: var(--secondary); color: var(--bg); }
+  .btn:active, .btn.held { background: var(--secondary); color: var(--bg); transform: scale(0.95); }
   #start-overlay {
     position: fixed; inset: 0; display: flex;
     align-items: center; justify-content: center;
     background: rgba(0,0,0,0.88); flex-direction: column;
-    text-align: center; padding: 20px; z-index: 10;
+    text-align: center; padding: 12px; z-index: 10;
   }
   #start-card { max-width: 460px; }
   #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 16px; letter-spacing: 2px; }
@@ -64,6 +69,12 @@
     border: 1px solid rgba(255,255,255,0.13);
     border-radius: 18px; padding: 34px 34px 38px;
     box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    max-height: calc(100dvh - 24px); overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  }
+  @media (max-height: 700px) {
+    #start-card { padding: 18px 18px 22px; }
+    #start-card img { max-height: 26vh !important; margin-bottom: 6px !important; }
+    #start-card p { margin-bottom: 14px; line-height: 1.4; }
   }
   #start-card h2 {
     font-family: 'Lilita One', system-ui, sans-serif;
@@ -84,9 +95,12 @@
     background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
   #overlay h2 { color: var(--primary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
   #overlay p { color: var(--secondary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
+  #overlay button { margin-top: 18px; padding: 14px 32px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--secondary); border: none; cursor: pointer;
-    border-radius: 4px; letter-spacing: 1px; }
+    border-radius: 4px; letter-spacing: 1px; user-select: none; -webkit-touch-callout: none; transition: opacity 0.15s, transform 0.1s; }
+  #overlay button:hover { opacity: 0.88; } #overlay button:active { transform: scale(0.96); }
+  #start-btn { min-height: 52px; user-select: none; -webkit-touch-callout: none; }
+  #start-btn:active { transform: scale(0.96); }
 </style>
 </head>
 <body>
@@ -99,6 +113,7 @@
   </div>
   <div id="list"></div>
   <canvas id="game" width="600" height="400"></canvas>
+  <div id="touch-hint">Left thumb on the view: move · right thumb: drag to look · or use the buttons</div>
   <div id="controls">
     <div class="ctrl-group">
       <button class="btn" id="btn-tl">↰</button>
@@ -117,8 +132,8 @@
       everything on the list, and get out before the clock hits zero. Finish a list for a fresh one
       and bonus time. Watch the minimap, mind the puddles, dodge the carts, and don't you DARE
       linger at the free samples.<br><br>
-      W A S D to move (A/D strafe) · ←→ or click-drag to look · On mobile: left thumb moves,
-      right thumb looks · Walk into an item to grab it</p>
+      Keyboard: W A S D to move (A/D strafe) · ←→ or click-drag to look · Touch: left thumb moves,
+      right thumb drags to look, or use the on-screen buttons · Walk into an item to grab it</p>
     <button id="start-btn">▶ Play</button>
   </div>
 </div>
@@ -141,6 +156,22 @@
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
   const W = canvas.width, H = canvas.height;
+  // Crisp rendering at any devicePixelRatio: logical W/H for all game math, backing store = CSS size * DPR.
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitCanvas, 50); }, { once: true, passive: true });
+  // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  function grabFocus() { try { window.focus(); document.body.focus && document.body.focus(); } catch (e) {} }
+  grabFocus(); addEventListener('pointerdown', grabFocus);
 
   // ===== GAME-SPECIFIC SECTION =====
   const START_TIME = 60;
@@ -230,10 +261,12 @@
   addEventListener('mousemove', e => { if (mouseDrag != null && running) { dir += (e.clientX - mouseDrag) * 0.005; mouseDrag = e.clientX; } });
   addEventListener('mouseup', () => { mouseDrag = null; });
 
-  let _hi = 0;
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   // ----- emoji sprite cache -----
@@ -298,6 +331,7 @@
   // ----- state -----
   let px, py, dir, score, timeLeft, round, list, rivals, carts, puddles, msgs, grabbed;
   let running = false, lastCart, slipT, stunT, invulnT, sampleTick, frame, bobT = 0, bobAmp = 0;
+  let hitFlash = 0, shakeT = 0, pops = [];   // hit flash / screen shake / score pop-ups (stepped in step(), drawn in draw())
   const FACES = ['😐', '😤', '🙄', '😬', '🤨'];
   const SHIRTS = ['#4f8fd9', '#5bb56a', '#c9713f', '#7a5fd0', '#3da8a0'];
 
@@ -356,6 +390,7 @@
     score = 0; timeLeft = START_TIME; round = 1;
     carts = []; msgs = []; grabbed = []; lastCart = 0;
     slipT = 0; stunT = 0; invulnT = 0; sampleTick = 0; frame = 0;
+    hitFlash = 0; shakeT = 0; pops = [];
     setupRound();
     overlay.style.display = 'none';
     updateHud();
@@ -373,7 +408,7 @@
     running = false;
     postHi(score);
     overMsg.textContent = LOSE_MSGS[Math.floor(Math.random() * LOSE_MSGS.length)];
-    overScore.textContent = 'Final score: ' + score + ' · Lists cleared: ' + (round - 1);
+    overScore.textContent = 'Score: ' + score.toLocaleString() + ' · Lists cleared: ' + (round - 1);
     overlay.style.display = 'flex';
   }
 
@@ -386,8 +421,10 @@
       if (walkable(nx, ny)) { px = nx; py = ny; }
     }
     score = Math.max(0, score - 5);
+    hitFlash = 10; shakeT = 14;
     say(msg, '#ffd24d');
   }
+  function pop(txt, col) { pops.push({ txt, col, x: W / 2 + (Math.random() - 0.5) * 120, y: H * 0.55, ttl: 50 }); }
 
   function step(now, dt) {
     frame++;
@@ -395,6 +432,10 @@
     if (timeLeft <= 0) { timeLeft = 0; updateHud(); endGame(); return; }
     if (stunT > 0) stunT--;
     if (invulnT > 0) invulnT--;
+    if (hitFlash > 0) hitFlash--;
+    if (shakeT > 0) shakeT--;
+    for (const p of pops) { p.ttl--; p.y -= 1.2; }
+    pops = pops.filter(p => p.ttl > 0);
 
     if (slipT > 0) {
       slipT--;
@@ -435,14 +476,14 @@
     for (const s of SLOTS) {
       if (s.item && Math.hypot(px - s.x, py - s.y) < 0.6) {
         const li = list.find(l => l.name === s.item.name && !l.got);
-        if (li) { li.got = true; score += LIST_PTS; say('+' + LIST_PTS + '  ' + s.item.emoji + ' ' + s.item.name, '#7dff9b'); renderList(); }
-        else { score += CHAOS_PTS; say('+' + CHAOS_PTS + '  ' + s.item.emoji, '#fff'); }
+        if (li) { li.got = true; score += LIST_PTS; say('+' + LIST_PTS + '  ' + s.item.emoji + ' ' + s.item.name, '#7dff9b'); pop('+' + LIST_PTS, '#7dff9b'); renderList(); }
+        else { score += CHAOS_PTS; say('+' + CHAOS_PTS + '  ' + s.item.emoji, '#fff'); pop('+' + CHAOS_PTS, '#fff'); }
         grabbed.push(s.item.emoji); if (grabbed.length > 6) grabbed.shift();
         s.item = null;
         if (list.every(l => l.got)) {
           const bonus = 50 + round * 10;
           score += bonus; timeLeft += LIST_BONUS_TIME; round++;
-          say('LIST DONE! +' + bonus + ' · +' + LIST_BONUS_TIME + 's', '#ffd24d');
+          say('LIST DONE! +' + bonus + ' · +' + LIST_BONUS_TIME + 's', '#ffd24d'); pop('+' + bonus, '#ffd24d');
           setupRound();
         }
       }
@@ -492,6 +533,8 @@
   function h32(a) { a |= 0; a = (a ^ 61) ^ (a >>> 16); a = a + (a << 3) | 0; a ^= a >>> 4; a = Math.imul(a, 0x27d4eb2d); a ^= a >>> 15; return a >>> 0; }
 
   function draw() {
+    ctx.save();
+    if (shakeT > 0) { const k = shakeT / 14 * 5; ctx.translate(Math.sin(frame * 2.1) * k, Math.cos(frame * 1.7) * k); }
     const viewDir = dir + (stunT > 0 ? Math.sin(frame * 0.5) * 0.04 : 0);
     const bob = Math.sin(bobT * 0.25) * bobAmp;
     const hor = H / 2 + bob;
@@ -562,7 +605,8 @@
         const ch = h32(mapX * 31 + mapY * 57 + side * 11);
         if (ch % 3 === 0 && frac > 0.15 && frac < 0.85) {
           const ad = adImg(ch % 5);
-          const u = (frac - 0.15) / 0.7 * 64;
+          let u = (frac - 0.15) / 0.7 * 64;
+          if ((side === 0 && rx < 0) || (side === 1 && ry > 0)) u = 64 - 2.5 - u;   // un-mirror ad text (camera plane is +90deg of dir, so flip is inverse of the classic rule)
           ctx.drawImage(ad, u, 0, 2.5, 64, x, y0 + lineH * 0.20, COLW + 1, lineH * 0.5);
           ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.8, (1 - s) * 0.85).toFixed(2) + ')';
           ctx.fillRect(x, y0 + lineH * 0.20, COLW + 1, lineH * 0.5);
@@ -643,6 +687,17 @@
     if (slipT > 0) {
       ctx.fillStyle = 'rgba(90,150,215,0.12)'; ctx.fillRect(0, 0, W, H);
     }
+    if (hitFlash > 0) {
+      ctx.fillStyle = 'rgba(227,42,54,' + (hitFlash / 10 * 0.35).toFixed(2) + ')'; ctx.fillRect(-10, -10, W + 20, H + 20);
+    }
+    // score pop-ups
+    ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineJoin = 'round';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.ttl / 20);
+      ctx.strokeText(p.txt, p.x, p.y); ctx.fillStyle = p.col; ctx.fillText(p.txt, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
 
     // grandma's shopping cart (first-person prop)
     const sway = Math.sin(bobT * 0.25) * 4, lift2 = Math.abs(Math.cos(bobT * 0.25)) * 3;
@@ -740,20 +795,29 @@
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-3, -3.5); ctx.lineTo(-3, 3.5); ctx.closePath(); ctx.fill();
     ctx.restore();
+    ctx.restore();
   }
 
-  let last = performance.now();
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  // All per-step constants (stun/slip counters, move speed, rival speed) are tuned for 60 steps/s;
+  // the clock (timeLeft) advances by exactly STEP_MS per step.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0, _loopStarted = false;
   function loop(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    if (running) step(now, dt);
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now, STEP_MS / 1000); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
     draw();
     requestAnimationFrame(loop);
   }
   document.getElementById('start-btn').addEventListener('click', () => {
     startOverlay.style.display = 'none';
-    last = performance.now();
-    reset(); requestAnimationFrame(loop);
+    grabFocus(); fitCanvas();
+    reset();
+    if (!_loopStarted) { _loopStarted = true; requestAnimationFrame(loop); }
   });
   addEventListener('keydown', e => {
     if (e.key === 'Enter') {
@@ -761,7 +825,7 @@
       else if (overlay.style.display === 'flex') document.getElementById('restart').click();
     }
   });
-  document.getElementById('restart').addEventListener('click', reset);
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
 })();
 </script>
 </body>

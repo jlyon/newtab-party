@@ -2,39 +2,63 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Weiners and Tubs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@700;800&display=swap" rel="stylesheet" />
 <style>
-  :root { --primary: #E8341C; --secondary: #2E9BE6; --bg: #14171c; --mustard: #F5B400; --wood: #8a5a2b; }
+  :root { --primary: #E8341C; --secondary: #2E9BE6; --bg: #14171c; --mustard: #F5B400; --wood: #8a5a2b; --reserved: 84px; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff;
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  body.touch { --reserved: 172px; }
+  /* phones: keep >= 24px of non-game margin so steering drags never start in the browser's edge-swipe zone */
+  @media (max-width: 700px) { body.touch canvas { width: min(95vw - 48px, calc((100dvh - var(--reserved)) * 0.6667)); } }
+  /* tablet landscape: controls beside the canvas so everything fits the short viewport */
+  @media (orientation: landscape) and (max-height: 820px) and (min-width: 700px) {
+    body.touch { --reserved: 96px; }
+    body.touch #wrap { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 28px; }
+    body.touch h1, body.touch #hud { flex-basis: 100%; text-align: center; justify-content: center; }
+    body.touch #controls { flex-direction: column; width: auto; margin: 0; flex: 0 0 auto; }
+    body.touch .btn { width: 110px; min-width: 0; height: 110px; flex: 0 0 auto; }
+    body.touch #touch-hint { flex-basis: 100%; order: 10; }
+  }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px;
+    padding: 6px 0 env(safe-area-inset-bottom); }
   h1 { margin: 0; font-size: clamp(15px, 4.5vw, 24px); letter-spacing: 1px; font-weight: 800; }
   h1 .a { color: var(--primary); } h1 .b { color: var(--secondary); }
   #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; }
   canvas { border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(95vw, calc((100dvh - 150px) * 0.667)); height: auto; display: block; }
-  #controls { display: flex; gap: 14px; margin-top: 2px; }
-  .btn { width: 96px; height: 54px; display: flex; align-items: center; justify-content: center;
+    width: min(95vw, calc((100dvh - var(--reserved)) * 0.6667)); height: auto; display: block;
+    user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  #hint { font-size: clamp(10px, 2.5vw, 13px); opacity: 0.5; }
+  body.touch #hint { display: none; }
+  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 14px); opacity: 0.6; text-align: center; padding: 0 16px; }
+  body.touch #touch-hint { display: block; }
+  /* On-screen steering: touch devices only. */
+  #controls { display: none; gap: 14px; margin-top: 2px; width: min(95vw, 360px); }
+  body.touch #controls { display: flex; }
+  .btn { flex: 1; min-width: 96px; height: 58px; display: flex; align-items: center; justify-content: center;
     font-size: 26px; font-weight: 800; color: #fff; background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; cursor: pointer;
     user-select: none; -webkit-touch-callout: none; touch-action: none; }
   .btn:active, .btn.held { background: var(--primary); border-color: var(--primary); }
   .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(8,10,14,0.92); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
-  #overlay { display: none; }
-  .badge { width: min(78vw, 320px); height: auto; margin-bottom: 14px; }
+    background: rgba(8,10,14,0.92); flex-direction: column; text-align: center; padding: 16px; z-index: 10; overflow-y: auto; }
+  #overlay { display: none; z-index: 20; }
+  .badge { width: min(78vw, 320px); max-height: 30dvh; height: auto; object-fit: contain; margin-bottom: 14px; }
+  #overlay .badge { max-height: 22dvh; }
   .card p { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6; margin: 0 0 22px; font-style: italic; max-width: 360px; }
   .card h2 { font-size: clamp(20px,6vw,30px); margin: 0 0 6px; }
   #overTitle { color: var(--secondary); }
   .card .score { color: #fff; margin: 4px 0 0; font-size: clamp(13px,3.4vw,16px); }
-  button.play { margin-top: 8px; padding: 13px 38px; font-size: 16px; font-weight: 800; letter-spacing: 1px;
-    background: var(--primary); color: #fff; border: none; cursor: pointer; border-radius: 8px; font-family: inherit; }
-  button.play:hover { opacity: 0.9; }
+  .card #overScore { font-size: clamp(18px, 5vw, 24px); font-weight: 800; font-style: normal; }
+  button.play { margin-top: 8px; padding: 13px 38px; min-height: 52px; min-width: 160px; font-size: 16px; font-weight: 800; letter-spacing: 1px;
+    background: var(--primary); color: #fff; border: none; cursor: pointer; border-radius: 8px; font-family: inherit;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.14s ease, opacity 0.14s; }
+  button.play:hover { opacity: 0.9; transform: translateY(-2px); }
+  button.play:active { transform: scale(0.97); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   /* Title on this screen is the SVG badge (no text heading), so the display font
@@ -48,7 +72,7 @@
     background: rgba(12,14,18,0.6);
     backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
     border: 1px solid rgba(255,255,255,0.13); border-radius: 18px;
-    padding: 28px 30px 32px; box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    padding: clamp(16px, 4vw, 28px) clamp(16px, 4vw, 30px) clamp(20px, 4vw, 32px); box-shadow: 0 24px 80px rgba(0,0,0,0.6);
   }
   #start-overlay .card p {
     color: rgba(255,255,255,0.9); font-style: normal; max-width: 40ch;
@@ -70,20 +94,22 @@
 <div id="wrap">
   <h1><span class="a">Weiners</span> &amp; <span class="b">Tubs</span></h1>
   <div id="hud">
-    <span id="score">Height: 0</span>
+    <span id="score">Score: 0</span>
     <span id="hi">Best: 0</span>
   </div>
   <canvas id="game" width="360" height="540"></canvas>
+  <div id="hint">&larr; &rarr; / A &middot; D to steer &nbsp;|&nbsp; Frank bounces on his own</div>
+  <div id="touch-hint">Hold a side, drag your finger, or tilt to steer &middot; Frank bounces on his own</div>
   <div id="controls">
-    <div class="btn" id="leftBtn">&#9664;</div>
-    <div class="btn" id="rightBtn">&#9654;</div>
+    <div class="btn" id="leftBtn" role="button" aria-label="Steer left">&#9664;</div>
+    <div class="btn" id="rightBtn" role="button" aria-label="Steer right">&#9654;</div>
   </div>
 </div>
 
 <div id="start-overlay" class="overlay">
   <div class="card">
     <div id="badgeSlot1"></div>
-    <p id="controls-hint">Frank auto-bounces &mdash; you just steer. &larr; &rarr; / A&middot;D / buttons &middot; tilt or swipe on phone.<br>Hop tub to tub up the tower. &#127866; beer = super-bounce. Icy tubs crack after one hop. Don't fall in the cold!</p>
+    <p id="controls-hint">Frank auto-bounces &mdash; you just steer. Keys &larr; &rarr; / A&middot;D, or on touch: hold a side of the tub tower, drag your finger, tilt, or use the buttons.<br>Hop tub to tub up the tower. &#127866; beer = super-bounce. Icy tubs crack after one hop. Don't fall in the cold!</p>
     <button class="play" id="start-btn">&#9654; Start hopping</button>
   </div>
 </div>
@@ -153,7 +179,22 @@
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
-  const W = canvas.width, H = canvas.height;
+  // Logical resolution for all game math; the backing store follows the displayed size x DPR.
+  const W = 360, H = 540;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+  function grabFocus(){ try { window.focus(); } catch(e){} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  // Reveal the on-screen controls once the player touches the screen.
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); fitCanvas(); }, { once: true, passive: true });
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'Frank';
@@ -175,7 +216,9 @@
   const held = { left: false, right: false };
   const keys = {};
   let tiltX = 0;
+  let followX = null;   // finger x (logical units) while dragging on the canvas: Frank tracks it
   let player, tubs, beers, score, hiScore = 0, running, started, bubbles, squash, highestY;
+  let pops = [], steamT = 0;   // score pop-ups + steam animation clock (advanced in step, read in draw)
 
   function holdBtn(id, key) {
     const el = document.getElementById(id);
@@ -190,10 +233,15 @@
 
   addEventListener('keydown', e => {
     keys[e.key] = true;
-    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
+    if (['ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter' && !e.repeat) {
+      if (startOverlay.style.display !== 'none') document.getElementById('start-btn').click();
+      else if (overlay.style.display === 'flex') document.getElementById('restart').click();
+    }
     if (['ArrowLeft','ArrowRight','a','d',' '].includes(e.key)) started = true;
   });
   addEventListener('keyup', e => { keys[e.key] = false; });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; held.left = held.right = false; });
 
   function makeTub(x, y) {
     const r = Math.random();
@@ -206,7 +254,7 @@
 
   function reset() {
     player = { x: W/2, y: H - 90, vx: 0, vy: JUMP };
-    tubs = []; beers = []; bubbles = []; score = 0; squash = 0; highestY = player.y;
+    tubs = []; beers = []; bubbles = []; pops = []; score = 0; squash = 0; highestY = player.y;
     running = true; started = false;
     // starting platform right under the player + a column above
     tubs.push({ x: W/2, y: H - 60, type: 'normal', vx: 0, used: false, cracked: false });
@@ -223,28 +271,40 @@
       beers.push({ x: t.x, y: t.y - 30, taken: false });
     }
   }
-  function updateHud() { scoreEl.textContent = 'Height: ' + score; hiEl.textContent = 'Best: ' + hiScore; }
-  function postHi(s) { window.parent.postMessage({ highScore: s }, '*'); }
+  function updateHud() { scoreEl.textContent = 'Score: ' + score.toLocaleString(); hiEl.textContent = 'Best: ' + hiScore.toLocaleString(); }
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
   function popBubbles(x, y, color, n) {
     for (let i = 0; i < (n||8); i++) bubbles.push({ x, y, vx:(Math.random()-0.5)*3, vy:-Math.random()*3-1, life:24, color });
   }
   function endGame() {
     running = false;
-    if (score > hiScore) { hiScore = score; postHi(hiScore); }
+    if (score > hiScore) hiScore = score;
+    // Score = height climbed (px of world scroll) + 100 per beer grabbed; posted exactly as shown.
+    postHi(score);
     overTitle.textContent = score >= 4000 ? 'Hot tub hero!' : 'Splashdown!';
     overMsg.textContent = LOSE_MSGS[(Math.random()*LOSE_MSGS.length)|0];
-    overScore.textContent = 'Height: ' + score + (score >= hiScore && score > 0 ? '  — new best!' : '   ·  Best: ' + hiScore);
+    overScore.textContent = 'Score: ' + score.toLocaleString() + (score >= hiScore && score > 0 ? '  — new best!' : '   ·  Best: ' + hiScore.toLocaleString());
     updateHud(); overlay.style.display = 'flex';
   }
 
   function step() {
+    steamT++;
     if (squash > 0) squash--;
+    for (const p of pops) { p.y -= 0.8; p.life--; }
+    pops = pops.filter(p => p.life > 0);
     if (!started) return;
 
     // horizontal steer
     let ax = 0;
     if (keys['ArrowLeft'] || keys['a'] || held.left)  ax -= MOVE;
     if (keys['ArrowRight']|| keys['d'] || held.right)  ax += MOVE;
+    if (ax === 0 && followX !== null) { const d = followX - player.x; if (Math.abs(d) > 3) ax = Math.sign(d) * Math.min(MOVE, Math.abs(d)); }
     if (ax === 0 && tiltX !== 0) ax = tiltX * MOVE;
     player.vx = ax;
     player.x += player.vx;
@@ -275,7 +335,7 @@
           player.vy = JUMP;
           squash = 6;
           popBubbles(player.x, t.y, '#bfe6ff', 5);
-          if (t.type === 'ice') { t.cracked = true; }
+          if (t.type === 'ice') { t.cracked = true; popBubbles(t.x, t.y, '#ffffff', 8); }
           break;
         }
       }
@@ -287,6 +347,7 @@
       if (Math.abs(player.x - b.x) < 20 && Math.abs(player.y - b.y) < 22) {
         b.taken = true; player.vy = SUPER; squash = 8;
         score += 100; popBubbles(b.x, b.y, '#F5B400', 12);
+        pops.push({ x: b.x, y: b.y - 14, text: '+100', life: 45 });
       }
     }
 
@@ -297,6 +358,7 @@
       for (const t of tubs) t.y += dy;
       for (const b of beers) b.y += dy;
       for (const bb of bubbles) bb.y += dy;
+      for (const p of pops) p.y += dy;
       score += Math.round(dy);
     }
 
@@ -425,11 +487,16 @@
     g.addColorStop(0, '#101722'); g.addColorStop(1, '#1b2a3a');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     // rising steam streaks
+    // (steamT advances in step(), so this stays pure rendering)
     ctx.fillStyle = 'rgba(207,232,255,0.05)';
     for (let i = 0; i < 6; i++) {
-      const sx = (i*73 + (performance.now()*0.02)) % W;
-      ctx.beginPath(); ctx.arc(sx, (i*120 + (performance.now()*0.05)) % H, 26, 0, Math.PI*2); ctx.fill();
+      const sx = (i*73 + steamT * 0.33) % W;
+      ctx.beginPath(); ctx.arc(sx, (i*120 + steamT * 0.83) % H, 26, 0, Math.PI*2); ctx.fill();
     }
+    // soft vignette for depth
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.85);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
     for (const t of tubs) drawTub(t);
     for (const b of beers) if (!b.taken) drawBeer(b);
     drawPlayer();
@@ -438,24 +505,45 @@
       ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    if (!started) {
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.textAlign = 'center';
-      ctx.font = 'bold ' + Math.round(W*0.045) + 'px system-ui';
-      ctx.fillText('Steer to start hopping!', W/2, H*0.3);
-      ctx.textAlign = 'left';
+    ctx.textAlign = 'center'; ctx.font = 'bold ' + Math.round(W*0.045) + 'px system-ui';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.life / 15); ctx.fillStyle = '#F5B400';
+      ctx.fillText(p.text, p.x, p.y);
     }
+    ctx.globalAlpha = 1;
+    if (!started) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText(document.body.classList.contains('touch') ? 'Hold a side or swipe to start!' : 'Steer to start hopping!', W/2, H*0.3);
+    }
+    ctx.textAlign = 'left';
   }
 
-  // swipe steering
-  let ts = null;
-  canvas.addEventListener('touchstart', e => { ts = e.touches[0].clientX; started = true; }, { passive: true });
+  // Touch steering on the canvas (scoped to the canvas, never the document):
+  //  - tap-and-hold the left/right half = steer that way (no horizontal travel needed);
+  //  - once the finger moves > 8px it becomes follow-the-finger: Frank tracks the finger's x.
+  let ts = null, dragging = false;
+  const canvasX = clientX => { const r = canvas.getBoundingClientRect(); return (clientX - r.left) * (W / r.width); };
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    ts = e.touches[0].clientX; started = true; dragging = false; followX = null;
+    const x = canvasX(ts);
+    held.left = x < W / 2; held.right = !held.left;
+  }, { passive: false });
   canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
     if (ts === null) return;
-    const dx = e.touches[0].clientX - ts;
-    if (dx < -6) { held.left = true; held.right = false; }
-    else if (dx > 6) { held.right = true; held.left = false; }
-  }, { passive: true });
-  canvas.addEventListener('touchend', () => { held.left = false; held.right = false; ts = null; });
+    const cx = e.touches[0].clientX;
+    if (!dragging && Math.abs(cx - ts) > 8) { dragging = true; held.left = held.right = false; }
+    if (dragging) followX = canvasX(cx);
+  }, { passive: false });
+  const touchDone = () => { held.left = false; held.right = false; ts = null; dragging = false; followX = null; };
+  canvas.addEventListener('touchend', touchDone);
+  canvas.addEventListener('touchcancel', touchDone);
+  // Back-swipe guard: a stray edge swipe stays on this page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => {
+    try { history.pushState(null, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
 
   // tilt steering
   function enableTilt() {
@@ -470,16 +558,30 @@
       tiltX = Math.sign(gg) * Math.min((abs - DEAD)/(MAX - DEAD), 1);
     });
   }
-  document.addEventListener('touchstart', enableTilt, { once: true });
+  document.addEventListener('touchstart', enableTilt, { once: true, passive: true });
 
-  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0, playing = false;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (playing && running) step(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
 
   document.getElementById('start-btn').addEventListener('click', () => {
-    startOverlay.style.display = 'none'; reset(); requestAnimationFrame(loop);
+    if (playing) return;
+    startOverlay.style.display = 'none'; grabFocus(); fitCanvas(); reset(); playing = true;
   });
   document.getElementById('restart').addEventListener('click', () => { reset(); });
 
   reset();
+  requestAnimationFrame(loop);   // started exactly once per page load
 })();
 </script>
 </body>

@@ -18,6 +18,9 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
+| `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
+| `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
+| `scripts/gen_logos.py` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG). |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
 
@@ -50,11 +53,12 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 
 ## Adding a game
 
-1. Build with the `game-builder` Claude Code skill (`/game-builder`)
-2. Copy `.html` to `worker/public/games/`
+1. Build with the `game-builder` Claude Code skill (`/newtab-party:game-builder` once the plugin is installed); it starts from `skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
+2. Copy `.html` to `worker/public/games/` and run the QA gate: `node scripts/qa/lint.mjs <id>` and `SHOTS=1 node scripts/qa/smoke.mjs <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
 4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
-5. `npm run deploy` from `worker/` — live immediately, no extension update needed
+5. Logo: `python3 scripts/gen_logos.py <id>` (Gemini key in `.env`, see `.env.example`; batch with `--missing`)
+6. `npm run deploy` from `worker/` — live immediately, no extension update needed
 
 Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
 
@@ -73,17 +77,22 @@ To retire a game, remove its id from `schedule` (keep the entry in `games` and t
 
 ### postHi() protocol
 
-Every game must signal high scores to the parent frame. Add this inside the IIFE:
+Every game must report its score to the parent frame. Add this inside the IIFE:
 
 ```js
-let _hi = 0;
+let _hi = 0;   // in-game "best" readout only
 function postHi(n) {
-  n = Math.floor(n) || 0;
-  if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+  n = Math.max(0, Math.round(Number(n) || 0));
+  if (n > _hi) _hi = n;
+  try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
 }
 ```
 
-Call `postHi(score)` whenever the player reaches a new personal best. The newtab wrapper listens and forwards it to `POST /api/plays`.
+Call `postHi(finalScore)` once on every game end (win, loss, timeout), never per-frame and never gated on a local best. **Scores are not normalized**: the integer shown on the game-over screen as `Score` is exactly the value posted and saved to the leaderboard (no `SCORE_SCALE`, no remapping). The newtab wrapper listens, checks whether it makes today's top 10, and forwards it to `POST /api/plays`.
+
+### Frame-rate independence
+
+Real-time games must run at the same speed on a 60 Hz laptop, a 144 Hz monitor and a 120 Hz iPhone. Canvas games use a fixed-step accumulator (`STEP_MS = 1000 / 60`, step the simulation in a `while (acc >= STEP_MS)` loop, draw once per frame) or scale every motion by a clamped `dt`. See the game-builder skill for the canonical loop.
 
 ## Database
 
@@ -109,6 +118,7 @@ All queries are in `worker/src/db.ts`. D1 uses `db.prepare(sql).bind(...).run/fi
 
 ## URLs
 
+- Docs: `README.md` (skill users), `DEPLOY.md` (running and hosting the site)
 - Production: `https://newtab.party`
 - GitHub: `https://github.com/jlyon/newtab-party`
 - Local dev: `http://localhost:8787` (wrangler dev default)

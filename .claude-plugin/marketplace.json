@@ -1,0 +1,13 @@
+{
+  "name": "newtab-party",
+  "owner": {
+    "name": "jlyon"
+  },
+  "plugins": [
+    {
+      "name": "newtab-party",
+      "source": ".",
+      "description": "Build a playable, phone-ready arcade game in a single HTML file with the game-builder skill"
+    }
+  ]
+}

@@ -10,39 +10,61 @@
 <style>
   :root { --primary: #FF7AAE; --secondary: #8FE0BB; --bg: #FFF1B0; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: #B23A6F;
-    font-family: system-ui, sans-serif; touch-action: manipulation; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); color: #B23A6F;
+    font-family: system-ui, sans-serif; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 100vh; padding: 16px 8px; gap: 10px; }
-  h1 { margin: 0; font-size: clamp(18px, 5vw, 28px); letter-spacing: 2px; color: #B23A6F; }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; flex-wrap: wrap; justify-content: center; }
-  #grid { display: grid; gap: 3px; }
+    justify-content: center; height: 100dvh; padding: 10px 8px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
+  h1 { margin: 0; font-size: clamp(18px, 5vw, 28px); letter-spacing: 2px; color: #B23A6F; user-select: none; -webkit-touch-callout: none; }
+  #hud { display: flex; gap: 4px 18px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; flex-wrap: wrap; justify-content: center;
+    user-select: none; -webkit-touch-callout: none; }
+  #hud #score { font-weight: 700; }
+  /* The basket. On phones the cells stay finger-sized and the board pans inside this panel
+     (the only element on the page that may scroll). */
+  #board { max-width: 100%; max-height: 100%; overflow: auto; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    scrollbar-width: thin; border-radius: 8px; flex: 0 1 auto; min-height: 0; }
+  #grid { display: grid; gap: 3px; width: max-content; padding: 2px; }
+  #grid.shake { animation: shake 0.4s ease-out; }
+  @keyframes shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-6px, 2px); }
+    40% { transform: translate(6px, -2px); } 60% { transform: translate(-4px, 1px); } 80% { transform: translate(4px, -1px); } }
   .cell {
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; cursor: pointer; border-radius: 6px; user-select: none;
-    border: 2px solid var(--primary);
+    font-weight: 700; cursor: pointer; border-radius: 6px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    border: 2px solid var(--primary); transition: transform 0.08s, filter 0.08s;
   }
-  .cell.hidden { background: var(--primary); color: var(--bg); font-size: 0; }
+  .cell.hidden { background: var(--primary); color: var(--bg); font-size: 0;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.12), 0 1px 2px rgba(178,58,111,0.25); }
+  @media (hover: hover) {
+    .cell.hidden:hover, .cell.flagged:hover { filter: brightness(1.08); transform: scale(1.06); }
+  }
+  .cell.hidden:active { transform: scale(0.94); filter: brightness(0.95); }
   .cell.flagged { background: var(--secondary); color: var(--bg); border-color: var(--secondary); }
   .cell.revealed { border-color: rgba(178,58,111,0.18); cursor: default; background: #FFFBE0; }
-  .cell.mine-hit { background: #FF5C8A !important; border-color: #E63973; }
+  .cell.pop { animation: pop 0.22s ease-out; }
+  @keyframes pop { 0% { transform: scale(0.6); background: #FFD9E8; } 100% { transform: scale(1); } }
+  .cell.mine-hit { background: #FF5C8A !important; border-color: #E63973; animation: pop 0.3s ease-out; }
   .cell.mine-shown { background: #FFE4EF; }
   .n1{color:#4488ff} .n2{color:#2BAE66} .n3{color:#E63973} .n4{color:#9966cc}
   .n5{color:#FF8800} .n6{color:#00B3B3} .n7{color:#B23A6F} .n8{color:#666}
-  #hint { font-size: clamp(10px, 2.5vw, 12px); opacity: 0.6; text-align: center; color: #B23A6F; }
+  #hint { font-size: clamp(10px, 2.5vw, 12px); opacity: 0.6; text-align: center; color: #B23A6F; user-select: none; }
+  #hint-pan { display: none; }
+  body.touch #hint-pan { display: inline; }
   #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(255, 241, 176, 0.94); flex-direction: column; text-align: center; padding: 20px; }
+    background: rgba(255, 241, 176, 0.94); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
   #overlay h2 { color: #B23A6F; font-size: clamp(26px, 7vw, 42px); margin: 0 0 8px; }
   #overlay p { color: #B23A6F; margin: 4px 0; font-size: clamp(12px, 3vw, 16px); }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700; }
-  #overlay button:hover { background: #FF5C9A; }
+  #overlay #overScore { font-size: clamp(18px, 5vw, 26px); font-weight: 800; margin-top: 10px; }
+  #overlay button { margin-top: 18px; padding: 14px 28px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s, background 0.12s; }
+  #overlay button:hover { background: #FF5C9A; transform: translateY(-1px); }
+  #overlay button:active { transform: scale(0.97); }
   #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(255, 241, 176, 0.96); flex-direction: column; text-align: center; padding: 20px; z-index: 30; }
   #start-overlay h2 { color: #B23A6F; font-size: clamp(26px, 7vw, 42px); margin: 0 0 10px; }
   #start-overlay p { color: #B23A6F; margin: 0 0 22px; font-size: clamp(12px, 3vw, 16px); max-width: 420px; line-height: 1.5; }
-  #start-overlay button { padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700; }
+  #start-overlay button { padding: 12px 28px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 999px; letter-spacing: 1px; font-weight: 700;
+    user-select: none; -webkit-touch-callout: none; }
   #start-overlay button:hover { background: #FF5C9A; }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
@@ -80,14 +102,15 @@
     <span>Tippy-toer: Bun-Bun</span>
     <span id="mines-left">🥚 0</span>
     <span id="timer">⏱ 0s</span>
+    <span id="score">Score: 0</span>
     <span id="hi">Best: —</span>
   </div>
-  <div id="grid"></div>
-  <div id="hint">Tap to tiptoe · Long-press (or right-click) to mark a 🐰</div>
+  <div id="board"><div id="grid"></div></div>
+  <div id="hint">Tap to tiptoe · Long-press (or right-click) to mark a 🐰<span id="hint-pan"> · Drag to pan the basket</span></div>
 </div>
 <div id="start-overlay">
   <img src="logos/tippity-toes.png" alt="Tippity Toes" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-  <p>Tap a tile to tiptoe across the basket. Long-press (or right-click) to mark a 🐰 over a suspected egg. Clear every safe tile without cracking one of the 40 eggs.</p>
+  <p>Tap / click a tile to tiptoe across the basket. Long-press (or right-click) to mark a 🐰 over a suspected egg. Clear every safe tile without cracking one of the 40 eggs.</p>
   <button id="start-btn">🐣 Start hopping</button>
 </div>
 <div id="overlay">
@@ -100,12 +123,16 @@
 (() => {
   const minesEl  = document.getElementById('mines-left');
   const timerEl  = document.getElementById('timer');
+  const scoreEl  = document.getElementById('score');
   const hiEl     = document.getElementById('hi');
   const overlay  = document.getElementById('overlay');
   const overTitle = document.getElementById('overTitle');
   const overMsg   = document.getElementById('overMsg');
   const overScore = document.getElementById('overScore');
   const gridEl = document.getElementById('grid');
+  const boardEl = document.getElementById('board');
+  const wrapEl = document.getElementById('wrap');
+  const startOverlay = document.getElementById('start-overlay');
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME = 'Bun-Bun';
@@ -120,23 +147,31 @@
   const LOSE_MSG = 'You stepped on an egg. It cracked. The Easter Bunny saw.';
   // ==================================
 
-  // Scoring: progress IS the score — round(safeRevealed/totalSafe * 700), posted on
-  // BOTH win and loss (how far you cleared). A win adds a speed bonus so a clean fast
-  // clear ≈ 1000; a loss posts proportional progress.
+  // Scoring (shown as "Score" in the HUD and on game over; posted exactly as shown):
+  //   score = 10 x safe tiles cleared                      (progress, max 2160 for a full clear)
+  //         + win bonus: max(0, 1500 - 5 x seconds)        (only on a clean clear; faster = more)
+  // Posted on BOTH win and loss, so a partial clear still registers how far you got.
+  const TILE_POINTS = 10;
+  function winBonus(seconds) { return Math.max(0, 1500 - 5 * seconds); }
+  function currentScore(won) { return TILE_POINTS * safeRevealed() + (won ? winBonus(timerVal) : 0); }
 
   let board, flagged, revealed, done, firstClick, started = false;
-  let timerStart, timerVal, timerTick, hiTime = null;
+  let timerStart, timerVal, timerTick, hiTime = null, hiScore = 0;
+  let lastHit = null;
 
   function reset() {
     board    = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     flagged  = Array.from({length: ROWS}, () => Array(COLS).fill(false));
     revealed = Array.from({length: ROWS}, () => Array(COLS).fill(false));
-    done = false; firstClick = true;
+    done = false; firstClick = true; lastHit = null;
     clearInterval(timerTick); timerVal = 0;
     timerEl.textContent = '⏱ 0s';
     minesEl.textContent = EGG + ' ' + MINES;
     overlay.style.display = 'none';
+    gridEl.classList.remove('shake');
+    prevRevealed = null;
     render();
+    updateScore();
   }
 
   function placeMines(safeR, safeC) {
@@ -171,32 +206,40 @@
     if (board[r][c] === 0) adj(r, c).forEach(([nr, nc]) => flood(nr, nc));
   }
 
-  let _hi = 0;
-  function postHi(s){ const n = Math.round(Number(s)||0); if (n > _hi) _hi = n; try { window.parent.postMessage({ highScore: n }, '*'); } catch(e){} }
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
+  function updateScore(won) {
+    scoreEl.textContent = 'Score: ' + currentScore(won).toLocaleString();
+    hiEl.textContent = 'Best: ' + (hiScore > 0 ? hiScore.toLocaleString() + (hiTime !== null ? ' (' + hiTime + 's)' : '') : '—');
+  }
 
   function endGame(won, hitR, hitC) {
     if (done) return;
     done = true;
     clearInterval(timerTick);
+    if (!won) lastHit = [hitR, hitC];
     // expose all eggs
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
         if (board[r][c] === -1 && !flagged[r][c]) revealed[r][c] = true;
     render(hitR, hitC);
-    const totalSafe = ROWS*COLS - MINES;
-    const frac = totalSafe ? safeRevealed()/totalSafe : 0;
-    let outScore = Math.round(frac * 700);                          // progress: how far you got (≈700 at full clear)
-    if (won) outScore += Math.round(300 * 60 / (timerVal + 60));    // speed bonus on a clean clear → win ≈ 750..1000
+    if (!won) { gridEl.classList.remove('shake'); void gridEl.offsetWidth; gridEl.classList.add('shake'); }
+    const outScore = currentScore(won);
+    const newBest = outScore > hiScore && outScore > 0;
+    if (newBest) hiScore = outScore;
+    if (won && (hiTime === null || timerVal < hiTime)) hiTime = timerVal;
+    updateScore(won);
     postHi(outScore);
-    if (won) {
-      if (hiTime === null || timerVal < hiTime) { hiTime = timerVal; }
-      hiEl.textContent = 'Best: ' + timerVal + 's';
-    }
     overTitle.textContent = won ? '🐣 Hatched!' : '🍳 Cracked!';
-    overMsg.textContent = won ? WIN_MSG + ' (' + timerVal + 's)' : LOSE_MSG;
-    overScore.textContent = won && hiTime === timerVal ? '✨ New record! ✨' : '';
+    overMsg.textContent = (won ? WIN_MSG : LOSE_MSG) + ' (' + safeRevealed() + '/' + (ROWS*COLS - MINES) + ' tiles · ' + timerVal + 's)';
+    overScore.textContent = 'Score: ' + outScore.toLocaleString() + (newBest ? ' ✨ new best!' : '');
     overlay.style.display = 'flex';
   }
 
@@ -214,6 +257,7 @@
     if (board[r][c] === -1) { revealed[r][c] = true; endGame(false, r, c); return; }
     flood(r, c);
     render();
+    updateScore();
     const safe = ROWS * COLS - MINES;
     if (revealed.flat().filter(Boolean).length >= safe) endGame(true);
   }
@@ -225,13 +269,28 @@
     render();
   }
 
-  let pressTimer = null;
+  // Touch: long-press = flag. A long-press must not also count as a tap (which would
+  // reveal the tile just un-flagged), and Android's synthetic contextmenu must not double-toggle.
+  let pressTimer = null, longPressed = false, lastTouchT = 0;
+  const GAP = 3;
 
-  function cellSize() { return Math.min(36, Math.floor((Math.min(window.innerWidth - 20, 640)) / COLS) - 3); }
+  function cellSize() {
+    const reserved = wrapEl.querySelector('h1').offsetHeight + document.getElementById('hud').offsetHeight
+      + document.getElementById('hint').offsetHeight + 8 * 3 + 24;
+    const availW = Math.min(window.innerWidth - 16, 760);
+    const availH = window.innerHeight - reserved;
+    let sz = Math.min(40, Math.floor(availW / COLS) - GAP, Math.floor(availH / ROWS) - GAP);
+    // Finger-sized tiles on touch devices; the board pans inside #board when it does not fit.
+    if (document.body.classList.contains('touch')) sz = Math.max(sz, 30);
+    return Math.max(14, sz);
+  }
 
+  let prevRevealed = null;
   function render(hitR, hitC) {
+    if (hitR === undefined && lastHit) { hitR = lastHit[0]; hitC = lastHit[1]; }
     const sz = cellSize();
     gridEl.style.gridTemplateColumns = `repeat(${COLS}, ${sz}px)`;
+    gridEl.style.gap = GAP + 'px';
     gridEl.innerHTML = '';
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -243,6 +302,7 @@
         if (revealed[r][c]) {
           const isMine = board[r][c] === -1;
           el.classList.add('revealed');
+          if (prevRevealed && !prevRevealed[r][c] && !isMine) el.classList.add('pop');
           if (isHit) el.classList.add('mine-hit');
           else if (isMine) el.classList.add('mine-shown');
           if (isMine) el.textContent = isHit ? CRACKED : EGG;
@@ -252,30 +312,55 @@
         } else {
           el.classList.add('hidden');
         }
-        el.addEventListener('click', e => { e.preventDefault(); onReveal(r, c); });
-        el.addEventListener('contextmenu', e => { e.preventDefault(); onFlag(r, c); });
-        el.addEventListener('touchstart', () => {
-          pressTimer = setTimeout(() => { onFlag(r, c); pressTimer = null; }, 480);
-        }, { passive: true });
-        el.addEventListener('touchend', e => {
-          if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        el.addEventListener('click', e => {
+          e.preventDefault();
+          if (longPressed) { longPressed = false; return; }
+          onReveal(r, c);
         });
-        el.addEventListener('touchmove', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+        el.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          if (Date.now() - lastTouchT < 1000) return;   // touch long-press already handled it
+          onFlag(r, c);
+        });
+        el.addEventListener('touchstart', () => {
+          lastTouchT = Date.now(); longPressed = false;
+          clearTimeout(pressTimer);
+          pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; onFlag(r, c); }, 480);
+        }, { passive: true });
+        const cancel = () => { lastTouchT = Date.now(); if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+        el.addEventListener('touchend', cancel, { passive: true });
+        el.addEventListener('touchcancel', cancel, { passive: true });
+        el.addEventListener('touchmove', () => { cancel(); longPressed = true; }, { passive: true });
         gridEl.appendChild(el);
       }
     }
+    prevRevealed = revealed.map(row => row.slice());
   }
 
-  addEventListener('keydown', e => {
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
-  });
-  addEventListener('resize', () => { if (!done || overlay.style.display === 'none') render(); });
-  document.getElementById('restart').addEventListener('click', reset);
-  document.getElementById('start-btn').addEventListener('click', () => {
-    document.getElementById('start-overlay').style.display = 'none';
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); render(); }, { once: true, passive: true });
+  try { if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch'); } catch (e) {}
+  // Panning the basket from the screen edge must not swipe back out of the arcade.
+  window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  boardEl.addEventListener('contextmenu', e => e.preventDefault());
+
+  function startGame() {
+    grabFocus();
+    startOverlay.style.display = 'none';
     started = true;
     reset();
+  }
+  addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.repeat) return;
+    if (startOverlay.style.display !== 'none') { startGame(); return; }
+    if (overlay.style.display !== 'none') document.getElementById('restart').click();
   });
+  addEventListener('resize', () => render());
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
+  document.getElementById('start-btn').addEventListener('click', startGame);
   reset();
 })();
 </script>

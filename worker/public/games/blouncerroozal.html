@@ -14,24 +14,39 @@
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden; touch-action: none;
+    overflow: hidden; touch-action: none; overscroll-behavior: none;
   }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(16px, 5vw, 26px); letter-spacing: 4px; text-shadow: 0 0 12px var(--primary), 0 0 24px var(--primary); }
+  /* HUD spans the same width as the canvas so its items line up with the table edges */
   #hud {
-    max-width: 95vw;
-    display: flex; justify-content: space-between;
+    width: min(95vw, calc((100dvh - 80px) * 0.875));
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
     font-size: clamp(11px, 3vw, 14px); opacity: 0.9; letter-spacing: 1px;
   }
-  #hud span { color: var(--primary); }
+  #hud span { color: var(--primary); white-space: nowrap; }
   canvas {
     background:
       radial-gradient(ellipse at center, rgba(0,80,40,0.45) 0%, rgba(0,0,0,0.85) 70%),
       repeating-linear-gradient(45deg, rgba(255,215,0,0.04) 0 8px, transparent 8px 16px);
     border: 2px solid var(--primary);
     box-shadow: 0 0 30px var(--primary), inset 0 0 40px rgba(0,0,0,0.7);
-    width: min(95vw, calc((100dvh - 80px) * 0.875)); height: auto; display: block; touch-action: none;
+    width: min(95vw, calc((100dvh - 80px) * 0.875)); aspect-ratio: 560 / 640; height: auto; display: block; touch-action: none;
+    cursor: none;
   }
+  /* touch devices reserve room for the gesture hint under the canvas */
+  body.touch canvas, body.touch #hud { width: min(95vw, calc((100dvh - 104px) * 0.875)); }
+  /* phones: keep >= 24px between the canvas and each screen edge (browser back-swipe zone) */
+  @media (max-width: 600px) { canvas, #hud, body.touch canvas, body.touch #hud { width: min(100vw - 48px, calc((100dvh - 104px) * 0.875)); } }
+  /* gesture hint, touch devices only */
+  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 13px); color: var(--secondary); letter-spacing: 1px; opacity: 0.85; text-align: center;
+    padding-bottom: env(safe-area-inset-bottom); }
+  body.touch #touch-hint { display: block; }
+  body.touch canvas { cursor: default; }
+  #overlay, #start-overlay { touch-action: none; }
+  #overlay button, #start-overlay button { min-height: 52px; user-select: none; -webkit-touch-callout: none; }
+  #overlay .final-score { color: #fff; font-size: clamp(22px, 6vw, 34px); font-weight: bold; letter-spacing: 2px; margin: 10px 0 0;
+    text-shadow: 0 0 12px var(--primary); }
   #overlay {
     position: fixed; inset: 0; display: none;
     align-items: center; justify-content: center;
@@ -102,35 +117,55 @@
     <span id="speed">Speed: x1.0</span>
   </div>
   <canvas id="game" width="560" height="640"></canvas>
+  <div id="touch-hint">Drag anywhere on the table to move the paddle · tap to launch</div>
 </div>
 <div id="start-overlay">
-  <img src="logos/blouncerroozal.png" alt="Blouncerroozal" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <img src="logos/blouncerroozal.png" alt="Blouncerroozal" style="display:block;width:min(82%,400px);max-height:min(40dvh,260px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
   <p>Smash the casino chips with the ball.</p>
-  <p class="sub">Drag or mouse to move the paddle · Tap/click or Space to launch · Catch falling chips for multiball</p>
+  <p class="sub">Drag / mouse / arrow keys to move the paddle · Tap / click / Space to launch · Catch falling chips for multiball</p>
   <button id="start-btn">▶ Place your bets</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">House wins</h2>
   <p id="overMsg">Ball escaped. Tragic.</p>
+  <p class="final-score" id="overScore">Score: $0</p>
   <p class="sub">Drag or mouse to move · Tap/click or Space to launch · Catch falling chips for multiball</p>
   <button id="restart">Double or nothing</button>
 </div>
 <script>
 (() => {
-  // High score reporting. Score is raw chips earned (endless: boards refill).
-  // One full board ≈ 1575 chips; a strong multi-board run ≈ 3500 chips.
-  // SCORE_SCALE tuned so a great run ≈ 1000; a typical decent run = low hundreds.
-  let _hi = 0;
-  const SCORE_SCALE = 0.28;   // tuned so a great run (~3500 chips) ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi) _hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
+  // Score = chips earned in dollars (endless: boards refill). Shown as "$1,240" in the HUD and
+  // "Score: $1,240" on the game-over screen; the posted leaderboard number is the same 1240.
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
 
   function grabFocus(){ try{ window.focus(); }catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); guardBackSwipe(); }, { once: true, passive: true });
+  // A stray edge swipe-back stays on the page instead of leaving the arcade.
+  function guardBackSwipe() {
+    try { history.pushState(null, '', location.href); window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} }); } catch (e) {}
+  }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
+  const W = 560, H = 640;   // logical size; all game math uses these
+  // Crisp at any devicePixelRatio: backing store = displayed CSS size x DPR, context scaled to logical W x H.
+  function fitCanvas() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const bw = Math.max(1, Math.round((r.width || W) * dpr)), bh = Math.max(1, Math.round((r.height || H) * dpr));
+    if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+    ctx.setTransform(bw / W, 0, 0, bh / H, 0, 0);
+  }
+  fitCanvas();
+  window.addEventListener('resize', fitCanvas);
   const scoreEl = document.getElementById('score');
   const livesEl = document.getElementById('lives');
   const speedEl = document.getElementById('speed');
@@ -168,7 +203,10 @@
 
   let paddle, balls, bricks, powerups, score, lives, running, launched;
   let speedMult = 1;
-  let lastTime = 0;
+  let playSteps = 0;                 // fixed steps since this run started (drives the speed ramp)
+  let particles = [], pops = [], shake = 0, flashT = 0;   // juice (updated in step, only drawn in draw)
+  const overScore = document.getElementById('overScore');
+  const fmt$ = n => '$' + Math.round(n).toLocaleString();
 
   function buildBricks() {
     const arr = [];
@@ -195,12 +233,13 @@
     bricks = buildBricks();
     powerups = [];
     score = 0; lives = 3;
-    launched = false; running = true; speedMult = 1;
+    launched = false; running = true; speedMult = 1; playSteps = 0;
+    particles = []; pops = []; shake = 0; flashT = 0;
     overlay.style.display = 'none';
     updateHud();
   }
   function updateHud() {
-    scoreEl.textContent = "Chips: $" + score;
+    scoreEl.textContent = "Chips: " + fmt$(score);
     livesEl.textContent = "Lives: " + lives;
     speedEl.textContent = "Speed: x" + speedMult.toFixed(1);
   }
@@ -213,8 +252,10 @@
     b.stuck = false; launched = true;
   }
   function endGame(won) {
-    postHi(score);
     running = false;
+    updateHud();
+    overScore.textContent = 'Score: ' + fmt$(score);
+    postHi(score);
     overTitle.textContent = won ? "JACKPOT" : "HOUSE WINS";
     const pool = won ? WIN_MESSAGES : LOSE_MESSAGES;
     overMsg.textContent = pool[Math.floor(Math.random() * pool.length)];
@@ -243,6 +284,11 @@
     if (e.key === 'ArrowLeft')  paddle.x = Math.max(0, paddle.x - 32);
     if (e.key === 'ArrowRight') paddle.x = Math.min(W - paddle.w, paddle.x + 32);
     if (e.key === ' ') { launch(); e.preventDefault(); }
+    if (e.key === 'Enter') {
+      if (startOverlay.style.display !== 'none') document.getElementById('start-btn').click();
+      else if (overlay.style.display === 'flex') document.getElementById('restart').click();
+      else launch();
+    }
   });
   canvas.addEventListener('click', launch);
 
@@ -254,10 +300,27 @@
     }
   }
 
-  function step(dt) {
-    speedMult = Math.min(2.5, 1 + (performance.now() / 1000) * SPEED_RAMP_PER_SEC * 0.1);
+  function burst(x, y, color, n, spd) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random()) * spd;
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: color, s: 2 + Math.random() * 3, life: 24 + Math.random() * 20, max: 44 });
+    }
+  }
+
+  // One fixed 60 Hz step. (Speed ramp counts steps since THIS run started, not since page load.)
+  function step() {
+    playSteps++;
+    speedMult = Math.min(2.5, 1 + (playSteps / 60) * SPEED_RAMP_PER_SEC * 0.1);
+    if (shake > 0) shake = Math.max(0, shake - 0.5);
+    if (flashT > 0) flashT--;
+    for (const br of bricks) if (br.flash > 0) br.flash--;
+    for (const q of particles) { q.x += q.vx; q.y += q.vy; q.vy += 0.08; q.vx *= 0.98; q.life--; }
+    particles = particles.filter(q => q.life > 0);
+    for (const p of pops) { p.y -= 0.8; p.life--; }
+    pops = pops.filter(p => p.life > 0);
     for (const b of balls) {
-      if (b.stuck) { b.x = paddle.x + paddle.w/2; b.y = paddle.y - b.r - 1; continue; }
+      if (b.stuck) { b.x = paddle.x + paddle.w/2; b.y = paddle.y - b.r - 1; b.trail = []; continue; }
+      (b.trail || (b.trail = [])).unshift({ x: b.x, y: b.y }); if (b.trail.length > 7) b.trail.pop();
       const desired = BALL_SPEED_START * speedMult;
       const curSpeed = Math.hypot(b.vx, b.vy) || desired;
       const k = desired / curSpeed;
@@ -283,8 +346,11 @@
         const dist = Math.hypot(dx, dy);
         if (dist < rad + b.r) {
           br.hp--;
+          br.flash = 6;   // brief white hit flash
           if (br.hp <= 0) {
             br.alive = false; score += br.value;
+            burst(cx, cy, br.color, 10, 2.6);
+            pops.push({ x: cx, y: cy, text: '+$' + br.value, life: 40 });
             paddle.w = Math.max(PADDLE_MIN_W, paddle.w - PADDLE_SHRINK_PER_CHIP);
             if (Math.random() < POWERUP_DROP_CHANCE) powerups.push({ x: cx, y: cy, r: 9 });
           }
@@ -305,19 +371,23 @@
         const origin = balls.length ? balls[0] : { x: W/2, y: H/2 };
         spawnMultiball(origin.x, origin.y);
         score += 15;
+        burst(p.x, p.y, SECONDARY, 14, 3);
+        pops.push({ x: p.x, y: p.y - 12, text: 'MULTIBALL +$15', life: 50 });
       }
     }
     powerups = powerups.filter(p => !p.dead);
     balls = balls.filter(b => b.y - b.r <= H + 30);
     if (balls.length === 0) {
       lives--;
+      shake = 8;
       if (lives <= 0) { endGame(false); }
       else { balls = [{ x: paddle.x + paddle.w/2, y: paddle.y - 9, r: 7, vx: 0, vy: 0, stuck: true }]; launched = false; }
     }
     // Endless: when the board is cleared, refill it (keep playing). No score ceiling.
     if (bricks.every(b => !b.alive)) {
       bricks = buildBricks();
-      // brief cosmetic flash of progress; ball/paddle continue uninterrupted
+      flashT = 18;   // brief cosmetic flash of progress; ball/paddle continue uninterrupted
+      pops.push({ x: W/2, y: H/2, text: 'BOARD CLEARED', life: 60 });
     }
     updateHud();
   }
@@ -339,31 +409,70 @@
       ctx.strokeStyle = b.alt; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, r + 1, 0, Math.PI*2); ctx.stroke();
     }
+    if (b.flash > 0) {   // hit flash (decays in step)
+      ctx.fillStyle = 'rgba(255,255,255,' + (b.flash / 6 * 0.7).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(cx, cy, r + 1, 0, Math.PI*2); ctx.fill();
+    }
   }
 
+  // Pure rendering: no state is mutated here.
   function draw() {
     ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - .5) * shake * 2, (Math.random() - .5) * shake * 2);
+    // soft chip shadows
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    for (const b of bricks) { if (!b.alive) continue; ctx.beginPath(); ctx.arc(b.x + b.w/2 + 2, b.y + b.h/2 + 3, b.w/2 - 2, 0, Math.PI*2); ctx.fill(); }
     for (const b of bricks) { if (!b.alive) continue; drawChip(b); }
     for (const p of powerups) {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, p.r, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = SECONDARY; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = PRIMARY; ctx.font = "bold 12px monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('+', p.x, p.y + 1);
     }
+    // paddle with glow
+    ctx.save(); ctx.shadowColor = PRIMARY; ctx.shadowBlur = 14;
     const grad = ctx.createLinearGradient(0, paddle.y, 0, paddle.y + paddle.h);
     grad.addColorStop(0, '#fff2a8'); grad.addColorStop(0.5, PRIMARY); grad.addColorStop(1, '#8a6a00');
     ctx.fillStyle = grad; ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.restore();
     ctx.strokeStyle = '#3a2d00'; ctx.lineWidth = 1; ctx.strokeRect(paddle.x, paddle.y, paddle.w, paddle.h);
     for (const b of balls) {
+      if (b.trail) for (let i = 0; i < b.trail.length; i++) {
+        const t = b.trail[i]; ctx.fillStyle = 'rgba(192,192,192,' + (0.28 * (1 - i / b.trail.length)).toFixed(2) + ')';
+        ctx.beginPath(); ctx.arc(t.x, t.y, b.r * (1 - i / b.trail.length) * 0.9, 0, Math.PI*2); ctx.fill();
+      }
       const bg = ctx.createRadialGradient(b.x - 2, b.y - 2, 1, b.x, b.y, b.r);
       bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.6, SECONDARY); bg.addColorStop(1, '#5a5a5a');
       ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
     }
+    for (const q of particles) { ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.fillStyle = q.c; ctx.fillRect(q.x, q.y, q.s, q.s); }
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.life / 15); ctx.fillStyle = '#fff';
+      ctx.font = (p.text.length > 8 ? 'bold 20px' : 'bold 14px') + ' monospace';
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+    if (flashT > 0) { ctx.fillStyle = 'rgba(255,215,0,' + (flashT / 18 * 0.25).toFixed(2) + ')'; ctx.fillRect(0, 0, W, H); }
+    if (running && !launched) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = 'bold 15px monospace';
+      ctx.fillText(document.body.classList.contains('touch') ? 'TAP TO LAUNCH' : 'CLICK OR SPACE TO LAUNCH', W/2, H * 0.62);
+    }
+    ctx.restore();
   }
 
-  function loop(t) {
-    const dt = Math.min(0.05, (t - lastTime) / 1000) || 0;
-    lastTime = t;
-    if (running) step(dt);
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
     draw();
     requestAnimationFrame(loop);
   }

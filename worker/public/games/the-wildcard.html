@@ -9,14 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
 <style>
   :root { --primary: #d896ff; --secondary: #ff6ec7; --bg: #150421; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    margin: 0; padding: 0; min-height: 100%;
+    margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--primary);
     font-family: Georgia, "Times New Roman", serif;
-    line-height: 1.55; overflow-x: hidden;
+    line-height: 1.55; overflow: hidden; touch-action: none; overscroll-behavior: none;
   }
-  #sparkles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  /* The story is the one scrolling panel on the page (pan-y only inside it). */
+  #page { position: relative; z-index: 1; height: 100dvh; overflow-y: auto; overflow-x: hidden;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom); }
+  #sparkles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
   .sparkle {
     position: absolute; width: 6px; height: 6px;
     background: var(--secondary);
@@ -27,17 +30,29 @@
   #wrap { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 60px 24px 80px; }
   h1 { color: var(--secondary); font-size: 56px; letter-spacing: 2px; margin: 0 0 6px; text-transform: lowercase; font-style: italic; }
   .sub { opacity: 0.75; font-size: 14px; margin-bottom: 40px; font-style: italic; }
-  #scene { font-size: 18px; border-left: 3px solid var(--secondary); padding: 0 0 0 20px; margin-bottom: 28px; min-height: 120px; }
+  #scene { font-size: clamp(16px, 4.2vw, 18px); border-left: 3px solid var(--secondary); padding: 0 0 0 20px; margin-bottom: 28px; min-height: 120px; }
+  #scene.fade { animation: fadeIn 0.35s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .choices { display: flex; flex-direction: column; gap: 10px; }
   .choice {
-    display: block; width: 100%; text-align: left; font: inherit; font-size: 16px;
-    background: transparent; color: var(--primary); border: 1px solid var(--primary);
+    display: block; width: 100%; min-height: 52px; text-align: left; font: inherit; font-size: clamp(15px, 4vw, 16px);
+    background: rgba(0,0,0,0.18); color: var(--primary); border: 1px solid var(--primary); border-radius: 6px;
     padding: 12px 16px; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.08s;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
-  .choice:hover { background: var(--primary); color: var(--bg); transform: translateX(4px); }
+  .choice .key { display: none; opacity: 0.55; font-size: 12px; margin-right: 8px; }
+  @media (hover: hover) {
+    .choice:hover { background: var(--primary); color: var(--bg); transform: translateX(4px); }
+    .ending .choice:hover { background: var(--secondary); color: var(--bg); }
+    .choice .key { display: inline; }
+  }
+  .choice:active { transform: scale(0.98); background: var(--primary); color: var(--bg); }
   .ending .choice { border-color: var(--secondary); color: var(--secondary); }
-  .ending .choice:hover { background: var(--secondary); color: var(--bg); }
+  .ending .choice:active { background: var(--secondary); color: var(--bg); }
   .meta { margin-top: 28px; font-size: 13px; opacity: 0.65; font-style: italic; }
+  .score-line { margin: 18px 0 4px; font-size: clamp(20px, 6vw, 28px); color: #fff; font-weight: 700;
+    text-shadow: 0 0 22px rgba(255,110,199,0.6); animation: fadeIn 0.5s ease-out; }
+  .ending-label { margin-bottom: 18px; font-style: italic; opacity: 0.8; }
 
   /* ── Landing page (opening story screen) — themed redesign ─────── */
   /* CYOA: no start overlay. Background on the page; readable glass panel on #wrap. */
@@ -47,7 +62,7 @@
       linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/the-wildcard.jpg') center/cover no-repeat fixed;
   }
   #wrap {
-    margin: 40px auto; padding: 40px 30px 48px;
+    margin: 40px auto; padding: 40px 30px 48px; max-width: 760px;
     background: rgba(21,4,33,0.6);
     backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
     border: 1px solid rgba(255,255,255,0.13);
@@ -60,36 +75,37 @@
     line-height: 1.05; margin: 0 0 10px; color: #fff;
     text-shadow: 0 3px 30px rgba(0,0,0,0.8), 0 0 26px rgba(255,110,199,0.5);
   }
+  @media (max-width: 520px) {
+    #wrap { margin: 12px auto 16px; padding: 24px 16px 28px; width: calc(100% - 24px); border-radius: 14px; }
+  }
 </style>
 </head>
 <body>
 <div id="sparkles"></div>
+<div id="page">
 <div id="wrap">
   <img src="logos/the-wildcard.png" alt="the wildcard" style="display:block;width:min(60%,300px);max-height:26vh;margin:0 auto 6px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-  <div class="sub">A bachelorette party CYOA. You're the wild card. Try not to ruin everything. (You will.) &mdash; Click a choice to continue.</div>
+  <div class="sub">A bachelorette party CYOA. You're the wild card. Try not to ruin everything. (You will.) &mdash; Tap or click a choice to continue.</div>
   <div id="scene"></div>
   <div id="choices" class="choices"></div>
   <div class="meta" id="meta"></div>
 </div>
+</div>
 <script>
 (() => {
-  // High score reporting.
-  // We post a CONTINUOUS skill metric on ANY ending (not only wins) so most
-  // plays register and results spread out. The raw metric rewards EXPLORATION
-  // (distinct story nodes ever seen this session — replaying to find new
-  // branches climbs the score) plus a big bonus for actually reaching a WIN
-  // ending, minus a small penalty per restart after a non-win ending (rewards
-  // getting there cleanly). SCORE_SCALE then normalizes onto the shared ~1000
-  // scale: a thorough WIN run that has seen most of the ~22 nodes lands ≈ 1000;
-  // a quick lose registers a modest spread of points instead of zero.
-  const WIN_BONUS       = 9;   // raw points for landing any win ending
-  const NODE_POINTS     = 1;   // raw per distinct node discovered this session
-  const RESTART_PENALTY = 1;   // raw per restart taken after a non-win ending
-  // ~22 nodes total; a thorough win ≈ 22*1 + 9 = 31 raw → 31*32 ≈ 992 ≈ 1000.
-  const SCORE_SCALE = 32;
-  let _hi = 0;
-  function postHi(raw) {
-    const n = Math.round((Number(raw) || 0) * SCORE_SCALE);
+  // Scoring (shown as "Score" while playing and on every ending; posted exactly as shown).
+  // The score rewards EXPLORATION plus actually reaching a WIN ending:
+  //   score = 10 x distinct scenes discovered this session
+  //         + 100 if this ending is a win
+  //         - 10 per restart taken after a non-win ending   (floored at 0)
+  // Replaying to find new branches raises it; every ending (win, lose, neutral) posts.
+  const WIN_BONUS       = 100;  // points for landing any win ending
+  const NODE_POINTS     = 10;   // per distinct scene discovered this session
+  const RESTART_PENALTY = 10;   // per restart taken after a non-win ending
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
@@ -98,8 +114,8 @@
   for (let i = 0; i < 40; i++) {
     const s = document.createElement('div');
     s.className = 'sparkle';
-    s.style.left = Math.random() * 100 + 'vw';
-    s.style.top = Math.random() * 100 + 'vh';
+    s.style.left = Math.random() * 96 + '%';
+    s.style.top = Math.random() * 96 + '%';
     s.style.animationDelay = (Math.random() * 4) + 's';
     s.style.animationDuration = (3 + Math.random() * 4) + 's';
     s.style.width = s.style.height = (4 + Math.random() * 8) + 'px';
@@ -247,45 +263,68 @@
     }
   };
 
+  const pageEl = document.getElementById('page');
   let visited = 0;                 // nodes seen in the current run
   let restarts = 0;                // restarts after a non-win ending this session
   const seenNodes = new Set();     // distinct nodes ever discovered this session
+  let ended = false;
+  function scoreFor(ending) {
+    return Math.max(0, NODE_POINTS * seenNodes.size + (ending === 'win' ? WIN_BONUS : 0) - RESTART_PENALTY * restarts);
+  }
+  function makeChoice(label, onPick, keyHint) {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    if (keyHint) { const k = document.createElement('span'); k.className = 'key'; k.textContent = keyHint; b.appendChild(k); }
+    b.appendChild(document.createTextNode(label));
+    b.addEventListener('click', onPick);
+    choicesEl.appendChild(b);
+    return b;
+  }
   function go(id) {
     const node = story[id];
     if (!node) { sceneEl.textContent = "(missing scene: " + id + ")"; return; }
     visited++;
     seenNodes.add(id);
     sceneEl.textContent = node.text;
+    sceneEl.classList.remove('fade'); void sceneEl.offsetWidth; sceneEl.classList.add('fade');
     choicesEl.innerHTML = '';
     choicesEl.classList.toggle('ending', !!node.ending);
+    ended = !!node.ending;
+    try { pageEl.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { pageEl.scrollTop = 0; }
     if (node.ending) {
-      // Post on ANY ending so most plays register a (continuous) score.
-      const raw = NODE_POINTS * seenNodes.size
-        + (node.ending === 'win' ? WIN_BONUS : 0)
-        - RESTART_PENALTY * restarts;
-      postHi(Math.max(0, raw));
+      // Post on ANY ending (win, lose, neutral) so every play registers.
+      const score = scoreFor(node.ending);
+      postHi(score);
       const lostRun = node.ending !== 'win';
-      const b = document.createElement('button');
-      b.className = 'choice';
-      b.textContent = '↺ Start over (you didn\'t learn anything)';
-      b.onclick = () => { if (lostRun) restarts++; visited = 0; go('start'); };
-      choicesEl.appendChild(b);
-      metaEl.textContent = node.ending === 'win'
+      const scoreLine = document.createElement('div');
+      scoreLine.className = 'score-line';
+      scoreLine.textContent = 'Score: ' + score.toLocaleString();
+      choicesEl.appendChild(scoreLine);
+      const label = document.createElement('div');
+      label.className = 'ending-label';
+      label.textContent = node.ending === 'win'
         ? '… Ending: somehow, you won …'
         : node.ending === 'lose'
           ? '… Ending: deeply earned …'
           : '… Ending: morally ambiguous …';
+      choicesEl.appendChild(label);
+      makeChoice('↺ Start over (you didn\'t learn anything)', () => { if (lostRun) restarts++; visited = 0; go('start'); }, 'Enter');
+      metaEl.textContent = 'Scenes discovered: ' + seenNodes.size + ' · Restarts: ' + restarts;
       return;
     }
-    metaEl.textContent = 'Scenes visited: ' + visited;
-    for (const c of node.choices || []) {
-      const b = document.createElement('button');
-      b.className = 'choice';
-      b.textContent = '▶ ' + c.label;
-      b.onclick = () => go(c.next);
-      choicesEl.appendChild(b);
-    }
+    metaEl.textContent = 'Scenes visited: ' + visited + ' · Score: ' + scoreFor(null).toLocaleString() + ' (+' + WIN_BONUS + ' for a win)';
+    (node.choices || []).forEach((c, i) => makeChoice('▶ ' + c.label, () => go(c.next), String(i + 1)));
   }
+  // Keyboard: 1-3 picks a choice, Enter starts over from an ending.
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  addEventListener('keydown', e => {
+    if (e.repeat) return;
+    const btns = choicesEl.querySelectorAll('.choice');
+    if (e.key === 'Enter' && ended && btns[0]) { e.preventDefault(); btns[0].click(); return; }
+    if (/^[1-9]$/.test(e.key) && !ended) { const b = btns[Number(e.key) - 1]; if (b) { e.preventDefault(); b.click(); } }
+  });
   go('start');
 })();
 </script>

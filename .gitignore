@@ -35,3 +35,10 @@ wrangler.toml.bak
 
 # OS
 Thumbs.db
+
+# logo generator scratch
+scripts/.logo-raw/
+
+# QA harness output
+scripts/qa/shots/
+scripts/qa/node_modules/

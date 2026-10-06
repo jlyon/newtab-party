@@ -14,22 +14,33 @@
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden; touch-action: none;
+    overflow: hidden; touch-action: none; overscroll-behavior: none;
   }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 4px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 26px); letter-spacing: 2px; color: var(--secondary); text-transform: lowercase; }
   #hud { width: min(min(600px, 95vw), calc((100dvh - 230px) * 0.857)); display: flex; justify-content: space-between; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; gap: 10px; }
   #hud span { white-space: nowrap; }
-  canvas { background: #000; border: 1px solid rgba(59,130,246,0.25); box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-width: min(600px, 95vw); max-height: calc(100dvh - 230px); width: auto; height: auto; display: block; }
-  #controls { display: flex; align-items: center; justify-content: space-between; width: min(min(600px, 95vw), calc((100dvh - 230px) * 0.857)); padding: 2px 0; }
-  @media (pointer: fine) { #controls { display: none; } canvas { max-height: calc(100dvh - 120px); } }
+  /* Explicit CSS width (height follows the 6:7 aspect) so the DPR backing-store resize never feeds back into layout. */
+  canvas { background: #000; border: 1px solid rgba(59,130,246,0.25); box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+    width: min(600px, 95vw, calc((100dvh - 120px) * 0.857)); height: auto; display: block; touch-action: none; }
+  /* Touch: >= 24px between the canvas and the screen edges so a drag never starts the browser's back gesture. */
+  body.touch canvas { width: min(600px, 100vw - 48px, calc((100dvh - 230px) * 0.857)); }
   /* On-screen controls are for touch devices only; revealed after first touch. */
-  body:not(.touch) #controls { display: none; }
+  #controls { display: none; align-items: center; justify-content: space-between; width: min(600px, 100vw - 48px, calc((100dvh - 230px) * 0.857)); padding: 2px 0 env(safe-area-inset-bottom); }
+  body.touch #controls { display: flex; }
+  /* Landscape touch (tablet / phone sideways): d-pad bottom-left, fire bottom-right, canvas uses the full height. */
+  @media (orientation: landscape) and (max-height: 820px) {
+    body.touch canvas { width: min(600px, 100vw - 48px, calc((100dvh - 96px) * 0.857)); }
+    body.touch #controls { position: fixed; inset: 0; width: auto; pointer-events: none; z-index: 5; padding: 0; }
+    body.touch .dpad { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); pointer-events: auto; }
+    body.touch .btn-fire { position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); pointer-events: auto; }
+    body.touch .btn { background: rgba(0,0,0,0.75); }
+  }
   .dpad { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .dpad-row { display: flex; gap: 3px; align-items: center; }
   .btn { width: 52px; height: 52px; font-size: 20px; border: 2px solid var(--primary);
     background: rgba(0,0,0,0.4); color: var(--primary); cursor: pointer; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; touch-action: none;
     user-select: none; -webkit-touch-callout: none; }
   .btn:active, .btn.held { background: var(--primary); color: #000; }
   .dpad-gap { width: 52px; }
@@ -44,8 +55,13 @@
   #overlay h2, #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 38px); margin: 0 0 10px; letter-spacing: 2px; }
   #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
   #overlay .small, #start-overlay .small { opacity: 0.7; font-size: clamp(11px, 2.5vw, 12px); }
-  #overlay button, #start-overlay button { margin-top: 18px; padding: 10px 22px; font-size: clamp(14px, 4vw, 16px); background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold; }
+  #overlay button, #start-overlay button { margin-top: 18px; padding: 14px 26px; min-height: 52px; font-size: clamp(14px, 4vw, 16px); background: var(--primary); color: var(--bg); border: none; cursor: pointer; letter-spacing: 1px; font-weight: bold;
+    user-select: none; -webkit-touch-callout: none; border-radius: 6px; transition: transform 0.12s, background 0.12s; }
   #overlay button:hover, #start-overlay button:hover { background: var(--secondary); }
+  #overlay button:active, #start-overlay button:active { transform: scale(0.97); }
+  #overlay { z-index: 9; }
+  .touch-only { display: none; } body.touch .touch-only { display: block; } body.touch .kbd-only { display: none; }
+  #overlay .score { color: #fff; font-size: clamp(18px, 5vw, 26px); font-weight: 800; margin: 6px 0 10px; }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
@@ -102,14 +118,17 @@
 <div id="start-overlay">
   <img src="logos/shootin-n-crackin.png" alt="shootin n crackin" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
   <p>You're a Pizza Slice dodging IRS auditors.</p>
-  <p>Arrow keys / WASD to move &nbsp;·&nbsp; Space (or ⚡) to shoot</p>
+  <p class="kbd-only">Arrow keys / WASD to move &nbsp;·&nbsp; Space to shoot</p>
+  <p class="touch-only">Drag the slice or use the d-pad &nbsp;·&nbsp; ⚡ to shoot</p>
   <p class="small">Lasers BOUNCE off walls. Bosses every 30s. Stay greasy.</p>
   <button id="start-btn">Play</button>
 </div>
 <div id="overlay">
   <h2 id="overTitle">audited</h2>
   <p id="overMsg">The IRS auditors got the slice. Tragic.</p>
-  <p>Arrow keys / WASD to move &nbsp;·&nbsp; Space to shoot</p>
+  <p class="score" id="overScore">Score: 0</p>
+  <p class="kbd-only">Arrow keys / WASD to move &nbsp;·&nbsp; Space to shoot &nbsp;·&nbsp; Enter to restart</p>
+  <p class="touch-only">Drag the slice or use the d-pad &nbsp;·&nbsp; ⚡ to shoot</p>
   <p class="small">Lasers BOUNCE off walls. Bosses every 30s. Stay greasy.</p>
   <button id="restart">Play again</button>
 </div>
@@ -121,18 +140,36 @@
   window.addEventListener('pointerdown', grabFocus);
   // On-screen controls are mobile-only: reveal on first touch.
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+  // Back-swipe guard: a stray edge swipe stays on the page instead of leaving the arcade.
+  window.addEventListener('touchstart', () => {
+    try { history.pushState(null, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
 
-  // High score reporting.
-  // SCORE_SCALE normalizes raw in-game score to a leaderboard magnitude where a
-  // strong ~60-90s run posts ≈ 1000. Raw great-run score is in the low thousands
-  // (10/enemy, 150/boss), so ~0.5 lands a great run near 1000.
-  let _hi = 0;
-  const SCORE_SCALE = 0.5;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
+  // High score reporting: the posted number is the HUD score (10 per auditor, 150 per boss).
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
+  // Logical size for all game math; the backing store is sized to CSS size x DPR
+  // and the context scaled to match, so rendering stays crisp at any size / DPR.
+  const W = 600, H = 700;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width  = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+  window.addEventListener('touchstart', () => setTimeout(fitCanvas, 0), { once: true, passive: true });   // body.touch changes the CSS size
   const scoreEl = document.getElementById('score');
   const livesEl = document.getElementById('lives');
   const waveEl = document.getElementById('wave');
@@ -176,24 +213,59 @@
   holdBtn('btn-up', 'up'); holdBtn('btn-down', 'down');
   holdBtn('btn-fire', 'fire');
 
-  let player, bullets, enemies, bosses, glitter;
+  // Drag on the canvas moves the slice (relative drag, scaled to logical units) and auto-fires while touching.
+  let dragTarget = null, dragLast = null;
+  function canvasPt(t) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (t.clientX - r.left) * (W / r.width), y: (t.clientY - r.top) * (H / r.height) };
+  }
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    dragLast = canvasPt(e.touches[0]); dragTarget = { x: player.x, y: player.y }; held.touchFire = true;
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!dragLast) return;
+    const p = canvasPt(e.touches[0]);
+    dragTarget.x += (p.x - dragLast.x) * 1.15; dragTarget.y += (p.y - dragLast.y) * 1.15;
+    dragTarget.x = Math.max(0, Math.min(W - player.w, dragTarget.x));
+    dragTarget.y = Math.max(0, Math.min(H - player.h, dragTarget.y));
+    dragLast = p;
+  }, { passive: false });
+  const endDrag = () => { dragLast = null; dragTarget = null; held.touchFire = false; };
+  canvas.addEventListener('touchend', endDrag, { passive: true });
+  canvas.addEventListener('touchcancel', endDrag, { passive: true });
+
+  let player, bullets, enemies, bosses, glitter, sparks;
   let score, lives, wave;
   let lastShot, lastSpawn, lastBoss, lastWave, lastTrail, startTime, running;
   let auditSurvived;
+  let shake = 0, flash = 0;      // hit shake + flash (stepped, rendered in draw)
   let toastText = '', toastUntil = 0;
   function showToast(msg) { toastText = msg; toastUntil = performance.now() + 1800; }
 
   function reset() {
     player = { x: W/2 - 18, y: H - 70, w: 36, h: 38 };
-    bullets = []; enemies = []; bosses = []; glitter = [];
+    bullets = []; enemies = []; bosses = []; glitter = []; sparks = [];
     score = 0; lives = 3; wave = 1;
     const now = performance.now();
     lastShot = 0; lastSpawn = 0;
     lastBoss = now; lastWave = now; lastTrail = 0; startTime = now;
     auditSurvived = false; toastText = ''; toastUntil = 0;
+    shake = 0; flash = 0; endDrag();
     running = true;
     overlay.style.display = 'none';
     updateHud();
+  }
+  function burst(x, y, color, n, v) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.4) * v;
+      sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, size: 2 + Math.random() * 3, color });
+    }
+  }
+  function hitPlayer() {
+    lives--; shake = 14; flash = 8;
+    burst(player.x + player.w / 2, player.y + player.h / 2, PRIMARY, 18, 3);
   }
   function updateHud() {
     scoreEl.textContent = 'Score: ' + score;
@@ -223,7 +295,8 @@
     running = false;
     overTitle.textContent = 'audited';
     overMsg.textContent = 'The ' + ENEMY_NAME + ' got the slice. Should have filed earlier.';
-    overlay.style.display = 'flex';
+    document.getElementById('overScore').textContent = 'Score: ' + score.toLocaleString();
+    setTimeout(() => { if (!running) overlay.style.display = 'flex'; }, 350);   // let the hit shake play first
   }
 
   function step(now) {
@@ -232,10 +305,16 @@
     if (keys['arrowright'] || keys['d'] || held.right) vx += PLAYER_SPEED;
     if (keys['arrowup']    || keys['w'] || held.up)    vy -= PLAYER_SPEED;
     if (keys['arrowdown']  || keys['s'] || held.down)  vy += PLAYER_SPEED;
+    if (dragTarget && !vx && !vy) {
+      // follow the drag target at (up to) the normal player speed so drag can't out-run the keys
+      const dx = dragTarget.x - player.x, dy = dragTarget.y - player.y, d = Math.hypot(dx, dy);
+      const mv = Math.min(d, PLAYER_SPEED * 1.6);
+      if (d > 0.5) { vx = dx / d * mv; vy = dy / d * mv; }
+    }
     player.x = Math.max(0, Math.min(W - player.w, player.x + vx));
     player.y = Math.max(0, Math.min(H - player.h, player.y + vy));
 
-    if ((keys[' '] || held.fire) && now - lastShot > BULLET_COOLDOWN_MS) {
+    if ((keys[' '] || held.fire || held.touchFire) && now - lastShot > BULLET_COOLDOWN_MS) {
       bullets.push({ x: player.x + player.w/2 - 3, y: player.y, w: 6, h: 12, vx: (Math.random() - 0.5) * 3.2, vy: -BULLET_SPEED, bounces: BULLET_BOUNCES });
       lastShot = now;
     }
@@ -261,19 +340,20 @@
     }
     for (const g of glitter) { g.x += g.vx; g.y += g.vy; g.life -= 0.025; }
     glitter = glitter.filter(g => g.life > 0);
+    fxStep();
 
     for (const e of enemies) {
-      for (const b of bullets) { if (!b.dead && rectsHit(b, e)) { e.dead = true; b.dead = true; score += 10; } }
-      if (!e.dead && rectsHit(e, player)) { e.dead = true; lives--; }
+      for (const b of bullets) { if (!b.dead && rectsHit(b, e)) { e.dead = true; b.dead = true; score += 10; burst(e.x + e.w / 2, e.y + e.h / 2, SECONDARY, 10, 2.2); } }
+      if (!e.dead && rectsHit(e, player)) { e.dead = true; hitPlayer(); }
     }
     for (const boss of bosses) {
       for (const b of bullets) {
         if (!b.dead && rectsHit(b, boss)) {
-          boss.hp--; b.dead = true;
-          if (boss.hp <= 0) { boss.dead = true; score += 150; }
+          boss.hp--; b.dead = true; burst(b.x, b.y, '#fff', 3, 1.5);
+          if (boss.hp <= 0) { boss.dead = true; score += 150; burst(boss.x + boss.w / 2, boss.y + boss.h / 2, SECONDARY, 40, 3.5); shake = 10; }
         }
       }
-      if (!boss.dead && rectsHit(boss, player)) { lives--; boss.y = -120; boss.vy = 0.7; }
+      if (!boss.dead && rectsHit(boss, player)) { hitPlayer(); boss.y = -120; boss.vy = 0.7; }
     }
     bullets = bullets.filter(b => !b.dead);
     enemies = enemies.filter(e => !e.dead && e.y < H + 40);
@@ -285,6 +365,13 @@
     // for leaderboard fairness, so the game is endless and ends only on death.)
     if (!auditSurvived && score >= WIN_SCORE) { auditSurvived = true; showToast('Audit survived!'); }
     if (lives <= 0) endGame();
+  }
+  // Cosmetic state advanced once per fixed step (also runs after game over so the last hit animates)
+  function fxStep() {
+    for (const s of sparks) { s.x += s.vx; s.y += s.vy; s.vy += 0.05; s.life -= 0.035; }
+    sparks = sparks.filter(s => s.life > 0);
+    if (shake > 0) shake--;
+    if (flash > 0) flash--;
   }
 
   function drawStars() {
@@ -335,9 +422,14 @@
   }
 
   function draw() {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) { const a = shake * 0.5; ctx.translate((Math.random() - 0.5) * a, (Math.random() - 0.5) * a); }
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#05030f'); bg.addColorStop(1, '#000');
+    ctx.fillStyle = bg; ctx.fillRect(-10, -10, W + 20, H + 20);
     drawStars();
     for (const g of glitter) { ctx.globalAlpha = Math.max(0, g.life); ctx.fillStyle = g.color; ctx.fillRect(g.x, g.y, g.size, g.size); }
+    for (const s of sparks) { ctx.globalAlpha = Math.max(0, s.life); ctx.fillStyle = s.color; ctx.fillRect(s.x, s.y, s.size, s.size); }
     ctx.globalAlpha = 1;
     drawPizza(player.x, player.y, player.w, player.h);
     ctx.save(); ctx.shadowColor = SECONDARY; ctx.shadowBlur = 10; ctx.fillStyle = SECONDARY;
@@ -352,18 +444,31 @@
       ctx.fillText(toastText, W / 2, H * 0.3);
       ctx.restore();
     }
+    ctx.restore();
+    if (flash > 0) { ctx.fillStyle = 'rgba(255,61,139,' + (flash / 8 * 0.35) + ')'; ctx.fillRect(0, 0, W, H); }
   }
 
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
   function loop(now) {
-    if (running) step(now);
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); else fxStep(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
     draw();
     requestAnimationFrame(loop);
   }
+  const startOverlay = document.getElementById('start-overlay');
+  function startGame() { startOverlay.style.display = 'none'; grabFocus(); reset(); }
   document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
-  document.getElementById('start-btn').addEventListener('click', () => {
-    document.getElementById('start-overlay').style.display = 'none';
-    grabFocus();
-    reset();
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (startOverlay.style.display !== 'none') startGame();
+    else if (overlay.style.display === 'flex') { grabFocus(); reset(); }
   });
   // Set up initial state but DO NOT start gameplay (spawns/timers) until Play.
   reset(); running = false;
