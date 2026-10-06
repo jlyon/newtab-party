@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>The Sunken Signal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,30 +16,43 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    margin: 0; padding: 0; min-height: 100%;
+    margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: #d9efe2;
     font-family: Georgia, "Times New Roman", serif;
     line-height: 1.5;
+    overflow: hidden; touch-action: none; overscroll-behavior: none;
   }
+  /* The story column is the only thing that scrolls (pan-y on this panel only). */
   #wrap {
-    max-width: 760px; margin: 0 auto;
-    padding: 14px 14px 60px;
+    max-width: 920px; margin: 0 auto;
+    height: 100dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    touch-action: pan-y; overscroll-behavior: contain;
+    padding: 12px 14px calc(24px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column; align-items: stretch;
   }
+  #wrap > * { flex-shrink: 0; }
   #hud {
     display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 14px; padding: 2px 4px 8px; color: var(--secondary);
-    letter-spacing: 1px;
+    font-size: clamp(12px, 3.2vw, 14px); padding: 2px 4px 8px; color: var(--secondary);
+    letter-spacing: 1px; gap: 10px; white-space: nowrap;
   }
-  #hud .score { color: var(--blue); font-size: 16px; }
+  #hud .score { color: var(--blue); font-size: clamp(14px, 3.6vw, 17px); }
+  #hud .score.pop { animation: pop 0.35s ease; }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
   #hud .gems { color: var(--primary); }
   #art {
     width: 100%; border: 1px solid #0e3a4a; border-radius: 8px;
     overflow: hidden; background: #041a24;
+    /* keep the picture from eating the whole phone screen so text + choices stay reachable */
+    max-height: calc(100dvh - 190px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 0 60px rgba(0,0,0,0.25);
   }
-  #art svg { display: block; width: 100%; height: auto; }
+  #art svg { display: block; width: 100%; height: auto; max-height: calc(100dvh - 190px); margin: 0 auto; }
+  #art.fade svg { animation: fadeIn 0.45s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   .gem { cursor: pointer; }
-  .gem:hover .rock { transform: scale(1.15); }
+  .gem .rock { transform-box: fill-box; transform-origin: center; transition: transform 0.12s; }
+  .gem:hover .rock, .gem:active .rock { transform: scale(1.25); }
   #scene {
     font-size: clamp(15px, 2.6vw, 18px);
     border-left: 3px solid var(--secondary);
@@ -91,6 +104,8 @@
   /* CYOA: the intro #overlay over the art box IS the landing screen. */
   #overlay {
     position: fixed; inset: 0; z-index: 50;
+    overflow-y: auto; touch-action: pan-y;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
     background:
       radial-gradient(90% 78% at 50% 42%, rgba(4,22,30,0.72), rgba(4,22,30,0.56) 68%, rgba(2,12,17,0.86)),
       linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/the-sunken-signal.jpg') center/cover no-repeat;
@@ -114,6 +129,10 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease, background 0.14s ease;
   }
   #playBtn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.06); background: var(--secondary, #e8c877); }
+  #playBtn:active { transform: translateY(1px) scale(0.98); filter: brightness(0.95); }
+  #playBtn { min-height: 52px; min-width: 160px; user-select: none; -webkit-touch-callout: none; }
+  #overlay img { display: block; width: min(82%, 400px); max-height: 30dvh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (max-height: 700px) { #overlay img { max-height: 22dvh; } #overlay p { margin: 2px 0; } }
 </style>
 </head>
 <body>
@@ -126,9 +145,9 @@
   <div id="artbox">
     <div id="art"></div>
     <div id="overlay">
-      <img src="logos/the-sunken-signal.png" alt="The Sunken Signal" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+      <img src="logos/the-sunken-signal.png" alt="The Sunken Signal">
       <p>You are Wren Calloway, salvage diver — the last person still listening on channel 121.5. Three nights ago, a research station that sank thirty-one years ago started broadcasting again.</p>
-      <p class="hint">Click choices to explore · 9 gems are hidden in the scenery — click them · Endings pay big</p>
+      <p class="hint">Tap choices to explore · 9 gems are hidden in the scenery — tap them · Endings pay big</p>
       <button id="playBtn">SET SAIL</button>
     </div>
   </div>
@@ -145,11 +164,14 @@
   const overlayEl = document.getElementById('overlay');
   const gemHud = document.getElementById('gemHud');
   const scoreHud = document.getElementById('scoreHud');
+  const wrapEl = document.getElementById('wrap');
 
-  let _hi = 0;
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   // ===== GAME-SPECIFIC SECTION =====
@@ -396,15 +418,16 @@
 
   function gemSvg(id, g) {
     return `<g class="gem" data-gem="${id}" transform="translate(${g.x},${g.y})">
-      <circle r="16" fill="transparent"/>
+      <circle r="30" fill="transparent"/>
       <g class="rock"><path d="M0 -9 L8 -2 L0 10 L-8 -2 Z" fill="#7fe9ff" stroke="#e8fdff" stroke-width="1.5"/>
       <path d="M0 -9 L0 10 M-8 -2 L8 -2" stroke="#e8fdff" stroke-width="1" opacity="0.8"/></g>
       <circle r="12" fill="url(#gl)"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.8s" repeatCount="indefinite"/></circle></g>`;
   }
 
-  function updateHud() {
+  function updateHud(pop) {
     gemHud.textContent = '◆ ' + S.gems.size + '/9';
-    scoreHud.textContent = S.score;
+    scoreHud.textContent = 'Score: ' + S.score.toLocaleString();
+    if (pop) { scoreHud.classList.remove('pop'); void scoreHud.offsetWidth; scoreHud.classList.add('pop'); }
   }
 
   function render(id) {
@@ -415,18 +438,21 @@
     if (node.art) for (const [gid, g] of Object.entries(GEMS))
       if (g.scene === node.art && !S.gems.has(gid)) art += gemSvg(gid, g);
     artEl.innerHTML = '<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">' + art + '</svg>';
+    artEl.classList.remove('fade'); void artEl.offsetWidth; artEl.classList.add('fade');
     if (node.onEnter) node.onEnter();
     sceneEl.innerHTML = node.text();
     choicesEl.innerHTML = '';
     choicesEl.classList.toggle('ending', !!node.ending);
+    wrapEl.scrollTop = 0;
     if (node.ending) {
+      // Score = 100 per gem found + the ending bonus; posted exactly as displayed.
       S.score += node.bonus;
-      updateHud();
+      updateHud(true);
       postHi(S.score);
       const label = node.ending === 'win' ? '✦ ' + (node.bonus === 800 ? 'Ending: the heist' : 'Ending: the answer') + ' · +' + node.bonus + ' ✦'
         : node.ending === 'lose' ? '✦ Ending: the island keeps you · +' + node.bonus + ' ✦'
         : '✦ Ending: the quiet life · +' + node.bonus + ' ✦';
-      metaEl.textContent = label + '  Final score: ' + S.score + (S.gems.size < 9 ? '  ·  ' + (9 - S.gems.size) + ' gems still hidden out there…' : '  ·  All 9 gems found. Show-off.');
+      metaEl.textContent = label + '  Score: ' + S.score.toLocaleString() + (S.gems.size < 9 ? '  ·  ' + (9 - S.gems.size) + ' gems still hidden out there…' : '  ·  All 9 gems found. Show-off.');
       const b = document.createElement('button');
       b.className = 'choice';
       b.textContent = '↻ Sail back and explore again (Enter)';
@@ -457,22 +483,30 @@
     if (S.gems.has(id)) return;
     S.gems.add(id);
     S.score += GEM_PTS;
-    updateHud();
+    updateHud(true);
     g.outerHTML = `<g transform="translate(${GEMS[id].x},${GEMS[id].y})"><text text-anchor="middle" y="-6" font-size="18" fill="#7fe9ff" font-family="Georgia">+${GEM_PTS}<animate attributeName="opacity" values="1;0" dur="1s" fill="freeze"/><animateTransform attributeName="transform" type="translate" values="0 0; 0 -24" dur="1s" fill="freeze"/></text></g>`;
   });
 
   addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
+    if (e.key !== 'Enter' || e.repeat) return;
+    e.preventDefault();
     if (overlayEl.style.display !== 'none') { start(); return; }
     const first = document.querySelector('.choice');
     if (first) first.click();
   });
 
+  // Mark touch devices (choices are big tap targets already; gems get a wide hit circle).
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+
   function start() {
+    if (overlayEl.style.display === 'none') return;
     overlayEl.style.display = 'none';
     restart();
+    try { window.focus(); } catch (e) {}
   }
   document.getElementById('playBtn').addEventListener('click', start);
+  try { window.focus(); } catch (e) {}
+  window.addEventListener('pointerdown', () => { try { window.focus(); } catch (e) {} });
 
   artEl.innerHTML = '<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">' + SCENES.beach() + '</svg>';
 })();

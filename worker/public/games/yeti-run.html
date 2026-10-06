@@ -8,22 +8,60 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet" />
 <style>
-  :root { --primary: #4FC3F7; --secondary: #FF6FB5; --bg: #0a1428; }
+  :root { --primary: #4FC3F7; --secondary: #FF6FB5; --bg: #0a1428; --reserved: 112px; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  body.touch { --reserved: 224px; }
+  /* phones: keep >= 24px of non-game margin so taps/drags never start in the browser's edge-swipe zone */
+  @media (max-width: 700px) {
+    body.touch canvas { width: min(95vw - 48px, calc((100dvh - var(--reserved)) * 1.7778)); }
+    body.touch.portrait canvas { width: min(95vw - 48px, calc((100dvh - var(--reserved)) * 1.3333)); }
+  }
+  /* tablet landscape: JUMP beside the canvas so everything fits the short viewport */
+  @media (orientation: landscape) and (max-height: 820px) and (min-width: 700px) {
+    body.touch { --reserved: 110px; }
+    body.touch canvas { width: min(95vw - 160px, calc((100dvh - var(--reserved)) * 1.7778)); }
+    body.touch #wrap { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 20px; }
+    body.touch h1, body.touch #hud, body.touch #touch-hint { flex-basis: 100%; text-align: center; justify-content: center; }
+    body.touch #touch-hint { order: 10; }
+    body.touch #touch-controls { flex: 0 0 auto; }
+    body.touch #touch-controls { width: 120px; }
+    body.touch #touch-controls button { min-height: 120px; }
+  }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px;
+    padding: 8px 0 env(safe-area-inset-bottom); }
   h1 { margin: 0; font-size: clamp(15px, 4vw, 22px); letter-spacing: 2px; }
-  #hud { display: flex; gap: 20px; font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
-  canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(95vw, calc((100dvh - 80px) * 3.048)); height: auto; display: block; cursor: pointer; }
+  #hud { display: flex; gap: clamp(10px, 4vw, 20px); font-size: clamp(11px, 3vw, 14px); opacity: 0.85; white-space: nowrap; }
+  canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6); border-radius: 6px;
+    width: min(95vw, calc((100dvh - var(--reserved)) * 1.7778)); height: auto; display: block; cursor: pointer;
+    user-select: none; -webkit-touch-callout: none; }
+  body.portrait canvas { width: min(95vw, calc((100dvh - var(--reserved)) * 1.3333)); }
   #hint { font-size: clamp(10px, 2.5vw, 13px); opacity: 0.5; }
-  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+  body.touch #hint { display: none; }
+  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 14px); opacity: 0.6; text-align: center; padding: 0 16px; }
+  body.touch #touch-hint { display: block; }
+  /* On-screen controls: touch devices only. */
+  #touch-controls { display: none; width: min(95vw, 480px); gap: 10px; }
+  body.touch #touch-controls { display: flex; }
+  #touch-controls button {
+    flex: 1; min-height: 64px; min-width: 48px; font-family: 'Bungee', system-ui, sans-serif;
+    font-size: clamp(16px, 4.5vw, 22px); letter-spacing: 2px; border: none; border-radius: 14px;
+    background: rgba(79,195,247,0.18); color: var(--primary); border: 2px solid rgba(79,195,247,0.6);
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; cursor: pointer;
+  }
+  #touch-controls button.pressed, #touch-controls button:active { background: var(--primary); color: var(--bg); transform: scale(0.97); }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 30;
     background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
-  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
-  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; font-family: 'Bungee', system-ui, sans-serif; }
+  #overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 46ch; }
+  #overlay #overScore { font-size: clamp(16px, 4.5vw, 22px); color: #fff; margin-top: 8px; }
+  #overlay button { margin-top: 18px; padding: 14px 32px; min-height: 52px; min-width: 160px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 40px; letter-spacing: 1px;
+    font-family: 'Bungee', system-ui, sans-serif; user-select: none; -webkit-touch-callout: none;
+    transition: transform 0.14s ease, filter 0.14s ease; }
+  #overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #overlay button:active { transform: scale(0.97); filter: brightness(0.95); }
   #start-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.82); flex-direction: column; text-align: center; padding: 20px; z-index: 20; }
   #start-overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 10px; letter-spacing: 1px; }
@@ -37,6 +75,8 @@
       radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)),
       linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/yeti-run.jpg') center/cover no-repeat;
   }
+  #start-overlay img { display: block; width: min(82%, 400px); max-height: 34dvh; margin: 0 auto 12px; object-fit: contain;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
   #start-overlay h2 {
     font-family: 'Bungee', sans-serif;
     font-size: clamp(38px, 11vw, 92px);
@@ -50,14 +90,16 @@
   }
   #start-overlay button {
     font-family: 'Bungee', sans-serif;
-    margin-top: 24px; padding: 15px 46px;
+    margin-top: 24px; padding: 15px 46px; min-height: 52px;
     font-size: clamp(14px,3.6vw,18px); letter-spacing: 2px; text-transform: uppercase;
     border: none; border-radius: 40px; cursor: pointer;
     color: var(--bg); background: var(--primary);
     box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    user-select: none; -webkit-touch-callout: none;
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay button:active { transform: scale(0.97); filter: brightness(0.95); }
 </style>
 </head>
 <body>
@@ -68,12 +110,16 @@
     <span id="score">Score: 0</span>
     <span id="hi">Best: 0</span>
   </div>
-  <canvas id="game" width="640" height="210"></canvas>
-  <div id="hint">Space · ↑ to jump &nbsp;|&nbsp; Double-jump allowed</div>
+  <canvas id="game" width="640" height="360"></canvas>
+  <div id="hint">Space · ↑ · click to jump &nbsp;|&nbsp; Double-jump allowed</div>
+  <div id="touch-hint">Tap the slope or JUMP to jump &middot; tap again mid-air to double-jump</div>
+  <div id="touch-controls">
+    <button id="btn-jump" type="button" aria-label="Jump">JUMP</button>
+  </div>
 </div>
 <div id="start-overlay">
-  <img src="logos/yeti-run.png" alt="Yeti Run" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-  <p>Tap, or press Space / &uarr; to jump &mdash; tap again mid-air to double-jump. Dodge the snowmen, skiers &amp; avalanche boulders. Endless run; go as far as you can.</p>
+  <img src="logos/yeti-run.png" alt="Yeti Run">
+  <p>Tap / Space / &uarr; to jump &mdash; tap again mid-air to double-jump. Dodge the snowmen, skiers &amp; avalanche boulders. Endless run; go as far as you can.</p>
   <button id="start-btn">&#10052; Start running</button>
 </div>
 <div id="overlay">
@@ -88,6 +134,13 @@
   function grabFocus(){ try { window.focus(); } catch(e){} }
   window.addEventListener('load', grabFocus);
   window.addEventListener('pointerdown', grabFocus);
+  // Reveal on-screen controls on the first real touch, and arm the back-swipe guard
+  // (a stray edge swipe stays on this page instead of leaving the arcade).
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch'); fitCanvas();
+    try { history.pushState(null, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -104,7 +157,13 @@
   // Logical game resolution (all drawing uses these units). The canvas backing
   // store is sized to the displayed element at full device-pixel resolution and
   // the context is scaled to match, so rendering stays crisp at any size / DPR.
-  const W = 640, H = 210;
+  // H is taller than the original 210 strip (more sky, same ground-relative
+  // gameplay geometry) so the action is legible on a portrait phone.
+  // Portrait screens (phones, tablets) get a 4:3 canvas (more sky) so the strip is not tiny; same geometry.
+  const PORTRAIT = window.innerHeight > window.innerWidth;
+  if (PORTRAIT) document.body.classList.add('portrait');
+  const W = 640, H = PORTRAIT ? 480 : 360;
+  canvas.height = H;
   const GROUND_Y = H - 30;
   function fitCanvas() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -140,13 +199,17 @@
   const EYE = '#2A1F4A';
   let py, pvy, jumpsLeft, obsts, frame, spd, score, hiScore = 0, running, started;
   let snowflakes = [];
+  let particles = [];      // snow puffs (jump / landing / death)
+  let pops = [];           // floating "+100" milestone pop-ups
+  let shake = 0, flash = 0, nextPop = 100;
+  let wasOnGround = true;
   let canStart = false;   // true once the title-screen Play button is clicked
 
   function reset() {
     py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2;
     obsts = []; frame = 0; spd = BASE_SPEED; score = 0;
     running = true; started = false;
-    snowflakes = [];
+    snowflakes = []; particles = []; pops = []; shake = 0; flash = 0; nextPop = 100; wasOnGround = true;
     for (let i = 0; i < 40; i++) {
       snowflakes.push({ x: Math.random() * W, y: Math.random() * (GROUND_Y - 4), r: 1 + Math.random() * 2, vy: 0.3 + Math.random() * 0.8 });
     }
@@ -156,21 +219,33 @@
     scoreEl.textContent = 'Score: ' + score;
     hiEl.textContent = 'Best: ' + hiScore;
   }
+  function puff(x, y, n, spread) {
+    for (let i = 0; i < n; i++) {
+      particles.push({ x, y, vx: (Math.random() - 0.5) * spread, vy: -Math.random() * spread * 0.6, r: 1.5 + Math.random() * 2.5, life: 20 + Math.random() * 15 });
+    }
+  }
   function jump() {
     if (!canStart || !running) return;
     started = true;
-    if (jumpsLeft > 0) { pvy = JUMP_FORCE; jumpsLeft--; }
+    if (jumpsLeft > 0) {
+      pvy = JUMP_FORCE; jumpsLeft--;
+      puff(PX + PW / 2, py + PH + 4, 6, jumpsLeft ? 3 : 4.5);
+    }
   }
-  // SCORE_SCALE normalizes raw score (floor(frame*spd*0.04), low thousands for a
-  // strong ~90s run) to a leaderboard magnitude where a great run posts ≈ 1000.
-  // postHi is monotonic + integer; pass it the RAW score.
-  let _hi = 0;
-  const SCORE_SCALE = 0.7;   // tuned so a great run ≈ 1000
-  function postHi(raw){ const n=Math.round((Number(raw)||0)*SCORE_SCALE); if(n>_hi)_hi=n; try{window.parent.postMessage({highScore:n},'*');}catch(e){} }
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
   function endGame(won, killerType) {
     running = false;
     if (score > hiScore) hiScore = score;
+    // Score = floor(frame * speed * 0.04), the distance readout shown in the HUD; posted as-is.
     postHi(score);
+    shake = won ? 0 : 14; flash = won ? 0 : 1;
+    if (!won) puff(PX + PW / 2, py + PH / 2, 22, 7);
     overTitle.textContent = won ? 'You win!' : 'Yedric down.';
     if (won) {
       overMsg.textContent = WIN_MSG;
@@ -184,7 +259,18 @@
     }
     overScore.textContent = 'Score: ' + score + (score >= hiScore && score > 0 ? ' · new best!' : '  ·  Best: ' + hiScore);
     updateHud();
-    overlay.style.display = 'flex';
+    // Let the death puff / shake play for a beat before the overlay covers it.
+    setTimeout(() => { if (!running) overlay.style.display = 'flex'; }, won ? 0 : 420);
+  }
+
+  // Effects that keep animating after death (shake decay, particles) — stepped, never in draw().
+  function stepFx() {
+    if (shake > 0) shake = Math.max(0, shake - 0.8);
+    if (flash > 0) flash = Math.max(0, flash - 0.08);
+    for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.life--; }
+    particles = particles.filter(p => p.life > 0 && p.y < H + 10);
+    for (const p of pops) { p.y -= 0.8; p.life--; }
+    pops = pops.filter(p => p.life > 0);
   }
 
   function step() {
@@ -192,7 +278,10 @@
     if (!started) return;
     spd += SPEED_INC;
     pvy += GRAVITY; py += pvy;
-    if (py >= GROUND_Y - PH) { py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2; }
+    const onGround = py >= GROUND_Y - PH;
+    if (onGround) { py = GROUND_Y - PH; pvy = 0; jumpsLeft = 2; }
+    if (onGround && !wasOnGround) puff(PX + PW / 2, py + PH + 4, 8, 4);
+    wasOnGround = onGround;
     const minGap = Math.max(200, 420 - frame * 0.12);
     if (!obsts.length || W - obsts[obsts.length - 1].x > minGap + Math.random() * 200) {
       const type = Math.floor(Math.random() * 3);
@@ -210,6 +299,7 @@
       if (s.x < 0) s.x += W;
     }
     score = Math.floor(frame * spd * 0.04);
+    if (score >= nextPop) { pops.push({ x: PX + PW / 2, y: py - 16, text: '+' + nextPop, life: 50 }); nextPop += 100; }
     if (WIN_SCORE > 0 && score >= WIN_SCORE) { endGame(true, -1); return; }
     for (const o of obsts) {
       if (PX + 6 + PW - 12 > o.x + 3 && PX + 6 < o.x + o.w - 3 && py + 5 + PH - 8 > o.y + 3) {
@@ -249,31 +339,56 @@
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(x + 3, y + h * 0.5, w - 6, 2);
   }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = COL1; ctx.globalAlpha = 0.15;
-    const mOff = (frame * (spd || BASE_SPEED) * 0.15) % 160;
-    for (let i = -1; i < 6; i++) {
-      const mx = i * 160 - mOff;
+  function drawShadow(cx, w, alpha) {
+    ctx.fillStyle = '#000'; ctx.globalAlpha = alpha;
+    ctx.beginPath(); ctx.ellipse(cx, GROUND_Y + 3, w / 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  function mountains(scroll, period, height, alpha, baseY) {
+    ctx.fillStyle = COL1; ctx.globalAlpha = alpha;
+    const off = scroll % period;
+    for (let i = -1; i < Math.ceil(W / period) + 1; i++) {
+      const mx = i * period - off;
       ctx.beginPath();
-      ctx.moveTo(mx, GROUND_Y);
-      ctx.lineTo(mx + 80, GROUND_Y - 70);
-      ctx.lineTo(mx + 160, GROUND_Y);
+      ctx.moveTo(mx, baseY);
+      ctx.lineTo(mx + period * 0.5, baseY - height);
+      ctx.lineTo(mx + period, baseY);
       ctx.closePath(); ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Pure rendering: reads state, mutates nothing.
+  function draw() {
+    const sp = spd || BASE_SPEED;
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    // Night sky gradient + a low moon.
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#07101f'); g.addColorStop(0.7, '#0e1d3a'); g.addColorStop(1, '#13264a');
+    ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+    ctx.fillStyle = '#e9f4ff'; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(W - 110, 62, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.12; ctx.beginPath(); ctx.arc(W - 110, 62, 40, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // Parallax mountain ranges: far (slow, tall), mid, near (the original ridge).
+    mountains(frame * sp * 0.04, 260, H * 0.42, 0.07, GROUND_Y);
+    mountains(frame * sp * 0.08, 200, H * 0.29, 0.10, GROUND_Y);
+    mountains(frame * sp * 0.15, 160, 70, 0.15, GROUND_Y);
     ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.7;
     for (const s of snowflakes) {
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
+    // Snow ground band.
+    ctx.fillStyle = '#dfeeff'; ctx.globalAlpha = 0.08; ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y); ctx.globalAlpha = 1;
     ctx.fillStyle = COL1; ctx.fillRect(0, GROUND_Y, W, 2);
     ctx.fillStyle = COL1; ctx.globalAlpha = 0.2;
-    const dashOff = (frame * (spd || BASE_SPEED)) % 80;
+    const dashOff = (frame * sp) % 80;
     for (let x = -dashOff; x < W; x += 80) ctx.fillRect(x, GROUND_Y - 2, 40, 1);
     ctx.globalAlpha = 1;
     for (const o of obsts) {
+      drawShadow(o.x + o.w / 2, o.w + 6, 0.3);
       if (o.type === 0) drawSnowman(o.x, o.y, o.w, o.h);
       else if (o.type === 1) drawSkier(o.x, o.y, o.w, o.h);
       else drawBoulder(o.x, o.y, o.w, o.h);
@@ -283,6 +398,8 @@
     const cx = PX + PW / 2;
     const bodyTop = py + 8;
     const onGround = py >= GROUND_Y - PH - 1;
+    const airH = (GROUND_Y - PH) - py;
+    drawShadow(cx, Math.max(14, PW + 8 - airH * 0.15), Math.max(0.1, 0.35 - airH * 0.0015));
 
     ctx.fillStyle = FUR;
     if (onGround) {
@@ -355,32 +472,76 @@
     ctx.closePath(); ctx.fill();
     // ===== end Yedric =====
 
+    // Snow puffs + milestone pop-ups.
+    ctx.fillStyle = '#ffffff';
+    for (const p of particles) {
+      ctx.globalAlpha = Math.min(1, p.life / 20) * 0.9;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold ' + Math.round(W * 0.028) + 'px system-ui';
+    ctx.textAlign = 'center';
+    for (const p of pops) {
+      ctx.globalAlpha = Math.min(1, p.life / 20);
+      ctx.fillStyle = COL2; ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'left';
+
     if (!started) {
       ctx.fillStyle = COL1; ctx.globalAlpha = 0.6;
       ctx.font = Math.round(W * 0.028) + 'px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText('Tap or press Space to start', W / 2, H / 2 - 14);
+      ctx.fillText(document.body.classList.contains('touch') ? 'Tap to start' : 'Tap or press Space to start', W / 2, H / 2 - 14);
       ctx.globalAlpha = 1; ctx.textAlign = 'left';
     }
+    ctx.restore();
+    if (flash > 0) { ctx.fillStyle = COL2; ctx.globalAlpha = flash * 0.35; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   }
 
   addEventListener('keydown', e => {
-    if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); }
-    if (e.key === 'Enter' && overlay.style.display !== 'none') document.getElementById('restart').click();
+    if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); if (!e.repeat) jump(); }
+    if (e.key === 'Enter' && !e.repeat) {
+      if (document.getElementById('start-overlay').style.display !== 'none') document.getElementById('start-btn').click();
+      else if (overlay.style.display !== 'none') document.getElementById('restart').click();
+    }
   });
   canvas.addEventListener('click', jump);
-  document.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+  // Touch is scoped to the canvas (never the document) so overlay buttons stay tappable.
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+  // On-screen JUMP button (touch devices only): holdBtn-style wiring, fires once per press.
+  const jumpBtn = document.getElementById('btn-jump');
+  const press = e => { e.preventDefault(); jumpBtn.classList.add('pressed'); jump(); };
+  const release = e => { e.preventDefault(); jumpBtn.classList.remove('pressed'); };
+  jumpBtn.addEventListener('touchstart', press, { passive: false });
+  jumpBtn.addEventListener('touchend', release, { passive: false });
+  jumpBtn.addEventListener('touchcancel', release, { passive: false });
+  jumpBtn.addEventListener('mousedown', press);
+  jumpBtn.addEventListener('mouseup', release);
+  jumpBtn.addEventListener('mouseleave', release);
   document.getElementById('restart').addEventListener('click', () => { reset(); started = true; });
   document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('start-overlay').style.display = 'none';
     canStart = true;
     grabFocus();
     reset();
+    fitCanvas();
   });
 
-  function loop() { if (running) step(); draw(); requestAnimationFrame(loop); }
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(); stepFx(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
   reset();
-  requestAnimationFrame(loop);
+  requestAnimationFrame(loop);   // started exactly once per page load
 })();
 </script>
 </body>

@@ -17,7 +17,10 @@
     --bad:#e05a5a;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
-  html,body{touch-action:none;height:100%}
+  html,body{touch-action:none;height:100%;overscroll-behavior:none}
+  .tc{display:none}.kb{display:inline}
+  body.touch .tc{display:inline}body.touch .kb{display:none}
+  @media (pointer:coarse){.tc{display:inline}.kb{display:none}}
   body{
     background:
       radial-gradient(circle at 20% -10%, rgba(245,197,66,.10), transparent 40%),
@@ -26,7 +29,7 @@
     color:#f3e9cf;
     font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
     display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-    min-height:100%;padding:10px;user-select:none;overflow-x:hidden;
+    height:100%;padding:10px 10px calc(10px + env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;overflow:hidden;
   }
   h1{
     font-size:clamp(22px,6.5vw,42px);letter-spacing:2px;color:var(--primary);
@@ -40,7 +43,8 @@
   }
   #status b{color:var(--primary)}
   .quip{display:inline-block;color:#d8c389;font-style:italic}
-  .layout{display:flex;gap:16px;width:100%;max-width:920px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+  .layout{display:flex;gap:16px;width:100%;max-width:1100px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+  @media (min-width:1000px){.layout{flex-wrap:nowrap}}
   .ladder{display:grid;grid-template-rows:repeat(8,auto);grid-auto-flow:column;gap:3px;align-content:start}
   .rung{
     font-size:clamp(9px,2.3vw,12px);padding:4px 9px;border-radius:6px;
@@ -53,7 +57,21 @@
   .rung.dead{opacity:.22;text-decoration:line-through}
   .rung.flash{animation:rflash .6s ease}
   @keyframes rflash{0%{background:#5a4205}100%{}}
-  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(380px,93vw);align-content:start}
+  /* board width is derived from the height left under the HUD so the page never scrolls:
+     boardH = 4*caseH + 3*gap, caseH = caseW/1.18, caseW = (B-30)/4  =>  B = (availH-30)*1.18 + 30 */
+  /* >=1000px: ladder and board side by side; board also bounded by the width left beside the ladder */
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(520px,calc(100vw - 600px),calc((100dvh - 290px) * 1.18 + 30px));align-content:start}
+  @media (max-width:999px){
+    /* ladder stacks above the board: compact amounts-only ladder (4x4) */
+    .board{width:min(93vw,calc((100dvh - 420px) * 1.18 + 30px))}
+    .ladder{grid-template-rows:repeat(4,auto);width:min(93vw,380px);grid-template-columns:repeat(4,1fr)}
+    .rung{min-width:0;padding:3px 4px;justify-content:center;gap:0}
+    .rung span:first-child{display:none}
+    .layout{gap:10px}
+  }
+  @media (max-width:700px){
+    .board{width:min(93vw,calc((100dvh - 345px - env(safe-area-inset-bottom)) * 1.18 + 30px))}
+  }
   .case{
     aspect-ratio:1.18/1;border:none;border-radius:11px;cursor:pointer;position:relative;
     background:
@@ -66,7 +84,9 @@
   .case::before{content:"";position:absolute;top:0;left:0;right:0;height:42%;
     background:linear-gradient(180deg,rgba(255,255,255,.45),transparent);border-radius:11px 11px 40% 40%}
   .case .lbl{position:relative;z-index:2;text-shadow:0 1px 0 rgba(255,255,255,.4)}
-  .case:active{transform:translateY(3px);box-shadow:0 1px 0 #4a3705, inset 0 2px 3px rgba(255,255,255,.5)}
+  .case{-webkit-touch-callout:none;user-select:none}
+  @media (hover:hover){.case:not(.opened):hover{transform:translateY(-2px);box-shadow:0 6px 0 #4a3705, 0 0 14px rgba(245,197,66,.35), inset 0 2px 3px rgba(255,255,255,.55), inset 0 -6px 10px rgba(80,55,0,.4)}}
+  .case:not(.opened):active{transform:translateY(3px);box-shadow:0 1px 0 #4a3705, inset 0 2px 3px rgba(255,255,255,.5)}
   .case.mine{outline:3px solid var(--primary);box-shadow:0 0 20px rgba(245,197,66,.85), 0 4px 0 #4a3705}
   .case.mine::after{content:"YOURS";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;letter-spacing:1px;color:#3a2c00;z-index:3}
   .case.opening{animation:pop .45s ease}
@@ -78,24 +98,33 @@
   .case.opened svg{width:62%;height:auto;display:block;margin:0 auto 1px}
   .case.opened .num{position:absolute;top:2px;left:4px;font-size:9px;color:#5e4f28;z-index:3}
   .case.opened .v{color:var(--accent);display:block;font-size:clamp(9px,2.6vw,12px);font-weight:bold}
-  .controls{display:flex;gap:14px;justify-content:center;margin:16px 0 4px;flex-wrap:wrap}
+  .controls{display:flex;gap:14px;justify-content:center;margin:12px 0 4px;flex-wrap:wrap;visibility:hidden}
+  .controls.on{visibility:visible}
+  .btn:hover{filter:brightness(1.08)}
   .btn{border:none;border-radius:12px;padding:14px 28px;font-size:clamp(15px,4vw,20px);font-weight:bold;
     cursor:pointer;min-width:130px;min-height:54px;letter-spacing:1px;user-select:none;-webkit-touch-callout:none;
     text-transform:uppercase;box-shadow:0 4px 0 rgba(0,0,0,.35)}
   .deal{background:linear-gradient(180deg,#8ee08e,#4fae4f);color:#06340c}
   .nodeal{background:linear-gradient(180deg,#f07a7a,#c23c3c);color:#3a0606}
   .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
-  .overlay{position:absolute;inset:0;background:rgba(10,7,1,.93);display:flex;flex-direction:column;
-    align-items:center;justify-content:center;text-align:center;padding:24px;z-index:20;backdrop-filter:blur(2px)}
+  .overlay{position:fixed;inset:0;background:rgba(10,7,1,.93);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:24px;z-index:20;backdrop-filter:blur(2px);overflow-y:auto;touch-action:pan-y}
+  .overlay img{display:block;width:min(82%,400px);max-height:min(40vh,34dvh);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))}
+  .overlay .score-lbl{color:#9c8a52;font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:2px}
   .overlay h2{color:var(--primary);font-size:clamp(20px,6vw,36px);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 18px rgba(245,197,66,.5)}
   .overlay p{max-width:470px;font-size:clamp(13px,3.6vw,17px);line-height:1.55;margin-bottom:18px;color:#e7dcc0}
   .play{background:linear-gradient(180deg,#ffe487,#dfb13a);color:#2a2000;border:none;border-radius:14px;
-    padding:16px 42px;font-size:20px;font-weight:bold;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 5px 0 #7c5e12}
+    padding:16px 42px;min-height:54px;font-size:20px;font-weight:bold;cursor:pointer;text-transform:uppercase;letter-spacing:1px;box-shadow:0 5px 0 #7c5e12;
+    user-select:none;-webkit-touch-callout:none}
+  .play:hover{filter:brightness(1.06)}
   .play:active{transform:translateY(3px);box-shadow:0 2px 0 #7c5e12}
   .offer{color:var(--primary);font-size:clamp(26px,8vw,48px);font-weight:bold;text-shadow:0 0 18px rgba(245,197,66,.6);animation:reveal .5s ease}
   @keyframes reveal{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
-  .wrap{position:relative;width:100%;max-width:940px;display:flex;flex-direction:column;align-items:center}
-  .hint{font-size:11px;color:#8a7842;margin-top:10px;letter-spacing:1px}
+  /* the whole game column is a touch-scrollable container: it fits 100dvh in the sizes we target,
+     and if a long status/offer ever pushes it past the fold the player can still scroll it */
+  .wrap{position:relative;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;
+    flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .hint{font-size:11px;color:#8a7842;margin-top:8px;letter-spacing:1px;flex:0 0 auto}
 
   /* Banker bot panel */
   .banker{display:flex;align-items:center;gap:10px;justify-content:center;margin:2px auto 4px;min-height:0}
@@ -152,15 +181,15 @@
     <div class="ladder" id="ladder"></div>
     <div class="board" id="board"></div>
   </div>
-  <div class="controls" id="controls" style="display:none">
+  <div class="controls" id="controls">
     <button class="btn deal" id="dealBtn">Deal</button>
     <button class="btn nodeal" id="noDealBtn">No Deal</button>
   </div>
-  <div class="hint">Tap a case &middot; Enter restarts after the game ends</div>
+  <div class="hint"><span class="kb">Click a case &middot; D = Deal, N = No Deal &middot; Enter starts / restarts</span><span class="tc">Tap a case to open it &middot; tap Deal or No Deal when Elon calls</span></div>
 
   <div class="overlay" id="startOverlay">
-    <img src="logos/oligarchs-dilemma.png" alt="Oligarch's Dilemma" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-    <p>16 sealed cases. One holds your fortune &mdash; the rest hold a reflecting pond contract. Pick a case to keep, open the others, and after each round <b>Elon the Banker</b> phones in a lowball offer. Deal, or risk it all. Greed is a strategy.</p>
+    <img src="logos/oligarchs-dilemma.png" alt="Oligarch's Dilemma">
+    <p>16 sealed cases. One holds your fortune &mdash; the rest hold a reflecting pond contract. <span class="kb">Click</span><span class="tc">Tap</span> a case to keep, open the others, and after each round <b>Elon the Banker</b> phones in a lowball offer. Deal, or risk it all. Greed is a strategy.</p>
     <button class="play" id="playBtn">Open the Vault</button>
   </div>
 </div>
@@ -256,19 +285,23 @@ const SCHEDULE=[5,4,3,2];
 
 const $ = id => document.getElementById(id);
 const fmt = n => "$"+n.toLocaleString("en-US");
-// SCORE: raw winnings span $0..$1,000,000,000 — wildly out of band with other
-// games, and a LINEAR scale mapping the $1B jackpot to ~1000 would crush normal
-// wins to near-zero. So we post a LOG-COMPRESSED score that spreads outcomes
-// across roughly 0..1600 with NO hard ceiling and stays monotonic:
-//   180 * log10(1 + win)  →  $1k≈540, $100k≈900, $1M≈1080, $10M≈1260, $1B≈1620.
-// A typical good cash-out (~$100k–$1M) lands ~900–1080; a full jackpot ~1620.
-// FLAG FOR REVIEW: the 180 multiplier and log10 base are a judgement call — if a
-// $1B jackpot scoring ~1.6x a typical win feels too flat (or too steep) relative
-// to the other games, retune LOG_SCALE or swap the log base.
-const LOG_SCALE = 180;
-function scoreFor(win){ return Math.round(LOG_SCALE * Math.log10(1 + Math.max(0, win))); }
-let _hi = 0;
-function postHi(v){ v = Math.round(v) || 0; if(v > _hi) _hi = v; try{ window.parent.postMessage({highScore:v}, "*"); }catch(e){} }
+// Score = the whole-dollar amount you walk away with (deal accepted, or your case's contents).
+// Shown as "$1,240" on the end screen and posted as 1240. No scaling.
+let _hi = 0;   // in-game "best" readout only
+// Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+function postHi(n){
+  n = Math.max(0, Math.round(Number(n) || 0));
+  if(n > _hi) _hi = n;
+  try{ window.parent.postMessage({highScore:n}, "*"); }catch(e){}
+}
+function grabFocus(){ try{ window.focus(); }catch(e){} }
+grabFocus(); window.addEventListener("pointerdown", grabFocus);
+window.addEventListener("touchstart", () => {
+  document.body.classList.add("touch");
+  try{ history.pushState(null, "", location.href); }catch(e){}   // back-swipe guard
+}, { once:true, passive:true });
+window.addEventListener("popstate", () => { try{ history.pushState(null, "", location.href); }catch(e){} });
+document.getElementById("board").addEventListener("contextmenu", e => e.preventDefault());
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
@@ -292,7 +325,7 @@ function newGame(){
   buildLadder(); setBanker();
   PRIZES.forEach((_,i)=>$("rung"+i).classList.remove("dead"));
   renderBoard();
-  $("controls").style.display="none";
+  $("controls").classList.remove("on");
   $("status").innerHTML="Pick the case you'll carry to the end. Choose wisely, comrade.";
 }
 
@@ -352,7 +385,7 @@ function startRound(){
 function makeOffer(){
   // dramatic pause
   phase="calculating";
-  $("controls").style.display="none";
+  $("controls").classList.remove("on");
   const line = pick(CALC_LINES);
   $("status").innerHTML = `<div class="thinking"><div class="calc">${line}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div></div>`;
   const wait = 1500 + Math.random()*900;
@@ -366,13 +399,13 @@ function revealOffer(){
   offer = Math.max(1, Math.round(avg*fairness/100)*100);
   const quip = pick(ELON_OPEN);
   $("status").innerHTML = `<div class="offer">${fmt(offer)}</div><span class="quip">Elon: &ldquo;${quip}&rdquo;</span>`;
-  $("controls").style.display="flex";
+  $("controls").classList.add("on");
   phase="offer";
 }
 
 function acceptDeal(){
   if(phase!=="offer") return;
-  $("controls").style.display="none";
+  $("controls").classList.remove("on");
   const mine=board[myCase].amt;
   gameOver=true; phase="done";
   let verdict = offer>=mine ? "You out-greeded the Banker."
@@ -382,7 +415,7 @@ function acceptDeal(){
 
 function rejectDeal(){
   if(phase!=="offer") return;
-  $("controls").style.display="none";
+  $("controls").classList.remove("on");
   round++;
   const closedOthers = board.filter((c,i)=>!c.opened && i!==myCase).length;
   if(closedOthers<=1){ finalRound(); return; }
@@ -402,11 +435,8 @@ function finalRound(){
 
 function finish(win,msg){
   $("status").innerHTML=msg;
-  // Track best raw haul for the on-screen "Best haul" readout, but POST the
-  // log-scaled score so the leaderboard stays in the shared band. postHi is
-  // monotonic on the scaled value.
   if(win>bestWin){ bestWin=win; }
-  postHi(scoreFor(win));
+  postHi(win);   // exact dollars, same number the end screen shows
   setTimeout(()=>showEnd(win),700);
 }
 
@@ -418,22 +448,24 @@ function showEnd(win){
              win>=1000000?"Solidly rich. Buy a small media outlet.":
              win>=100000?"Comfortable. Suspiciously comfortable.":
              "The reflecting pond is lovely this time of year.";
-  ov.innerHTML=`<h2>${fmt(win)}</h2><p>${rank}<br><br>Best haul this session: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
+  ov.innerHTML=`<div class="score-lbl">Score</div><h2>${fmt(win)}</h2><p>${rank}<br><br>Best haul this session: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
   $("wrap").appendChild(ov);
-  $("againBtn").onclick=restart;
+  $("againBtn").onclick=()=>{ grabFocus(); restart(); };
 }
 
 function restart(){ const ov=$("endOverlay"); if(ov) ov.remove(); newGame(); }
 
 $("dealBtn").onclick=acceptDeal;
 $("noDealBtn").onclick=rejectDeal;
-$("playBtn").onclick=()=>{ $("startOverlay").remove(); newGame(); };
+$("playBtn").onclick=()=>{ grabFocus(); $("startOverlay").remove(); newGame(); };
 
 document.addEventListener("keydown",e=>{
+  if(e.repeat) return;
   if(e.key==="Enter"){
     if($("endOverlay")) restart();
     else if($("startOverlay")){ $("startOverlay").remove(); newGame(); }
-  }
+  } else if(e.key==="d"||e.key==="D"){ acceptDeal(); }
+  else if(e.key==="n"||e.key==="N"){ rejectDeal(); }
 });
 
 buildLadder();

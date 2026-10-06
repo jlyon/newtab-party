@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Bend it like Maxi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,26 +11,33 @@
   :root { --primary: #2ecc71; --secondary: #f5d442; --bg: #0a1420; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
-    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  /* instruction wording: keyboard on desktop, gestures on touch */
+  .tc { display: none; } .kb { display: inline; }
+  body.touch .tc { display: inline; } body.touch .kb { display: none; }
+  @media (pointer: coarse) { .tc { display: inline; } .kb { display: none; } }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(700px, 95vw); width: min(700px, 95vw, calc((100dvh - 80px) * 600 / 420));
-    height: auto; display: block; }
-  #controls { display: flex; gap: 6px; align-items: center; max-width: 95vw; flex-wrap: wrap; justify-content: center; }
-  @media (pointer: fine) { #controls { display: none; } }
-  @media (pointer: coarse) { canvas { width: 95vw; width: min(95vw, calc((100dvh - 190px) * 600 / 420)); } }
+    width: min(95vw, calc((100dvh - 70px) * 600 / 420));
+    height: auto; display: block; touch-action: none; cursor: crosshair; }
+  /* touch controls: only shown once a real touch happens (body.touch) */
+  #controls { display: none; gap: 8px; align-items: center; width: min(95vw - 48px, 720px); flex-wrap: wrap; justify-content: center;
+    padding-bottom: env(safe-area-inset-bottom); }
+  body.touch #controls { display: flex; }
+  body.touch canvas { width: min(95vw - 48px, calc((100dvh - 220px) * 600 / 420)); }   /* side margins keep drags away from the back-swipe edge */
   .ctrl-group { display: flex; gap: 5px; }
-  .btn { padding: 8px 12px; height: 52px; min-width: 48px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
+  .btn { padding: 8px 12px; height: 56px; min-width: 52px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 6px;
-    user-select: none; -webkit-touch-callout: none; white-space: nowrap; }
-  .btn:active, .btn.held { background: var(--primary); color: var(--bg); }
+    user-select: none; -webkit-touch-callout: none; white-space: nowrap; transition: transform 0.08s ease; }
+  .btn:hover { background: rgba(46,204,113,0.18); }
+  .btn:active, .btn.held { background: var(--primary); color: var(--bg); transform: scale(0.96); }
   #btn-kick { border-color: var(--secondary); color: var(--secondary); padding: 8px 22px; font-weight: 700; }
   #btn-kick:active, #btn-kick.held { background: var(--secondary); color: var(--bg); }
   #power-bar-wrap { flex: 1; height: 16px; border: 2px solid var(--primary); border-radius: 4px; min-width: 60px; }
   #power-bar { height: 100%; width: 0%; background: var(--secondary); border-radius: 2px; }
   #start-overlay { position: fixed; inset: 0; display: flex; align-items: center;
-    background: rgba(4,10,18,0.94); flex-direction: column; text-align: center; padding: 20px; z-index: 10; overflow-y: auto; }
+    background: rgba(4,10,18,0.94); flex-direction: column; text-align: center; padding: 20px; z-index: 10; overflow-y: auto; touch-action: pan-y; }
   #start-card { max-width: 460px; margin: auto 0; }
   #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,36px); margin: 0 0 10px; letter-spacing: 2px; }
   #start-card p { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.6; margin: 0 0 18px; font-style: italic; }
@@ -46,8 +53,11 @@
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
   #overlay h2 { color: var(--secondary); font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px; }
   #overlay p { color: #fff; margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 420px; }
-  #overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
-    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px; }
+  #overlay button { margin-top: 18px; padding: 14px 28px; min-height: 52px; font-size: clamp(14px, 3.5vw, 16px);
+    background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 4px; letter-spacing: 1px;
+    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s ease, filter 0.12s ease; }
+  #overlay button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  #overlay button:active { transform: scale(0.97); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
@@ -82,6 +92,16 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-btn:hover { opacity: 1; transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-btn:active { transform: scale(0.97); }
+  #start-card img { display: block; width: min(82%, 400px); max-height: 34dvh; margin: 0 auto 12px; object-fit: contain;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (max-height: 720px) {
+    #start-card { padding: 16px 18px 20px; }
+    #start-card img { max-height: 18dvh; margin-bottom: 6px; }
+    #start-card p { margin-bottom: 10px; font-size: 12px; }
+    .team-row { gap: 6px; margin-bottom: 12px; }
+    select { padding: 8px 6px; }
+  }
 </style>
 </head>
 <body>
@@ -103,9 +123,9 @@
 </div>
 <div id="start-overlay">
   <div id="start-card">
-    <img src="logos/bend-it-like-maxi.png" alt="Bend it like Maxi" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <img src="logos/bend-it-like-maxi.png" alt="Bend it like Maxi">
     <p>96th minute of the 2026 World Cup Final. 1–1. Ten free kicks stand between you and immortality.<br>
-    ← → aim · A / D curve · Hold Space to charge · Release to kick</p>
+    <span class="kb">← → aim · A / D curve · Hold Space to charge · Release to kick</span><span class="tc">Drag the pitch or tap ◀ ▶ to aim · ↶ ↷ buttons curve it · Hold KICK to charge, release to shoot</span></p>
     <div class="team-row">
       <div><label>Your nation</label><select id="sel-my"></select></div>
       <div class="vs">VS</div>
@@ -116,6 +136,7 @@
 </div>
 <div id="overlay">
   <h2 id="overTitle"></h2>
+  <p id="overScore" style="color:var(--secondary);font-size:clamp(18px,5vw,26px);font-weight:700;margin:6px 0 4px"></p>
   <p id="overMsg"></p>
   <button id="restart">Rewrite history</button>
 </div>
@@ -127,14 +148,37 @@
   const overlay = document.getElementById('overlay');
   const overTitle = document.getElementById('overTitle');
   const overMsg = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
   const startOverlay = document.getElementById('start-overlay');
-  const SCALE = 2, W = 600, H = 420;
-  canvas.width = W * SCALE; canvas.height = H * SCALE; ctx.scale(SCALE, SCALE);
+  const W = 600, H = 420;
+  // Crisp at any devicePixelRatio: logical W/H for all game math, backing store = CSS size x DPR.
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    const bw = Math.max(1, Math.round(cssW * dpr)), bh = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas);
 
-  let _hi = 0;
+  // reveal touch controls on the first real touch; also arm the back-swipe guard so a stray edge swipe stays on the page
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch'); fitCanvas();
+    try { history.pushState(null, '', location.href); } catch (e) {}
+  }, { once: true, passive: true });
+  window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
+  const isTouch = () => document.body.classList.contains('touch');
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  grabFocus(); addEventListener('pointerdown', grabFocus);
+
+  let _hi = 0;   // in-game "best" readout only
+  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
   function postHi(n) {
-    n = Math.floor(n) || 0;
-    if (n > _hi) { _hi = n; window.parent.postMessage({ highScore: n }, '*'); }
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
 
   // ===== GAME-SPECIFIC SECTION =====
@@ -252,6 +296,7 @@
   let ball, loft, gxFinal, wallN, jumped, guessed, wallChecked, diveX, wind;
   let resultTimer, comment, clockS, crowd = [], flashT = 0, resultBall = null;
   let goalAnim = 0, netBall = null, confetti = [], splash = null;
+  let popups = [], shake = 0;   // score pop-ups + brief screen shake (stepped in step(), read in draw())
 
   for (let i = 0; i < 900; i++) {
     crowd.push({ x: Math.random() * 600, y: 6 + Math.random() * 148,
@@ -265,12 +310,16 @@
   });
   selMy.value = teamIdx('ARG'); selOp.value = teamIdx('FRA');
 
-  document.getElementById('start-btn').addEventListener('click', () => {
+  let loopStarted = false;
+  function startGame() {
     my = TEAMS[+selMy.value]; op = TEAMS[+selOp.value];
     keeperKit = YELLOWISH.includes(op.c1) ? '#FF5CA8' : '#c8d419';
     startOverlay.style.display = 'none';
-    reset(); requestAnimationFrame(loop);
-  });
+    grabFocus();
+    reset();
+    if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }   // loop started exactly once per page load
+  }
+  document.getElementById('start-btn').addEventListener('click', startGame);
 
   function reset() {
     kick = 1; score = 0; goals = 0; clockS = 318;
@@ -281,7 +330,7 @@
   function setupKick() {
     phase = 'aim'; aim = 0; curve = 0; power = 0; charging = false;
     ball = null; resultBall = null; wallChecked = false;
-    netBall = null; goalAnim = 0; confetti = []; splash = null;
+    netBall = null; goalAnim = 0; confetti = []; splash = null; popups = [];
     if (kick === 1) { spotX = 0; distF = 1; }
     else {
       spotX = Math.random() < 0.3 ? 0 : (Math.random() * 2 - 1) * 90;
@@ -314,7 +363,10 @@
   addEventListener('keydown', e => {
     keys[e.key] = true;
     if (e.key === ' ') e.preventDefault();
-    if (e.key === 'Enter' && overlay.style.display === 'flex') document.getElementById('restart').click();
+    if (e.key === 'Enter' && !e.repeat) {
+      if (startOverlay.style.display !== 'none') { e.preventDefault(); startGame(); }
+      else if (overlay.style.display === 'flex') document.getElementById('restart').click();
+    }
   });
   addEventListener('keyup', e => {
     if (keys[e.key] && e.key === ' ') releaseKick();
@@ -326,18 +378,23 @@
     charging = false;
   }
 
-  // swipe on the pitch to aim (mobile)
-  let lastTX = null;
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); lastTX = e.touches[0].clientX; }, { passive: false });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (phase !== 'aim' || lastTX === null) return;
+  // drag / swipe on the pitch to aim (mouse + touch via pointer events)
+  let dragX = null;
+  canvas.addEventListener('pointerdown', e => {
+    if (phase !== 'aim') return;
+    dragX = e.clientX;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (dragX === null || phase !== 'aim') return;
     const rect = canvas.getBoundingClientRect();
-    const dx = (e.touches[0].clientX - lastTX) * (W / rect.width);
+    const dx = (e.clientX - dragX) * (W / rect.width);
     aim = Math.max(-135, Math.min(135, aim + dx * 0.8));
-    lastTX = e.touches[0].clientX;
-  }, { passive: false });
-  canvas.addEventListener('touchend', () => { lastTX = null; });
+    dragX = e.clientX;
+  });
+  const endDrag = () => { dragX = null; };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });   // canvas only, never document-level
 
   function pathX(z) { return spotX + (aim - spotX) * z + curve * BEND * z * (1 - z) + wind * z * z; }
   function pathH(z) { return loft * 3.6 * z * (1 - 0.75 * z); }
@@ -367,9 +424,9 @@
     else if (hF > BAR_H + 6) {
       msg = OVER_MSG[Math.floor(Math.random() * OVER_MSG.length)]; sTxt = 'OVER THE BAR!'; sCol = '#ff5252'; }
     else if (Math.abs(gx) > POST_X - 6 || hF > BAR_H - 6) {
-      msg = POST_MSG[Math.floor(Math.random() * POST_MSG.length)]; sTxt = 'OFF THE POST!'; sCol = '#ff8c42'; deflect(); }
+      msg = POST_MSG[Math.floor(Math.random() * POST_MSG.length)]; sTxt = 'OFF THE POST!'; sCol = '#ff8c42'; deflect(); shake = 8; }
     else if (saved) {
-      msg = SAVE_MSG[Math.floor(Math.random() * SAVE_MSG.length)]; sTxt = 'SAVED!'; sCol = '#ff5252'; pts = 10; deflect(); }
+      msg = SAVE_MSG[Math.floor(Math.random() * SAVE_MSG.length)]; sTxt = 'SAVED!'; sCol = '#ff5252'; pts = 10; deflect(); shake = 5; }
     else {
       msg = GOAL_MSG[Math.floor(Math.random() * GOAL_MSG.length)];
       pts = 100 + (Math.abs(gx) > 85 ? 40 : 0) + (hF > 95 ? 40 : 0)
@@ -383,7 +440,7 @@
       }
     }
     score += pts;
-    if (pts >= 100) postHi(score);
+    if (pts > 0) popups.push({ x: sx(gx, 1), y: groundY(1) - 40, text: '+' + pts, t: 80, c: pts >= 100 ? '#f5d442' : '#fff' });
     endKick(msg, sTxt, sCol);
   }
 
@@ -402,16 +459,18 @@
 
   function endGame() {
     phase = 'gameover';
+    // Score = sum of kick points (100 + corner/top/curve bonuses + 5 x kick number per goal, 10 per save). Posted as-is.
     postHi(score);
     if (goals > 0) {
       overTitle.textContent = '🏆 CHAMPIONS OF THE WORLD 🏆';
       overMsg.textContent = my.name + ' win the 2026 World Cup! Maxi buried ' + goals + ' of ' +
-        TOTAL_KICKS + ' free kicks in the most stressful six minutes of stoppage time ever played. Final points: ' + score + '.';
+        TOTAL_KICKS + ' free kicks in the most stressful six minutes of stoppage time ever played.';
     } else {
       overTitle.textContent = '💔 HEARTBREAK';
       overMsg.textContent = 'Ten free kicks. Zero goals. The whistle blows, ' + op.name +
-        ' win it on penalties, and Maxi stares into the void. Points: ' + score + '. Run it back.';
+        ' win it on penalties, and Maxi stares into the void. Run it back.';
     }
+    overScore.textContent = 'Score: ' + score.toLocaleString();
     overlay.style.display = 'flex';
   }
 
@@ -434,7 +493,7 @@
         const wallTop = jumped ? 130 : 95;
         if (Math.abs(xw) < span && h < wallTop) {
           if (jumped && h < 20) comment = UNDER_MSG[0];
-          else { deflect(); endKick(WALL_MSG[Math.floor(Math.random() * WALL_MSG.length)], 'BLOCKED!', '#ff5252'); return; }
+          else { deflect(); shake = 7; endKick(WALL_MSG[Math.floor(Math.random() * WALL_MSG.length)], 'BLOCKED!', '#ff5252'); return; }
         }
       }
       if (ball && ball.z >= 1) resolveArrival();
@@ -450,6 +509,9 @@
     }
     for (const c of confetti) { c.y += c.vy; c.sway += 0.15; c.x += Math.sin(c.sway) * 0.8; }
     confetti = confetti.filter(c => c.y < 165);
+    for (const p of popups) { p.y -= 0.7; p.t--; }
+    popups = popups.filter(p => p.t > 0);
+    if (shake > 0) shake = Math.max(0, shake - 0.5);
     if (goalAnim > 0) goalAnim--;
     if (splash && --splash.t <= 0) splash = null;
 
@@ -538,7 +600,15 @@
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0c1520'; ctx.fillRect(0, 0, W, 162);
+    ctx.save();
+    if (shake > 0) ctx.translate(Math.sin(shake * 23.7) * shake * 0.6, Math.cos(shake * 17.3) * shake * 0.4);
+    // stands: layered dark gradient with a floodlight glow
+    const standsG = ctx.createLinearGradient(0, 0, 0, 162);
+    standsG.addColorStop(0, '#060b12'); standsG.addColorStop(1, '#13202e');
+    ctx.fillStyle = standsG; ctx.fillRect(-10, -10, W + 20, 172);
+    const glow = ctx.createRadialGradient(CX, -40, 10, CX, -40, 320);
+    glow.addColorStop(0, 'rgba(255,255,255,0.14)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 162);
     for (const d of crowd) {
       ctx.globalAlpha = 0.5 + Math.random() * 0.4;
       ctx.fillStyle = d.c; ctx.fillRect(d.x, d.y, 2.4, 2.4);
@@ -556,7 +626,11 @@
       ctx.fillStyle = i % 2 ? '#1f9440' : '#188034';
       ctx.fillRect(0, yTop, 600, yBot - yTop + 1);
     }
-    ctx.fillStyle = '#188034'; ctx.fillRect(0, groundY(0), 600, H - groundY(0));
+    ctx.fillStyle = '#188034'; ctx.fillRect(-10, groundY(0), 620, H - groundY(0) + 10);
+    // pitch light falloff toward the stands
+    const pitchG = ctx.createLinearGradient(0, groundY(1), 0, H);
+    pitchG.addColorStop(0, 'rgba(0,0,0,0.28)'); pitchG.addColorStop(0.5, 'rgba(0,0,0,0)'); pitchG.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = pitchG; ctx.fillRect(0, groundY(1), W, H - groundY(1));
 
     // penalty arc + spot flavor
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
@@ -596,10 +670,15 @@
     }
 
     // ball beyond wall drawn behind wall
+    const ballShadow = (x, gy, h, s) => {
+      ctx.fillStyle = 'rgba(0,0,0,' + Math.max(0.08, 0.35 - h * 0.0025) + ')';
+      ctx.beginPath(); ctx.ellipse(x, gy, (7 + h * 0.03) * Math.max(0.45, s), 2.6 * Math.max(0.45, s), 0, 0, Math.PI * 2); ctx.fill();
+    };
     const ballDraw = () => {
       if (ball) {
-        const s = persp(ball.z);
-        drawBallAt(sx(pathX(ball.z), ball.z), groundY(ball.z) - pathH(ball.z) * s, 7 * Math.max(0.45, s));
+        const s = persp(ball.z), h = pathH(ball.z);
+        ballShadow(sx(pathX(ball.z), ball.z), groundY(ball.z), h * s, s);
+        drawBallAt(sx(pathX(ball.z), ball.z), groundY(ball.z) - h * s, 7 * Math.max(0.45, s));
       }
       if (resultBall) drawBallAt(resultBall.x, resultBall.y, 6 * resultBall.s);
     };
@@ -617,7 +696,7 @@
     }
 
     if (!(ball && ball.z > wallZ)) ballDraw();
-    if (!ball && !resultBall && phase === 'aim') drawBallAt(CX, 388, 7);
+    if (!ball && !resultBall && phase === 'aim') { ballShadow(CX, 390, 0, 1); drawBallAt(CX, 388, 7); }
 
     // Maxi
     if (phase === 'aim') drawFigure(CX - 42, 396, 1, my.c1, my.c2 === '#FFFFFF' ? '#222' : my.c2, 0, -0.08, false, '#e0ac69');
@@ -639,29 +718,39 @@
       ctx.beginPath(); ctx.moveTo(tx, gY - 10); ctx.lineTo(tx, gY + 2); ctx.stroke();
     }
 
-    // jumbotron in the stands above the goal
+    // score pop-ups
+    for (const p of popups) {
+      ctx.globalAlpha = Math.min(1, p.t / 30);
+      ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = p.c; ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // jumbotron in the stands above the goal (two lines so nothing overflows the board)
     const jFlash = flashT > 0 && flashT % 10 < 5;
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
-    ctx.fillRect(78, 4, 444, 58);
+    ctx.fillRect(78, 4, 444, 64);
     ctx.strokeStyle = jFlash ? '#ffffff' : '#f5d442'; ctx.lineWidth = 2;
-    ctx.strokeRect(78, 4, 444, 58);
-    ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center';
+    ctx.strokeRect(78, 4, 444, 64);
+    ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center';
     const cm = Math.floor(clockS / 60), cs = String(clockS % 60).padStart(2, '0');
     ctx.fillStyle = jFlash ? '#f5d442' : '#fff';
-    ctx.fillText(my.id + ' 1 – 1 ' + op.id + '  ·  90+' + cm + ':' + cs +
-      '  ·  KICK ' + kick + '/' + TOTAL_KICKS + '  ·  PTS ' + score +
-      (wind ? '  ·  WIND ' + (wind > 0 ? '→' : '←') + Math.abs(Math.round(wind)) : ''), CX, 27);
+    ctx.fillText(my.id + ' 1 – 1 ' + op.id + '  ·  90+' + cm + ':' + cs + '  ·  KICK ' + kick + '/' + TOTAL_KICKS, CX, 22);
+    ctx.font = 'bold 13px system-ui';
+    ctx.fillText('SCORE ' + score.toLocaleString() +
+      (wind ? '  ·  WIND ' + (wind > 0 ? '→' : '←') + Math.abs(Math.round(wind)) : ''), CX, 39);
     ctx.font = 'italic 11px system-ui';
     ctx.fillStyle = '#f5d442';
-    ctx.fillText(comment, CX, 48);
+    ctx.fillText(comment, CX, 57);
 
     // aim HUD
     if (phase === 'aim') {
-      ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
       const sideTxt = spotX < -25 ? 'left channel' : spotX > 25 ? 'right channel' : 'dead center';
-      ctx.fillText('Aim ← →   ·   Curve A/D: ' + (curve >= 0 ? '↷ ' : '↶ ') + Math.abs(curve).toFixed(1) +
-        '   ·   Power (hold Space): ' + Math.round(power) + '%   ·   ' + Math.round(24 * distF) + 'm out, ' + sideTxt, 10, 408);
-      if (power > 88) { ctx.fillStyle = '#ff4400'; ctx.fillText('WILD!', 190, 408); }
+      ctx.fillText((isTouch() ? '' : '← → aim  ·  A/D curve  ·  hold Space  ·  ') + 'Curve ' + (curve >= 0 ? '↷ ' : '↶ ') + Math.abs(curve).toFixed(1) +
+        '  ·  Power ' + Math.round(power) + '%  ·  ' + Math.round(24 * distF) + 'm out, ' + sideTxt, 10, 409);
+      if (power > 88) { ctx.fillStyle = '#ff4400'; ctx.textAlign = 'right'; ctx.fillText('WILD!', 590, 409); }
     }
 
     // outcome splash (goal or miss)
@@ -680,10 +769,23 @@
       ctx.globalAlpha = 1;
     }
     ctx.textAlign = 'left';
+    ctx.restore();
   }
 
-  function loop() { step(); draw(); requestAnimationFrame(loop); }
-  document.getElementById('restart').addEventListener('click', reset);
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);   // clamp long stalls (hidden tab) so we don't fast-forward
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { step(); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+  document.getElementById('restart').addEventListener('click', () => { grabFocus(); reset(); });
 })();
 </script>
 </body>
