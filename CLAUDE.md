@@ -20,9 +20,10 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
 | `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
-| `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `retire`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
+| `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `retire`, `today`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
 | `scripts/gen_logos.mjs` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG via `sharp`). No args = generate every missing logo. |
 | `scripts/retire_game.mjs` | Retires games from the rotation by starting a new schedule era (see Rotation rules). |
+| `scripts/set_today.mjs` | Makes a given game today's game by swapping it into today's slot (`npm run today -- <id>`). |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
 
@@ -75,12 +76,16 @@ Rotation is driven by the `schedule` array (game ids in air order), anchored at 
 - Every id in `schedule` must exist in the `games` array. A game listed in `games` but absent from `schedule` simply never airs; an id in `schedule` with no matching game falls through to the legacy modulo pick.
 - **Don't remove ids from `schedule` by hand** — that re-maps every date. Use `scripts/retire_game.mjs` (below), which starts a new era instead.
 - **Deploy at midnight UTC.** Appending to `schedule` doesn't move the current cycle, but still deploy at the boundary as a habit so nothing changes mid-session.
-- Don't move `scheduleEpoch` by hand — it's the anchor. Changing it shifts everything. (`retire_game.mjs` is the one thing that may start a new era.)
+- Don't move `scheduleEpoch` by hand — it's the anchor. Changing it shifts everything. (`retire_game.mjs` and `set_today.mjs` are the only things that may start a new era.)
 - Past leaderboard records are stored in D1 by `game_id` and are unaffected — only the computed date→game mapping changes.
 
 ### Retiring a game
 
 Run `npm run retire -- <id> [<id> ...]` (add `--dry-run` to preview) and deploy the same UTC day. It moves the current era into `scheduleHistory`, writes a new `schedule`/`scheduleEpoch` anchored at today (rotated so today's game is unchanged, retired ids removed), and records the id in `retired`. Keep the entry in `games` and the file in `public/games/`: the game stays in the library (`/games` lists retired games in a Retired section linked to their last airing) and past replays/records still resolve. **Never hand-edit `scheduleHistory` or an old era's `schedule`**: those are what past dates resolve against. If the game being retired is today's, the script anchors the new era at tomorrow and you must deploy after 00:00 UTC. To bring a retired game back, append its id to `schedule` and delete its `retired` entry.
+
+### Forcing today's game
+
+`npm run today -- <id>` (with `--dry-run` to preview) swaps `<id>` into today's UTC slot; the game that was scheduled for today takes `<id>`'s old slot, so no other day moves. If the current era started before today it starts a new era first (old one into `scheduleHistory`). Deploy the same UTC day. Doing this mid-day means the plays already recorded for the previous game stay in D1 but leave today's leaderboard page, so prefer running it right after 00:00 UTC.
 
 ### postHi() protocol
 
