@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Vertigo</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee+Shade&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ff5c1a; --secondary: #2ef2ff; --bg: #140b2e; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (480 / 480))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 140px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  #hint { display: none; font-size: clamp(11px, 2.8vw, 13px); opacity: .6; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  #start-overlay h2 { font-family: 'Bungee Shade', 'Impact', sans-serif; font-size: clamp(34px, 9vw, 72px); letter-spacing: 1px; color: var(--primary); text-shadow: 0 0 28px rgba(255,92,26,.45); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-weight: 700; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.66)),
+      url('backgrounds/vertigo.jpg') center/cover no-repeat;
+  }
+  #start-overlay h2 {
+    font-family: 'Bungee Shade', 'Impact', sans-serif;
+    font-size: clamp(34px, 8vw, 68px); line-height: 1; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,92,26,0.6);
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,20,0.55); backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
+  #start-overlay button { box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="combo"></span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="480" height="480"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">↺</button>
+    <button class="btn" id="btn-right">↻</button>
+  </div>
+  <div id="hint">Hold the buttons, tap-hold either half of the arena, or tilt your phone</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img onerror="this.replaceWith(Object.assign(document.createElement('h2'),{textContent:'VERTIGO'}))" src="logos/vertigo.png" alt="VERTIGO" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <p>You don't control the ball. You control the <b>world</b>. Hold ← → (or the buttons, or tilt your phone) to spin the arena and roll the ball into gems before they rot into spikes. Touch a spike and it's over.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 480, H = 480;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || keys['A'] || held.left || held.lhalf;
+  const right = () => keys['ArrowRight'] || keys['d'] || keys['D'] || held.right || held.rhalf;
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION =====
+  // The world is a square arena in "world" coordinates centred on (0,0). The screen shows it
+  // rotated by theta. Gravity always points screen-down, so in world space it is (sin θ, cos θ).
+  const A = 150;            // arena half-size (diagonal incl. walls must fit the canvas when tilted 45°)
+  const WALL = 14;          // border thickness
+  const R = 11;             // ball radius
+  const OMEGA = 0.042;      // max spin speed, rad per step
+  const CX = W / 2, CY = H / 2;
+
+  let score = 0, combo = 1, gems = 0, ticks = 0, sinceGem = 9999;
+  let theta = 0, omega = 0, tiltTarget = null;
+  let ball, blocks, gem, parts, trail, flash;
+  const scoreEl = document.getElementById('score'), comboEl = document.getElementById('combo');
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function setScore(n) { score = n; scoreEl.textContent = 'Score: ' + score.toLocaleString(); }
+  function setCombo() { comboEl.textContent = combo > 1 ? 'Combo x' + combo : ''; }
+
+  function border() {
+    return [
+      { x: -A - WALL, y: -A - WALL, w: 2 * (A + WALL), h: WALL, k: 'wall' },
+      { x: -A - WALL, y: A, w: 2 * (A + WALL), h: WALL, k: 'wall' },
+      { x: -A - WALL, y: -A, w: WALL, h: 2 * A, k: 'wall' },
+      { x: A, y: -A, w: WALL, h: 2 * A, k: 'wall' },
+    ];
+  }
+  function overlapsAny(x, y, w, h, pad) {
+    return blocks.some(b => x < b.x + b.w + pad && x + w > b.x - pad && y < b.y + b.h + pad && y + h > b.y - pad);
+  }
+  // Find a free rectangle away from the ball (and gem). Returns null if the arena is too crowded.
+  function freeSpot(w, h, pad, ballDist) {
+    for (let i = 0; i < 60; i++) {
+      const x = rnd(-A + 10, A - 10 - w), y = rnd(-A + 10, A - 10 - h);
+      const cx = x + w / 2, cy = y + h / 2;
+      if (Math.hypot(cx - ball.x, cy - ball.y) < ballDist) continue;
+      if (gem && Math.hypot(cx - gem.x, cy - gem.y) < 60) continue;
+      if (overlapsAny(x, y, w, h, pad)) continue;
+      return { x, y };
+    }
+    return null;
+  }
+  function gemLife() { return Math.max(240, 480 - gems * 7); }
+  function spawnGem() {
+    const s = freeSpot(26, 26, 18, 70) || { x: rnd(-A + 30, A - 56), y: rnd(-A + 30, A - 56) };
+    gem = { x: s.x + 13, y: s.y + 13, life: gemLife(), max: gemLife(), spin: 0 };
+  }
+  function spawnSpike(x, y) {
+    const S = 26;
+    if (x === undefined) { const s = freeSpot(S, S, 16, 110); if (!s) return; x = s.x; y = s.y; }
+    blocks.push({ x, y, w: S, h: S, k: 'spike', born: ticks });
+  }
+  function spawnWall() {
+    const long = rnd(50, 90), thin = 20;
+    const vert = Math.random() < 0.5;
+    const w = vert ? thin : long, h = vert ? long : thin;
+    const s = freeSpot(w, h, 20, 90); if (!s) return;
+    blocks.push({ x: s.x, y: s.y, w, h, k: 'wall', born: ticks });
+  }
+
+  function reset() {
+    setScore(0); combo = 1; gems = 0; ticks = 0; sinceGem = 9999; theta = 0; omega = 0; flash = 0;
+    ball = { x: 0, y: -A + 60, vx: 0, vy: 0, onGround: false };
+    blocks = border();
+    // a few starter obstacles so the first seconds already need some steering
+    blocks.push({ x: -95, y: 15, w: 76, h: 20, k: 'wall', born: -999 });
+    blocks.push({ x: 45, y: -50, w: 20, h: 84, k: 'wall', born: -999 });
+    gem = null; spawnGem();
+    parts = []; trail = [];
+    setCombo();
+  }
+
+  const DEATHS = ['The world kept spinning. You did not.', 'Spiked. Gravity sends its regards.', 'Dizzy yet?', 'That spike was literally your fault.', 'You rotated a whole planet and still lost.'];
+
+  function step() {
+    ticks++; sinceGem++;
+    if (ticks % 60 === 0) setScore(score + 1);          // 1 pt per second survived
+
+    // ── Spin the world ──
+    let target = 0;
+    if (left()) target -= OMEGA;
+    if (right()) target += OMEGA;
+    if (target === 0 && tiltTarget !== null) target = tiltTarget;
+    omega += (target - omega) * 0.14;
+    theta += omega;
+
+    // ── Ball physics in world space ──
+    const G = Math.min(0.5, 0.26 + gems * 0.0045);
+    ball.vx += G * Math.sin(theta);
+    ball.vy += G * Math.cos(theta);
+    ball.vx *= 0.996; ball.vy *= 0.996;
+    const sp = Math.hypot(ball.vx, ball.vy);
+    if (sp > 9) { ball.vx *= 9 / sp; ball.vy *= 9 / sp; }
+    ball.x += ball.vx; ball.y += ball.vy;
+
+    // collisions: 2 relaxation passes against every block
+    let hitSpike = false, touching = false;
+    for (let pass = 0; pass < 2; pass++) {
+      for (const b of blocks) {
+        const cx = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+        const cy = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+        let dx = ball.x - cx, dy = ball.y - cy;
+        let d = Math.hypot(dx, dy);
+        if (d >= R) continue;
+        if (b.k === 'spike') { if (d < R - 3) hitSpike = true; }
+        let nx, ny;
+        if (d < 1e-6) {
+          // centre inside the box: push out along the shallowest axis
+          const l = ball.x - b.x, r = b.x + b.w - ball.x, t = ball.y - b.y, bt = b.y + b.h - ball.y;
+          const m = Math.min(l, r, t, bt);
+          nx = m === l ? -1 : m === r ? 1 : 0; ny = m === t ? -1 : m === bt ? 1 : 0; d = -m;
+        } else { nx = dx / d; ny = dy / d; }
+        ball.x += nx * (R - d); ball.y += ny * (R - d);
+        const vn = ball.vx * nx + ball.vy * ny;
+        if (vn < 0) { ball.vx -= (1 + 0.25) * vn * nx; ball.vy -= (1 + 0.25) * vn * ny; }
+        touching = true;
+      }
+    }
+    if (touching) { ball.vx *= 0.985; ball.vy *= 0.985; }   // rolling friction
+    if (hitSpike) { flash = 1; gameOver('Impaled', DEATHS[Math.floor(Math.random() * DEATHS.length)]); return; }
+
+    // ── Gem ──
+    gem.spin += 0.06; gem.life--;
+    if (Math.hypot(ball.x - gem.x, ball.y - gem.y) < R + 12) {
+      combo = sinceGem < 180 ? Math.min(5, combo + 1) : 1;
+      sinceGem = 0; gems++;
+      setScore(score + 10 * combo); setCombo();
+      for (let i = 0; i < 18; i++) { const a = rnd(0, Math.PI * 2), s = rnd(1, 4); parts.push({ x: gem.x, y: gem.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 40, c: i % 3 ? '#2ef2ff' : '#fff' }); }
+      if (gems % 3 === 0) spawnSpike();
+      if (gems % 5 === 0) spawnWall();
+      spawnGem();
+    } else if (gem.life <= 0) {
+      // the gem rots into a spike right where it was
+      const gx = gem.x - 13, gy = gem.y - 13;
+      for (let i = 0; i < 14; i++) { const a = rnd(0, Math.PI * 2), s = rnd(0.5, 2.5); parts.push({ x: gem.x, y: gem.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 30, c: '#ff5c1a' }); }
+      if (Math.hypot(ball.x - gem.x, ball.y - gem.y) > R + 30) spawnSpike(gx, gy); else spawnSpike();
+      combo = 1; setCombo();
+      spawnGem();
+    }
+
+    // ── fx ──
+    trail.push({ x: ball.x, y: ball.y }); if (trail.length > 10) trail.shift();
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.t--; }
+    parts = parts.filter(p => p.t > 0);
+  }
+
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // backdrop
+    const bg = ctx.createRadialGradient(CX, CY, 40, CX, CY, 340);
+    bg.addColorStop(0, '#22124a'); bg.addColorStop(1, '#0b0619');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // gravity chevron: always screen-down, so the player never loses "which way is down"
+    ctx.save(); ctx.translate(CX, H - 10); ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-9, -6); ctx.lineTo(0, 2); ctx.lineTo(9, -6); ctx.stroke(); ctx.restore();
+
+    ctx.save();
+    ctx.translate(CX, CY); ctx.rotate(theta);
+
+    // arena floor
+    ctx.fillStyle = '#17103a'; ctx.fillRect(-A, -A, 2 * A, 2 * A);
+    ctx.strokeStyle = 'rgba(46,242,255,.08)'; ctx.lineWidth = 1;
+    for (let i = -A + 40; i < A; i += 40) { ctx.beginPath(); ctx.moveTo(i, -A); ctx.lineTo(i, A); ctx.moveTo(-A, i); ctx.lineTo(A, i); ctx.stroke(); }
+
+    // blocks
+    for (const b of blocks) {
+      const age = Math.min(1, (ticks - b.born) / 20);          // pop-in
+      if (b.k === 'wall') {
+        ctx.fillStyle = '#2a1d63'; ctx.strokeStyle = '#2ef2ff'; ctx.lineWidth = 2;
+        ctx.globalAlpha = age; roundRect(b.x, b.y, b.w, b.h, 4); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+      } else {
+        const m = b.x + b.w / 2, n = b.y + b.h / 2, s = (b.w / 2) * (0.6 + 0.4 * age);
+        ctx.fillStyle = '#ff5c1a'; ctx.strokeStyle = '#ffd1b8'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? s * 0.55 : s * 1.15; ctx.lineTo(m + Math.cos(a) * rr, n + Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#5a1300'; ctx.beginPath(); ctx.arc(m, n, s * 0.3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // gem + rot ring
+    if (gem) {
+      const f = gem.life / gem.max, urgent = f < 0.3 && Math.floor(ticks / 6) % 2 === 0;
+      ctx.strokeStyle = urgent ? '#ff5c1a' : 'rgba(46,242,255,.7)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(gem.x, gem.y, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); ctx.stroke();
+      ctx.save(); ctx.translate(gem.x, gem.y); ctx.rotate(gem.spin); ctx.scale(1, 0.75);
+      ctx.fillStyle = urgent ? '#ffb48f' : '#2ef2ff'; ctx.shadowColor = '#2ef2ff'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(11, 0); ctx.lineTo(0, 13); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(11, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    // particles
+    for (const p of parts) { ctx.globalAlpha = p.t / 40; ctx.fillStyle = p.c; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }
+    ctx.globalAlpha = 1;
+
+    // ball trail + ball
+    if (ball) {
+      trail.forEach((t, i) => { ctx.globalAlpha = (i / trail.length) * 0.35; ctx.fillStyle = '#ff5c1a'; ctx.beginPath(); ctx.arc(t.x, t.y, R * (0.4 + 0.6 * i / trail.length), 0, Math.PI * 2); ctx.fill(); });
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = '#ff5c1a'; ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ff5c1a'; ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      // highlight stays screen-up-left so the ball reads as a sphere while the world spins
+      ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(-theta);
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.arc(-4, -4, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    ctx.restore();
+
+    // arena rim
+    ctx.save(); ctx.translate(CX, CY); ctx.rotate(theta);
+    ctx.strokeStyle = 'rgba(46,242,255,.5)'; ctx.lineWidth = 2; ctx.strokeRect(-A - WALL, -A - WALL, 2 * (A + WALL), 2 * (A + WALL));
+    ctx.restore();
+
+    if (flash > 0) { ctx.fillStyle = `rgba(255,92,26,${flash * 0.5})`; ctx.fillRect(0, 0, W, H); flash = Math.max(0, flash - 0.04); }
+  }
+
+  // ── Touch: hold either half of the arena to spin that way ──
+  function halves(touches) {
+    held.lhalf = false; held.rhalf = false;
+    for (const t of touches) { const p = toLogical(t.clientX, t.clientY); if (p.x < W / 2) held.lhalf = true; else held.rhalf = true; }
+  }
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); halves(e.touches); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); halves(e.touches); }, { passive: false });
+  canvas.addEventListener('touchend', e => { e.preventDefault(); halves(e.touches); }, { passive: false });
+  canvas.addEventListener('touchcancel', e => { halves(e.touches); }, { passive: false });
+  canvas.addEventListener('mousedown', e => { const p = toLogical(e.clientX, e.clientY); if (p.x < W / 2) held.lhalf = true; else held.rhalf = true; });
+  addEventListener('mouseup', () => { held.lhalf = false; held.rhalf = false; });
+
+  // ── Tilt: phone roll maps to spin speed ──
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      if (!running) return;
+      const g = e.gamma || 0;
+      tiltTarget = Math.abs(g) < 6 ? null : Math.max(-1, Math.min(1, g / 30)) * OMEGA;
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

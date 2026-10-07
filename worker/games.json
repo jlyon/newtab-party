@@ -29,7 +29,8 @@
     "cleanup-on-isle-11",
     "yeti-run",
     "senor-frogs-cabo",
-    "fogwatch"
+    "fogwatch",
+    "vertigo"
   ],
   "scheduleHistory": [
     {
@@ -334,6 +335,15 @@
       "controls": "← → / A D or drag to aim the lamp · Space / ✦ flares the beam wide (burns oil). Three wrecks and it's lights out.",
       "type": "lighthouse",
       "logo": "a weathered lighthouse on black rocks with a golden beam cutting through fog, a kraken eye glowing in the dark water, vintage maritime crest"
+    },
+    {
+      "id": "vertigo",
+      "name": "Vertigo",
+      "file": "games/vertigo.html",
+      "description": "You don't control the ball, you control the world: spin the whole arena so gravity rolls the ball into gems before they rot into spikes.",
+      "controls": "← → / A D, hold either half of the arena, or tilt your phone to spin the world. Grab gems fast for combos. Touch a spike and it's over.",
+      "type": "tilt-maze",
+      "logo": "a glossy orange ball balanced on a tilted neon-cyan square arena spinning in space, dizzy spiral motion lines, retro arcade crest"
     }
   ]
 }
