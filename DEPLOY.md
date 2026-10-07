@@ -40,10 +40,12 @@ newtab-party/
 │   ├── newtab.html / .js      # New tab UI (thin client)
 │   └── icons/
 ├── ios/                       # Thin WKWebView wrapper around newtab.party
+├── package.json               # npm scripts for everything (run from the root)
 ├── scripts/
 │   ├── qa/lint.mjs            # Static rules every game must pass
 │   ├── qa/smoke.mjs           # Playwright run on desktop, iPhone and iPad
-│   └── gen_logos.mjs           # Batch logo generator (Gemini API)
+│   ├── gen_logos.mjs          # Batch logo generator (Gemini API)
+│   └── retire_game.mjs        # Retire games from the rotation
 └── worker/
     ├── src/
     │   ├── index.ts           # Fetch handler and all routes
@@ -53,15 +55,13 @@ newtab-party/
     ├── public/games/          # Game HTML, plus logos/ and backgrounds/
     ├── games.json             # Game registry and air schedule (source of truth)
     ├── schema.sql
-    ├── wrangler.toml
-    └── package.json
+    └── wrangler.toml
 ```
 
 ## Run it locally
 
 ```bash
-cd worker
-npm install
+npm install                    # at the repo root
 npm run db:init:local          # first time only: create the local D1 database
 npm run dev                    # http://localhost:8787
 ```
@@ -71,19 +71,18 @@ To test the extension against your local worker, set `SERVER_URL = 'http://local
 Type-check the worker:
 
 ```bash
-cd worker && npx tsc --noEmit
+npm run typecheck
 ```
 
 ## Deploy your own copy
 
-You need a [Cloudflare account](https://dash.cloudflare.com/sign-up) (the free tier works). Wrangler is already a dev dependency in `worker/package.json`.
+You need a [Cloudflare account](https://dash.cloudflare.com/sign-up) (the free tier works). Wrangler is already a dev dependency in the root `package.json`; every npm script runs from the repo root and passes `--cwd worker` to wrangler.
 
 ### 1. Create the database
 
 ```bash
-cd worker
 npm install
-npx wrangler d1 create newtab-party
+npx wrangler d1 create newtab-party --cwd worker
 ```
 
 Paste the printed `database_id` into `worker/wrangler.toml`:
@@ -137,11 +136,11 @@ Then reload the extension in `chrome://extensions`.
 ## Adding a game to the rotation
 
 1. Put the file in `worker/public/games/<id>.html`.
-2. Run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>`.
+2. Run the QA gate: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>`.
 3. Add an entry to the `games` array in `worker/games.json`.
 4. Append the id to the **end** of the `schedule` array.
 5. Generate its logo (see below).
-6. `npm run deploy` from `worker/`. No extension update is needed.
+6. `npm run deploy`. No extension update is needed.
 
 ### Rotation rules
 
@@ -160,7 +159,6 @@ Each game has a transparent crest logo at `worker/public/games/logos/<id>.png`. 
 cp .env.example .env            # once, then set GEMINI_API_KEY (https://aistudio.google.com/apikey)
 pip install pillow numpy        # once
 
-cd worker
 npm run logos                                         # every game without a logo (default)
 npm run logos -- my-game                              # one or more specific games
 npm run logos -- my-game --force --hint "a smug goose in a tuxedo"
@@ -173,7 +171,6 @@ The script reads each game's name and description from `games.json`, or an optio
 ## QA harness
 
 ```bash
-cd worker
 npm run qa:lint -- [id ...]                 # every game when no ids are given
 SHOTS=1 npm run qa:smoke -- [id ...]        # screenshots go to scripts/qa/shots/
 MODES=desktop,mobile npm run qa:smoke -- my-game
@@ -207,6 +204,6 @@ It needs Playwright. Run `npm i -D playwright` in `scripts/qa`, or set `CHROMIUM
 ```bash
 curl https://newtab.party/api/daily | jq .
 
-cd worker && npx wrangler d1 execute newtab-party --remote \
+npx wrangler d1 execute newtab-party --cwd worker --remote \
   --command "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10"
 ```

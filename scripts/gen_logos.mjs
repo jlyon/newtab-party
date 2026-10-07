@@ -13,7 +13,7 @@
 //   node scripts/gen_logos.mjs <slug> --from-file raw.png   # just key an image you already have
 //   node scripts/gen_logos.mjs --dry-run --all       # print the prompts, call nothing
 //
-// Needs: sharp (already present under worker/node_modules via wrangler; otherwise `npm i sharp` in worker/).
+// Needs: sharp (already in node_modules via wrangler; otherwise `npm i sharp` at the repo root).
 // Optional games.json field per game: "logo": "prompt hint about the mascot / scene".
 
 import fs from 'node:fs';
@@ -30,12 +30,18 @@ const RAW_DIR = path.join(ROOT, 'scripts', '.logo-raw');          // kept only w
 const DEFAULT_MODEL = 'gemini-2.5-flash-image';
 const API = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent';
 
-// sharp lives in worker/node_modules (pulled in by wrangler); resolve it from there first.
+// sharp is pulled in by wrangler, so the root node_modules has it after `npm install`.
+// Loaded lazily so --dry-run works without it.
 let sharp;
-for (const base of [path.join(ROOT, 'worker', 'package.json'), import.meta.url]) {
-  try { sharp = createRequire(base)('sharp'); break; } catch {}
+function loadSharp() {
+  if (sharp) return sharp;
+  try { return (sharp = createRequire(path.join(ROOT, 'package.json'))('sharp')); }
+  catch (e) {
+    console.error(`could not load sharp: ${e.message.split('\n')[0]}`);
+    console.error('Run `npm install` at the repo root (or `npm i sharp`).');
+    process.exit(2);
+  }
 }
-if (!sharp) { console.error('sharp not found. Run `npm install` in worker/ (or `npm i sharp` there).'); process.exit(2); }
 
 const EMBLEMS = [
   'round badge', 'heater shield', 'banner with a ribbon', 'pennant', 'playing-card frame',
@@ -130,6 +136,7 @@ function floodFill(mask, out, w, h, seeds, label) {
 
 /** Turn a logo on #FF00FF into a clean RGBA cutout. Returns { png, width, height, coverage }. */
 async function keyMagenta(raw) {
+  const sharp = loadSharp();
   const { data, info } = await sharp(raw).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const w = info.width, h = info.height, N = w * h;
   const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N), m = new Float32Array(N);

@@ -383,7 +383,7 @@ Logos are generated in batches by a script, not by browsing. It calls the Gemini
 ```bash
 cp .env.example .env            # once: paste GEMINI_API_KEY=... (https://aistudio.google.com/apikey)
 pip install pillow numpy        # once
-cd worker && npm run logos -- <slug>              # one game (reads name + description from games.json)
+npm run logos -- <slug>                           # one game (reads name + description from games.json)
 npm run logos                                     # every game that has no logo yet
 npm run logos -- <slug> --force --hint "a smug goose in a tuxedo, oval cameo"
 npm run logos -- <slug> --from-file ~/Downloads/raw.png   # key an image you made elsewhere

@@ -155,7 +155,7 @@
 
   function reset() {
     score = 0; ang = 0; flare = false; oil = 1; lives = 3; combo = 0; savedN = 0; t = 0;
-    spawnT = 60; krakT = 500; ships = []; parts = []; shake = 0; toast = ''; toastT = 0; aimTarget = null;
+    spawnT = 45; krakT = 300; ships = []; parts = []; shake = 0; toast = ''; toastT = 0; aimTarget = null;
     updHud();
   }
 
@@ -166,11 +166,11 @@
     const tx = LX + (Math.random() * 150 - 75), ty = LY;
     const d = Math.hypot(tx - x, ty - y);
     ships.push({ x, y, vx: (tx - x) / d, vy: (ty - y) / d, r: 13, warn: 0, lit: false, saved: false, wob: Math.random() * 6,
-                 spdMul: 0.85 + Math.random() * 0.4, kraken: false, hue: Math.random() < 0.5 ? '#c9a46a' : '#a8b7c7' });
+                 spdMul: 0.8 + Math.random() * 0.6, sway: 0.4 + Math.random() * 0.9, kraken: false, hue: Math.random() < 0.5 ? '#c9a46a' : '#a8b7c7' });
   }
   function spawnKraken() {
     const fromLeft = Math.random() < 0.5, y = 50 + Math.random() * 130;
-    ships.push({ x: fromLeft ? -50 : W + 50, y, vx: fromLeft ? 1 : -1, vy: 0.12, r: 26, rage: 0, lit: false, saved: false, wob: 0, kraken: true });
+    ships.push({ x: fromLeft ? -50 : W + 50, y, vx: fromLeft ? 1 : -1, vy: 0.25 + Math.random() * 0.2, r: 26, rage: 0, lit: false, saved: false, wob: 0, kraken: true });
     say('something stirs in the fog…');
   }
   function burst(x, y, col, n) {
@@ -193,28 +193,29 @@
     if (aimTarget !== null) ang += (aimTarget - ang) * 0.3;
     ang = clamp(ang, -ANG_MAX, ANG_MAX);
     flare = fire() && oil > 0;
-    oil = flare ? Math.max(0, oil - 1 / 110) : Math.min(1, oil + 1 / 320);
+    oil = flare ? Math.max(0, oil - 1 / 80) : Math.min(1, oil + 1 / 420);
     const hw = flare ? 0.30 : 0.125;
 
-    if (--spawnT <= 0) { spawnShip(); spawnT = Math.max(40, 140 - t / 45); }
-    if (t > 700 && --krakT <= 0 && !ships.some(s => s.kraken)) { spawnKraken(); krakT = 480 + Math.random() * 300; }
-    const spd = Math.min(1.25, 0.42 + t / 2600);
+    if (--spawnT <= 0) { spawnShip(); spawnT = Math.max(36, 105 - t / 40); if (t > 3000 && Math.random() < 0.35) spawnShip(); }
+    if (t > 420 && --krakT <= 0 && ships.filter(s => s.kraken).length < (t > 3000 ? 2 : 1)) { spawnKraken(); krakT = 260 + Math.random() * 220; }
+    const spd = Math.min(1.7, 0.5 + t / 1700);
 
     for (let i = ships.length - 1; i >= 0; i--) {
       const s = ships[i];
       s.wob += 0.05;
       if (s.saved) { s.x += s.vx; s.y += s.vy; if (s.x < -60 || s.x > W + 60 || s.y < -60) ships.splice(i, 1); continue; }
-      const sp = s.kraken ? 0.22 : spd * s.spdMul;
+      const sp = s.kraken ? 0.3 : spd * s.spdMul;
       s.x += s.vx * sp; s.y += s.vy * sp;
+      if (!s.kraken) s.x += Math.sin(s.wob * 0.7) * s.sway;
       const dx = s.x - LX, dy = s.y - LY, d = Math.hypot(dx, dy), a = Math.atan2(dx, -dy);
       s.lit = d < BEAM_LEN && Math.abs(angDiff(a, ang)) < hw + (s.r * 0.7) / d;
       if (s.kraken) {
-        s.rage = s.lit ? s.rage + 1 / 28 : Math.max(0, s.rage - 1 / 90);
+        s.rage = s.lit ? s.rage + 1 / 20 : Math.max(0, s.rage - 1 / 160);
         if (s.rage >= 1) { burst(s.x, s.y, '#ff4b6e', 40); ships.splice(i, 1); loseLife('THE KRAKEN STRIKES THE TOWER'); continue; }
         if (s.x < -70 || s.x > W + 70 || s.y > LY) ships.splice(i, 1);
         continue;
       }
-      if (s.lit) s.warn += 1 / 32;
+      if (s.lit) s.warn += 1 / 42; else s.warn = Math.max(0, s.warn - 1 / 120);
       if (s.warn >= 1) {
         s.saved = true; combo++; savedN++;
         const pts = 10 + 2 * Math.min(combo - 1, 10);
@@ -233,7 +234,7 @@
   }
 
   function drawShip(s) {
-    const a = Math.atan2(s.vy, s.vx), alpha = s.saved ? 0.85 : s.lit ? 1 : 0.14;
+    const a = Math.atan2(s.vy, s.vx), alpha = s.saved ? 0.85 : s.lit ? 1 : 0.10;
     ctx.save(); ctx.translate(s.x, s.y + Math.sin(s.wob) * 1.5); ctx.rotate(a); ctx.globalAlpha = alpha;
     ctx.fillStyle = s.hue; ctx.beginPath();
     ctx.moveTo(18, 0); ctx.quadraticCurveTo(8, -9, -14, -8); ctx.lineTo(-16, 8); ctx.quadraticCurveTo(8, 9, 18, 0); ctx.fill();

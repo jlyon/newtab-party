@@ -20,8 +20,8 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
 | `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
-| `worker/package.json` | npm scripts for everything above: `dev`, `deploy`, `logos`, `retire`, `qa:lint`, `qa:smoke`, `typecheck` (run from `worker/`; pass script args after `--`). |
-| `scripts/gen_logos.mjs` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG via `sharp` from `worker/node_modules`). No args = generate every missing logo. |
+| `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `retire`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
+| `scripts/gen_logos.mjs` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG via `sharp`). No args = generate every missing logo. |
 | `scripts/retire_game.mjs` | Retires games from the rotation by starting a new schedule era (see Rotation rules). |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
@@ -61,8 +61,8 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 2. Copy `.html` to `worker/public/games/` and run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
 4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
-5. Logo: `npm run logos` from `worker/` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`)
-6. `npm run deploy` from `worker/` — live immediately, no extension update needed
+5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`)
+6. `npm run deploy` — live immediately, no extension update needed
 
 Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
 
@@ -80,7 +80,7 @@ Rotation is driven by the `schedule` array (game ids in air order), anchored at 
 
 ### Retiring a game
 
-Run `npm run retire -- <id> [<id> ...]` from `worker/` (add `--dry-run` to preview) and deploy the same UTC day. It moves the current era into `scheduleHistory`, writes a new `schedule`/`scheduleEpoch` anchored at today (rotated so today's game is unchanged, retired ids removed), and records the id in `retired`. Keep the entry in `games` and the file in `public/games/`: the game stays in the library (`/games` lists retired games in a Retired section linked to their last airing) and past replays/records still resolve. **Never hand-edit `scheduleHistory` or an old era's `schedule`**: those are what past dates resolve against. If the game being retired is today's, the script anchors the new era at tomorrow and you must deploy after 00:00 UTC. To bring a retired game back, append its id to `schedule` and delete its `retired` entry.
+Run `npm run retire -- <id> [<id> ...]` (add `--dry-run` to preview) and deploy the same UTC day. It moves the current era into `scheduleHistory`, writes a new `schedule`/`scheduleEpoch` anchored at today (rotated so today's game is unchanged, retired ids removed), and records the id in `retired`. Keep the entry in `games` and the file in `public/games/`: the game stays in the library (`/games` lists retired games in a Retired section linked to their last airing) and past replays/records still resolve. **Never hand-edit `scheduleHistory` or an old era's `schedule`**: those are what past dates resolve against. If the game being retired is today's, the script anchors the new era at tomorrow and you must deploy after 00:00 UTC. To bring a retired game back, append its id to `schedule` and delete its `retired` entry.
 
 ### postHi() protocol
 
@@ -135,21 +135,21 @@ All queries are in `worker/src/db.ts`. D1 uses `db.prepare(sql).bind(...).run/fi
 ## Running locally
 
 ```bash
-cd worker
-npm install
+npm install                    # repo root: wrangler, typescript, sharp (via wrangler)
 npm run db:init:local          # create local D1 SQLite (first time only)
 npm run dev                    # wrangler dev → http://localhost:8787
 ```
+
+All npm scripts run from the repo root; the wrangler ones pass `--cwd worker` so `wrangler.toml`, `schema.sql` and `.wrangler/` state stay in `worker/`.
 
 For extension dev, set `SERVER_URL = 'http://localhost:8787'` in `newtab.js` and reload the extension in `chrome://extensions`.
 
 ## Deploying
 
 ```bash
-cd worker
-npx wrangler d1 create newtab-party   # first time only — paste database_id into wrangler.toml
-npm run db:init:remote                 # first time only — runs schema.sql against prod D1
-npm run deploy                         # wrangler deploy
+npx wrangler d1 create newtab-party --cwd worker   # first time only — paste database_id into worker/wrangler.toml
+npm run db:init:remote                              # first time only — runs schema.sql against prod D1
+npm run deploy                                      # wrangler deploy
 ```
 
 ## Common tasks
@@ -161,17 +161,17 @@ curl https://newtab.party/api/daily | jq .
 
 **Inspect the D1 database (local):**
 ```bash
-cd worker && npx wrangler d1 execute newtab-party --local \
+npx wrangler d1 execute newtab-party --cwd worker --local \
   --command "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10"
 ```
 
 **Inspect the D1 database (production):**
 ```bash
-cd worker && npx wrangler d1 execute newtab-party \
+npx wrangler d1 execute newtab-party --cwd worker \
   --command "SELECT game_id, score, played_at FROM plays ORDER BY played_at DESC LIMIT 10"
 ```
 
 **Type-check the worker:**
 ```bash
-cd worker && npm run typecheck
+npm run typecheck
 ```
