@@ -43,7 +43,7 @@ newtab-party/
 ├── scripts/
 │   ├── qa/lint.mjs            # Static rules every game must pass
 │   ├── qa/smoke.mjs           # Playwright run on desktop, iPhone and iPad
-│   └── gen_logos.py           # Batch logo generator (Gemini API)
+│   └── gen_logos.mjs           # Batch logo generator (Gemini API)
 └── worker/
     ├── src/
     │   ├── index.ts           # Fetch handler and all routes
@@ -137,7 +137,7 @@ Then reload the extension in `chrome://extensions`.
 ## Adding a game to the rotation
 
 1. Put the file in `worker/public/games/<id>.html`.
-2. Run the QA gate: `node scripts/qa/lint.mjs <id>` and `SHOTS=1 node scripts/qa/smoke.mjs <id>`.
+2. Run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>`.
 3. Add an entry to the `games` array in `worker/games.json`.
 4. Append the id to the **end** of the `schedule` array.
 5. Generate its logo (see below).
@@ -160,11 +160,12 @@ Each game has a transparent crest logo at `worker/public/games/logos/<id>.png`. 
 cp .env.example .env            # once, then set GEMINI_API_KEY (https://aistudio.google.com/apikey)
 pip install pillow numpy        # once
 
-python3 scripts/gen_logos.py --missing                  # every game without a logo
-python3 scripts/gen_logos.py my-game                    # one or more specific games
-python3 scripts/gen_logos.py my-game --force --hint "a smug goose in a tuxedo"
-python3 scripts/gen_logos.py my-game --from-file raw.png   # key an image you made elsewhere
-python3 scripts/gen_logos.py --dry-run --all            # print prompts, call nothing
+cd worker
+npm run logos                                         # every game without a logo (default)
+npm run logos -- my-game                              # one or more specific games
+npm run logos -- my-game --force --hint "a smug goose in a tuxedo"
+npm run logos -- my-game --from-file raw.png          # key an image you made elsewhere
+npm run logos -- --dry-run --all                      # print prompts, call nothing
 ```
 
 The script reads each game's name and description from `games.json`, or an optional `"logo"` hint field. It renders the crest on flat magenta and chroma-keys it to real transparency. Set `GEMINI_IMAGE_MODEL` in `.env` to override the default model.
@@ -172,9 +173,10 @@ The script reads each game's name and description from `games.json`, or an optio
 ## QA harness
 
 ```bash
-node scripts/qa/lint.mjs [id ...]           # every game when no ids are given
-SHOTS=1 node scripts/qa/smoke.mjs [id ...]  # screenshots go to scripts/qa/shots/
-MODES=desktop,mobile node scripts/qa/smoke.mjs my-game
+cd worker
+npm run qa:lint -- [id ...]                 # every game when no ids are given
+SHOTS=1 npm run qa:smoke -- [id ...]        # screenshots go to scripts/qa/shots/
+MODES=desktop,mobile npm run qa:smoke -- my-game
 ```
 
 The lint checks for score scaling, a fixed-step game loop, the viewport meta tag, touch-gated controls and `100vh`. The smoke test serves the games locally, clicks Play, feeds keyboard and touch input, and flags page errors, overflow, clipped canvases, off-screen or tiny buttons, and content that can't be scrolled by touch. It runs on desktop, iPhone 13, iPhone SE, and iPad in both orientations.

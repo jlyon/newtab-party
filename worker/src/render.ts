@@ -409,7 +409,12 @@ export interface CalCell {
   isFuture: boolean;
 }
 
-export function renderGamesCalendar({ today, cells }: { today: string; cells: CalCell[] }): string {
+export interface RetiredEntry {
+  game: Game;
+  lastAired: string | null;   // YYYY-MM-DD of its final airing, if one is in range
+}
+
+export function renderGamesCalendar({ today, cells, retired = [] }: { today: string; cells: CalCell[]; retired?: RetiredEntry[] }): string {
   const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const cellHtml = (c: CalCell): string => {
@@ -436,6 +441,17 @@ export function renderGamesCalendar({ today, cells }: { today: string; cells: Ca
   for (let i = 0; i < cells.length; i += 7) {
     weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
   }
+
+  // Retired games: out of the rotation, still playable via their last airing.
+  const retiredHtml = retired.length ? `
+  <div class="kicker retired-kicker">Retired</div>
+  <p class="blurb">Out of the daily rotation, never out of the building. Still here for practice.</p>
+  <div class="retired-grid">${retired.map(({ game, lastAired }) => {
+    const name = esc(game.name);
+    const logo = `<img class="cal-logo" src="/games/logos/${game.id}.png" alt="${name}" loading="lazy">`;
+    if (!lastAired) return `<div class="cal-cell is-retired" title="${name}">${logo}</div>`;
+    return `<a class="cal-cell is-retired" href="/play/${lastAired}" aria-label="Practice ${name} (retired)" title="${name}">${logo}</a>`;
+  }).join('')}</div>` : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -471,6 +487,10 @@ ${FAVICON}
   .cal-cell.is-today { border-color: #ffd700; box-shadow: 0 0 0 1px #ffd700, 0 8px 30px rgba(255,215,0,0.18); }
   .cal-cell.is-future { opacity: 0.5; cursor: default; }
   .cal-cell.is-empty { opacity: 0.3; cursor: default; }
+  .retired-kicker { margin-top: 40px; color: rgba(255,255,255,0.35); }
+  .retired-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 18px; }
+  .cal-cell.is-retired { filter: saturate(0.6); opacity: 0.8; }
+  a.cal-cell.is-retired:hover { filter: none; opacity: 1; }
   .foot { margin-top: 30px; font-size: 12px; color: rgba(255,255,255,0.28); }
   .foot a { color: rgba(255,255,255,0.5); }
   @media (max-width: 560px) {
@@ -493,6 +513,7 @@ ${FAVICON}
   </div>
   <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
   ${weeks}
+  ${retiredHtml}
   <div class="foot"><a href="/">← Back to today's game</a></div>
 </div>
 </body>

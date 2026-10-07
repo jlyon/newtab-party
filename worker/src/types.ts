@@ -7,6 +7,22 @@ export interface Game {
   type?: string;
 }
 
+// One rotation era: `schedule` (game ids in air order) anchored at `scheduleEpoch`.
+export interface ScheduleEra {
+  scheduleEpoch: string;   // YYYY-MM-DD this era took effect
+  schedule: string[];
+}
+
+// Shape of worker/games.json. `scheduleEpoch` + `schedule` are the CURRENT era
+// (what every client uses for today); `scheduleHistory` holds earlier eras so the
+// worker can resolve past dates exactly as they aired.
+export interface GamesData extends ScheduleEra {
+  version?: number;
+  scheduleHistory?: ScheduleEra[];     // previous eras, oldest first
+  retired?: Record<string, string>;    // game id → YYYY-MM-DD it left the rotation (still in `games`)
+  games: Game[];
+}
+
 export interface Play {
   id: number;
   game_id: string;

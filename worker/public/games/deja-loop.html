@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Déjà Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik+Glitch&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ff4d6a; --secondary: #ffc94a; --bg: #0f2a4a; --teal: #6fe3d2; --ghost: #a9c2da; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'DM Mono', ui-monospace, Menlo, monospace; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; font-variant-numeric: tabular-nums; }
+  #hud b { color: var(--primary); font-weight: 500; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (560 / 420))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); cursor: crosshair; touch-action: none; }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; font-size: 12px; color: var(--ghost); letter-spacing: .06em; text-align: center; }
+  body.touch #touch-controls { display: flex; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,22,40,.88); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-family: 'Rubik Glitch', 'DM Mono', monospace; font-weight: 400; font-size: clamp(34px, 9vw, 72px); color: var(--primary); line-height: 1; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); margin: 6px 0; }
+  .overlay .rules { color: var(--ghost); font-size: clamp(12px, 2.8vw, 14px); }
+  .overlay .rules span { color: #fff; }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'Rubik Glitch', 'DM Mono', monospace; font-size: clamp(15px, 3.5vw, 19px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #over-title { font-size: clamp(22px, 5.5vw, 40px); max-width: 18ch; }
+
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(6,16,30,0.62), rgba(6,16,30,0.5) 72%, rgba(6,16,30,0.8)),
+      url('backgrounds/deja-loop.jpg') center/cover no-repeat, #0b1f38;
+  }
+  #start-overlay h2 {
+    font-family: 'Rubik Glitch', 'DM Mono', monospace;
+    font-size: clamp(36px, 9vw, 72px);
+    line-height: 0.98; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,77,106,0.55);
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay .rules { color: #c6d8ea; }
+  #start-overlay button {
+    margin-top: 22px; padding: 15px 50px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer;
+    color: #10100f; background: var(--primary);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
+    transition: transform 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: <b>0</b></span><span id="echoes">Echoes: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="560" height="420"></canvas>
+  <div id="touch-controls"><span>Drag anywhere to steer · your red dot chases your finger</span></div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <h2>Déjà Loop</h2>
+  <p>Every 4 seconds, a copy of you replays your last 4 seconds. Forever. Touch one and you're done.</p>
+  <p class="rules"><span>Mouse / drag / WASD</span> to steer · <span>gold orbs</span> = 1 pt + 1 per echo on the board · <span>teal rings</span> erase your 2 oldest echoes · don't stand still</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 560, H = 420;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    gridCache = null;
+  }
+  let gridCache = null;
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  const kx = () => ((keys['ArrowRight'] || keys['d'] || keys['D']) ? 1 : 0) - ((keys['ArrowLeft'] || keys['a'] || keys['A']) ? 1 : 0);
+  const ky = () => ((keys['ArrowDown'] || keys['s'] || keys['S']) ? 1 : 0) - ((keys['ArrowUp'] || keys['w'] || keys['W']) ? 1 : 0);
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; beep(330, .09, 'triangle', .1, 220); }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running || dying > 0) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const LOOP = 240, GRACE = 45, R = 9, SPEED = 3.9;   // 4 s loops at 60 steps/s
+  const C = { grid: '#17385f', gridS: '#27548a', red: '#ff4d6a', gold: '#ffc94a', teal: '#6fe3d2', ghost: '#a9c2da', bg: '#0f2a4a', ink: '#e9f2fb' };
+  let score = 0, p, rec, f, loopN, echoes, orb, forget, parts, pops, flash, shake, killer, frames, dying = 0;
+  let ptr = { x: W / 2, y: H / 2, active: false };
+
+  // tiny synth, starts only after the Play click
+  let actx = null;
+  function beep(freq, dur, type, vol, slide) {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+
+  function reset() {
+    score = 0; p = { x: W / 2, y: H / 2 }; rec = new Float32Array(LOOP * 2); f = 0; loopN = 0; echoes = [];
+    forget = null; parts = []; pops = []; flash = 0; shake = 0; killer = null; frames = 0; dying = 0;
+    ptr = { x: W / 2, y: H / 2, active: false };
+    spawnOrb(); hud();
+  }
+  function hud() {
+    document.getElementById('score').innerHTML = 'Score: <b>' + score.toLocaleString() + '</b>';
+    document.getElementById('echoes').textContent = 'Echoes: ' + echoes.length;
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function safeSpot(minD) {
+    let x, y;
+    for (let t = 0; t < 60; t++) {
+      x = rnd(30, W - 30); y = rnd(30, H - 30);
+      if (Math.hypot(x - p.x, y - p.y) < minD) continue;
+      let ok = true;
+      for (const e of echoes) { for (let k = 0; k < LOOP && ok; k += 20) if (Math.hypot(x - e.path[k * 2], y - e.path[k * 2 + 1]) < R * 2.4) ok = false; if (!ok) break; }
+      if (ok) break;
+    }
+    return { x, y, t: 0 };
+  }
+  function spawnOrb() { orb = safeSpot(110); }
+  function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = rnd(1, 4.5); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(25, 50), color }); } }
+
+  function step() {
+    // particles + shake keep animating through the death beat
+    for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.x += q.vx; q.y += q.vy; q.vx *= .95; q.vy *= .95; if (--q.life <= 0) parts.splice(i, 1); }
+    for (let i = pops.length - 1; i >= 0; i--) { pops[i].y -= .6; if (--pops[i].life <= 0) pops.splice(i, 1); }
+    if (shake > 0) { shake *= .86; if (shake < .3) shake = 0; }
+    if (flash > 0) flash -= .05;
+    if (dying > 0) { if (--dying === 0) finish(); return; }
+    if (!running) return;
+
+    const dx0 = kx(), dy0 = ky();
+    if (dx0 || dy0) { const m = Math.hypot(dx0, dy0); p.x += dx0 / m * SPEED; p.y += dy0 / m * SPEED; ptr.active = false; }
+    else if (ptr.active) { const dx = ptr.x - p.x, dy = ptr.y - p.y, d = Math.hypot(dx, dy); if (d > .5) { const m = Math.min(SPEED, d) / d; p.x += dx * m; p.y += dy * m; } }
+    p.x = Math.min(W - R, Math.max(R, p.x)); p.y = Math.min(H - R, Math.max(R, p.y));
+    rec[f * 2] = p.x; rec[f * 2 + 1] = p.y;
+
+    for (const e of echoes) {
+      if (++e.age < GRACE) continue;
+      if (Math.hypot(e.path[f * 2] - p.x, e.path[f * 2 + 1] - p.y) < R * 1.7) { die(e); return; }
+    }
+    orb.t++;
+    if (Math.hypot(orb.x - p.x, orb.y - p.y) < R * 2.2) {
+      const pts = 1 + echoes.length; score += pts;
+      burst(orb.x, orb.y, C.gold, 16); pops.push({ x: orb.x, y: orb.y, txt: '+' + pts, life: 50 });
+      beep(660 + Math.min(600, echoes.length * 40), .09, 'square', .06, 300);
+      spawnOrb(); hud();
+    }
+    if (forget) {
+      forget.t++;
+      if (Math.hypot(forget.x - p.x, forget.y - p.y) < R * 2.4) {
+        for (const e of echoes.splice(0, 2)) burst(e.path[f * 2], e.path[f * 2 + 1], C.teal, 14);
+        burst(forget.x, forget.y, C.teal, 20); pops.push({ x: forget.x, y: forget.y, txt: 'forgotten', life: 60 });
+        beep(880, .25, 'sine', .1, -600); forget = null; hud();
+      } else if (forget.t > LOOP * 2) forget = null;
+    }
+    f++; frames++;
+    if (f >= LOOP) {
+      echoes.push({ path: rec.slice(), born: loopN, age: 0 });
+      rec = new Float32Array(LOOP * 2); f = 0; loopN++; flash = 1;
+      beep(196, .14, 'triangle', .09, -60);
+      if (loopN === 5) pops.push({ x: W / 2, y: H / 2, txt: 'five of you now. cozy.', life: 90 });
+      if (loopN % 3 === 0 && !forget) forget = safeSpot(140);
+      hud();
+    }
+  }
+  function die(e) {
+    running = false; killer = e; dying = 45; shake = 14;
+    burst(p.x, p.y, C.red, 40); beep(140, .5, 'sawtooth', .12, -100);
+  }
+  function finish() {
+    const ago = (loopN - killer.born) * 4;
+    const quips = ['Past you was just minding their own business.', 'In fairness, you did tell them to go that way.',
+      'History repeats. Yours does it every four seconds.', 'You were your own worst enemy. Literally.',
+      'Some habits are hard to break. Especially your own path.'];
+    gameOver('You hit yourself from ' + ago + ' seconds ago.', quips[Math.floor(Math.random() * quips.length)] + '  Loops survived: ' + loopN + '.');
+  }
+
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || ptr.active) { const q = toLogical(e.clientX, e.clientY); ptr.x = q.x; ptr.y = q.y; ptr.active = true; } });
+  canvas.addEventListener('pointerdown', e => { const q = toLogical(e.clientX, e.clientY); ptr.x = q.x; ptr.y = q.y; ptr.active = true; try { canvas.setPointerCapture(e.pointerId); } catch (x) {} });
+  canvas.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') ptr.active = false; });
+  canvas.addEventListener('pointercancel', () => { ptr.active = false; });
+
+  function buildGrid() {
+    const g = document.createElement('canvas'); g.width = W * 2; g.height = H * 2;
+    const c = g.getContext('2d'); c.scale(2, 2);
+    c.fillStyle = C.bg; c.fillRect(0, 0, W, H); c.lineWidth = 1;
+    for (let i = 0, x = .5; x < W; x += 20, i++) { c.strokeStyle = i % 5 ? C.grid : C.gridS; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+    for (let i = 0, y = .5; y < H; y += 20, i++) { c.strokeStyle = i % 5 ? C.grid : C.gridS; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    gridCache = g;
+  }
+  function draw(now) {
+    if (!gridCache) buildGrid();
+    ctx.save();
+    if (shake) ctx.translate((Math.random() - .5) * shake * 2, (Math.random() - .5) * shake * 2);
+    ctx.drawImage(gridCache, 0, 0, W, H);
+    if (!p) { ctx.restore(); return; }
+    if (!running && !dying && !killer) { attract(now); ctx.restore(); return; }
+
+    const prog = f / LOOP;
+    ctx.fillStyle = C.gridS; ctx.fillRect(0, 0, W, 4);
+    ctx.fillStyle = prog > .85 ? C.red : C.ink; ctx.fillRect(0, 0, W * prog, 4);
+    if (flash > 0) { ctx.fillStyle = C.ink; ctx.globalAlpha = flash * .08; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+
+    // your live trail: this becomes the next echo
+    ctx.setLineDash([3, 5]); ctx.lineWidth = 1.5; ctx.strokeStyle = C.red;
+    ctx.globalAlpha = prog > .85 ? .4 + .3 * Math.sin(now / 60) : .3;
+    ctx.beginPath(); for (let i = 0; i < f; i++) { const x = rec[i * 2], y = rec[i * 2 + 1]; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    const n = echoes.length;
+    ctx.font = '500 9px "DM Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    echoes.forEach((e, i) => {
+      const a = n > 1 ? i / (n - 1) : 1, s0 = Math.max(0, f - 18);
+      ctx.strokeStyle = C.ghost; ctx.lineWidth = 2; ctx.globalAlpha = .2 + .3 * a;
+      ctx.beginPath(); for (let k = s0; k <= f; k++) { const x = e.path[k * 2], y = e.path[k * 2 + 1]; k === s0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+      ctx.globalAlpha = 1;
+      const x = e.path[f * 2], y = e.path[f * 2 + 1];
+      ctx.beginPath(); ctx.arc(x, y, R * .85, 0, 6.283); ctx.fillStyle = C.bg; ctx.fill();
+      ctx.lineWidth = 2.2; ctx.strokeStyle = e === killer ? C.red : C.ghost;
+      if (e.age < GRACE) { ctx.setLineDash([3, 3]); ctx.globalAlpha = .5 + .5 * Math.sin(e.age / 3); }
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.fillStyle = C.ghost; ctx.fillText(String(e.born + 1), x, y + .5);
+    });
+
+    if (forget) {
+      const pulse = 1 + .12 * Math.sin(forget.t / 6), blink = forget.t > LOOP * 2 - 90 && Math.floor(forget.t / 8) % 2;
+      if (!blink) {
+        ctx.strokeStyle = C.teal; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); ctx.lineDashOffset = -forget.t / 2;
+        ctx.beginPath(); ctx.arc(forget.x, forget.y, R * 1.5 * pulse, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+        ctx.beginPath(); ctx.arc(forget.x, forget.y, R * .45, 0, 6.283); ctx.fillStyle = C.teal; ctx.fill();
+      }
+    }
+    const os = Math.min(1, orb.t / 12);
+    ctx.beginPath(); ctx.arc(orb.x, orb.y, R * .8 * os * (1 + .08 * Math.sin(orb.t / 8)), 0, 6.283); ctx.fillStyle = C.gold; ctx.fill();
+    ctx.beginPath(); ctx.arc(orb.x, orb.y, R * 1.45 * os, 0, 6.283); ctx.strokeStyle = C.gold; ctx.globalAlpha = .4; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1;
+
+    if (running) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, 6.283); ctx.fillStyle = C.red; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, -Math.PI / 2, -Math.PI / 2 + prog * 6.283);
+      ctx.strokeStyle = C.red; ctx.lineWidth = 2; ctx.globalAlpha = .55; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    for (const q of parts) { ctx.globalAlpha = Math.min(1, q.life / 40); ctx.fillStyle = q.color; ctx.fillRect(q.x - 2, q.y - 2, 4, 4); }
+    ctx.globalAlpha = 1; ctx.font = '500 13px "DM Mono", monospace'; ctx.fillStyle = C.ink;
+    for (const q of pops) { ctx.globalAlpha = Math.min(1, q.life / 25); ctx.fillText(q.txt, q.x, q.y - R * 2); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  function attract(now) {   // figure-eight demo behind the title card
+    const pos = s => [W / 2 + W * .36 * Math.sin(s), H / 2 + H * .26 * Math.sin(2 * s)];
+    const s0 = now / 1400;
+    for (let k = 5; k >= 1; k--) {
+      const [x, y] = pos(s0 - k * .55);
+      ctx.beginPath(); ctx.arc(x, y, R * .85, 0, 6.283); ctx.fillStyle = C.bg; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = C.ghost; ctx.globalAlpha = .25 + .12 * (6 - k); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    const [x, y] = pos(s0); ctx.beginPath(); ctx.arc(x, y, R, 0, 6.283); ctx.fillStyle = C.red; ctx.fill();
+  }
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

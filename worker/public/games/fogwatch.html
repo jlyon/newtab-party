@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Fogwatch</title>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ffc857; --secondary: #4fd1c5; --bg: #0a1020; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (640 / 400))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  #touch-hint { display: none; font-size: clamp(11px, 3vw, 13px); opacity: .6; }
+  body.touch #touch-hint { display: block; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 120px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); color: var(--bg); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay h2 { font-family: 'IM Fell English SC', Georgia, serif; font-size: clamp(44px, 11vw, 92px); letter-spacing: 3px; line-height: 1;
+    text-shadow: 0 0 28px rgba(255,200,87,.55), 0 4px 30px rgba(0,0,0,.8); }
+  #start-overlay button { font-family: 'IM Fell English SC', Georgia, serif; }
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.66)),
+      url('backgrounds/fogwatch.jpg') center/cover no-repeat;
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button { padding: 15px 50px; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
+  #start-overlay .sub { font-family: 'IM Fell English SC', Georgia, serif; color: var(--secondary); font-size: clamp(14px, 3.4vw, 20px); margin: 0 0 6px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="saved">Saved: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="640" height="400"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-fire">✦</button>
+    <button class="btn" id="btn-right">▶</button>
+  </div>
+  <div id="touch-hint">Drag the sea or tilt to aim the lamp · hold ✦ to flare</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img src="logos/fogwatch.png" alt="Fogwatch" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+  <h2 style="display:none">Fogwatch</h2>
+  <p class="sub">Night shift at Gull Rock</p>
+  <p>Ships are drifting toward your rocks in the fog. Hold the lamp on a ship until its ring fills and it turns away. Three wrecks and it's lights out. If something has eyes, do <b>not</b> keep the light on it.<br><br>◀ ▶ or A / D aim the lamp (or drag on the sea) · Space / ✦ flares the beam wide, but it burns oil.</p>
+  <button id="start-btn">Light the lamp</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Lights out</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Another night</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 640, H = 400;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-fire', 'fire');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || keys['A'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || keys['D'] || held.right;
+  const fire  = () => keys[' '] || held.fire;
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME: Fogwatch =====
+  const LX = 320, LY = 326, BEAM_LEN = 440, ANG_MAX = 1.27, WRECK_R = 58;
+  const TAU = Math.PI * 2;
+  let score = 0, ang, flare, oil, lives, combo, savedN, t, spawnT, krakT, ships, parts, shake, toast, toastT, aimTarget = null, stars = [];
+  for (let i = 0; i < 70; i++) stars.push({ x: Math.random() * W, y: Math.random() * 180, r: Math.random() * 1.2 + .3, p: Math.random() * TAU });
+  const angDiff = (a, b) => ((a - b + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function say(s) { toast = s; toastT = 70; }
+  function updHud() {
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    document.getElementById('saved').textContent = 'Saved: ' + savedN;
+  }
+
+  function reset() {
+    score = 0; ang = 0; flare = false; oil = 1; lives = 3; combo = 0; savedN = 0; t = 0;
+    spawnT = 60; krakT = 500; ships = []; parts = []; shake = 0; toast = ''; toastT = 0; aimTarget = null;
+    updHud();
+  }
+
+  function spawnShip() {
+    let x, y;
+    if (Math.random() < 0.65) { x = 40 + Math.random() * 560; y = -24; }
+    else { x = Math.random() < 0.5 ? -24 : W + 24; y = 10 + Math.random() * 140; }
+    const tx = LX + (Math.random() * 150 - 75), ty = LY;
+    const d = Math.hypot(tx - x, ty - y);
+    ships.push({ x, y, vx: (tx - x) / d, vy: (ty - y) / d, r: 13, warn: 0, lit: false, saved: false, wob: Math.random() * 6,
+                 spdMul: 0.85 + Math.random() * 0.4, kraken: false, hue: Math.random() < 0.5 ? '#c9a46a' : '#a8b7c7' });
+  }
+  function spawnKraken() {
+    const fromLeft = Math.random() < 0.5, y = 50 + Math.random() * 130;
+    ships.push({ x: fromLeft ? -50 : W + 50, y, vx: fromLeft ? 1 : -1, vy: 0.12, r: 26, rage: 0, lit: false, saved: false, wob: 0, kraken: true });
+    say('something stirs in the fog…');
+  }
+  function burst(x, y, col, n) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, s = 0.6 + Math.random() * 2.4;
+      parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 30 + Math.random() * 30, col }); }
+  }
+  function loseLife(why) {
+    lives--; combo = 0; shake = 14; say(why);
+    if (lives <= 0) {
+      const line = savedN === 0 ? 'Not a single ship made it. The gulls are judging you.'
+        : savedN < 10 ? `${savedN} ships saved before the sea took the lamp.` : `${savedN} ships owe you their lives. The rocks still won.`;
+      gameOver('Lights out', line);
+    }
+  }
+
+  function step() {
+    t++;
+    if (left()) ang -= 0.034;
+    if (right()) ang += 0.034;
+    if (aimTarget !== null) ang += (aimTarget - ang) * 0.3;
+    ang = clamp(ang, -ANG_MAX, ANG_MAX);
+    flare = fire() && oil > 0;
+    oil = flare ? Math.max(0, oil - 1 / 110) : Math.min(1, oil + 1 / 320);
+    const hw = flare ? 0.30 : 0.125;
+
+    if (--spawnT <= 0) { spawnShip(); spawnT = Math.max(40, 140 - t / 45); }
+    if (t > 700 && --krakT <= 0 && !ships.some(s => s.kraken)) { spawnKraken(); krakT = 480 + Math.random() * 300; }
+    const spd = Math.min(1.25, 0.42 + t / 2600);
+
+    for (let i = ships.length - 1; i >= 0; i--) {
+      const s = ships[i];
+      s.wob += 0.05;
+      if (s.saved) { s.x += s.vx; s.y += s.vy; if (s.x < -60 || s.x > W + 60 || s.y < -60) ships.splice(i, 1); continue; }
+      const sp = s.kraken ? 0.22 : spd * s.spdMul;
+      s.x += s.vx * sp; s.y += s.vy * sp;
+      const dx = s.x - LX, dy = s.y - LY, d = Math.hypot(dx, dy), a = Math.atan2(dx, -dy);
+      s.lit = d < BEAM_LEN && Math.abs(angDiff(a, ang)) < hw + (s.r * 0.7) / d;
+      if (s.kraken) {
+        s.rage = s.lit ? s.rage + 1 / 28 : Math.max(0, s.rage - 1 / 90);
+        if (s.rage >= 1) { burst(s.x, s.y, '#ff4b6e', 40); ships.splice(i, 1); loseLife('THE KRAKEN STRIKES THE TOWER'); continue; }
+        if (s.x < -70 || s.x > W + 70 || s.y > LY) ships.splice(i, 1);
+        continue;
+      }
+      if (s.lit) s.warn += 1 / 32;
+      if (s.warn >= 1) {
+        s.saved = true; combo++; savedN++;
+        const pts = 10 + 2 * Math.min(combo - 1, 10);
+        score += pts; updHud();
+        const side = s.x < LX ? -1 : 1;
+        s.vx = side * 1.1 + (Math.random() - .5) * .3; s.vy = -0.8;
+        burst(s.x, s.y, '#4fd1c5', 10);
+        say(combo > 1 ? `+${pts}  ×${combo} streak` : `+${pts}  turned away`);
+        continue;
+      }
+      if (d < WRECK_R) { burst(s.x, s.y, '#ffc857', 26); ships.splice(i, 1); loseLife('WRECKED ON THE ROCKS'); }
+    }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vx *= .96; p.vy *= .96; if (--p.life <= 0) parts.splice(i, 1); }
+    if (shake > 0) shake *= 0.85;
+    if (toastT > 0) toastT--;
+  }
+
+  function drawShip(s) {
+    const a = Math.atan2(s.vy, s.vx), alpha = s.saved ? 0.85 : s.lit ? 1 : 0.14;
+    ctx.save(); ctx.translate(s.x, s.y + Math.sin(s.wob) * 1.5); ctx.rotate(a); ctx.globalAlpha = alpha;
+    ctx.fillStyle = s.hue; ctx.beginPath();
+    ctx.moveTo(18, 0); ctx.quadraticCurveTo(8, -9, -14, -8); ctx.lineTo(-16, 8); ctx.quadraticCurveTo(8, 9, 18, 0); ctx.fill();
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(-10, -3, 14, 6);
+    ctx.fillStyle = s.lit || s.saved ? '#fff2b0' : '#ffd36b'; ctx.globalAlpha = Math.max(alpha, 0.55);
+    ctx.beginPath(); ctx.arc(-2, 0, 2.2, 0, TAU); ctx.fill();
+    ctx.restore();
+    if (s.warn > 0 && !s.saved) {
+      ctx.strokeStyle = '#4fd1c5'; ctx.lineWidth = 3; ctx.globalAlpha = 0.95;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r + 8, -Math.PI / 2, -Math.PI / 2 + s.warn * TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  function drawKraken(s) {
+    const alpha = s.lit ? 0.95 : 0.13 + s.rage * 0.3;
+    ctx.save(); ctx.translate(s.x, s.y); ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#3b1f4d';
+    for (let k = 0; k < 7; k++) { const b = k / 7 * TAU + s.wob * 0.4; const r = 30 + Math.sin(s.wob * 1.3 + k) * 8;
+      ctx.beginPath(); ctx.arc(Math.cos(b) * r, Math.sin(b) * r * .6 + 6, 7, 0, TAU); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(0, 0, 26, 18, 0, 0, TAU); ctx.fill();
+    const glow = s.lit ? 1 : 0.5 + s.rage;
+    ctx.fillStyle = `rgba(255,${Math.round(120 - s.rage * 100)},90,${Math.min(1, glow)})`;
+    ctx.beginPath(); ctx.arc(-9, -4, 4 + s.rage * 2, 0, TAU); ctx.arc(9, -4, 4 + s.rage * 2, 0, TAU); ctx.fill();
+    ctx.restore();
+    if (s.rage > 0) {
+      ctx.strokeStyle = '#ff4b6e'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r + 12, -Math.PI / 2, -Math.PI / 2 + s.rage * TAU); ctx.stroke();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0.5) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+    // sea
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#060c18'); g.addColorStop(1, '#0d1b33');
+    ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+    ctx.fillStyle = '#dfe9ff';
+    for (const s of stars) { ctx.globalAlpha = 0.25 + 0.35 * Math.sin(t * 0.03 + s.p); ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(120,160,220,0.10)'; ctx.lineWidth = 1.5;
+    for (let y = 40; y < H; y += 34) { ctx.beginPath(); for (let x = -10; x <= W + 10; x += 8) { const yy = y + Math.sin(x * 0.03 + t * 0.025 + y) * 4; x === -10 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); } ctx.stroke(); }
+    // beam
+    const hw = flare ? 0.30 : 0.125;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const rg = ctx.createRadialGradient(LX, LY, 10, LX, LY, BEAM_LEN);
+    rg.addColorStop(0, flare ? 'rgba(255,220,120,0.55)' : 'rgba(255,205,100,0.42)'); rg.addColorStop(1, 'rgba(255,200,87,0)');
+    ctx.fillStyle = rg;
+    const cone = (w) => { ctx.beginPath(); ctx.moveTo(LX, LY);
+      for (let k = -8; k <= 8; k++) { const a = ang + w * k / 8; ctx.lineTo(LX + Math.sin(a) * BEAM_LEN, LY - Math.cos(a) * BEAM_LEN); } ctx.closePath(); ctx.fill(); };
+    cone(hw); ctx.globalAlpha = 0.45; cone(hw * 0.45); ctx.globalAlpha = 1;
+    ctx.restore();
+    // ships (unlit first so lit ones sit on top)
+    for (const s of ships) if (!s.lit) s.kraken ? drawKraken(s) : drawShip(s);
+    for (const s of ships) if (s.lit) s.kraken ? drawKraken(s) : drawShip(s);
+    // particles
+    for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life / 30); ctx.fillStyle = p.col; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    ctx.globalAlpha = 1;
+    // rocks + tower
+    ctx.fillStyle = '#141a26'; ctx.beginPath(); ctx.moveTo(230, H + 10); ctx.lineTo(250, 362); ctx.lineTo(285, 348); ctx.lineTo(320, 356); ctx.lineTo(360, 346); ctx.lineTo(392, 364); ctx.lineTo(412, H + 10); ctx.fill();
+    ctx.fillStyle = '#e9e4d8'; ctx.beginPath(); ctx.moveTo(306, 350); ctx.lineTo(334, 350); ctx.lineTo(330, 332); ctx.lineTo(310, 332); ctx.fill();
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(308, 340, 24, 5);
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(308, 326, 24, 7);
+    ctx.fillStyle = '#fff3c4'; ctx.beginPath(); ctx.arc(LX, LY, flare ? 7 : 5, 0, TAU); ctx.fill();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; const lg = ctx.createRadialGradient(LX, LY, 0, LX, LY, 40);
+    lg.addColorStop(0, 'rgba(255,220,120,0.6)'); lg.addColorStop(1, 'rgba(255,220,120,0)'); ctx.fillStyle = lg; ctx.fillRect(LX - 40, LY - 40, 80, 80); ctx.restore();
+    ctx.restore();
+    // HUD on canvas
+    for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lives ? 1 : 0.2; ctx.fillStyle = i < lives ? '#ffc857' : '#fff';
+      ctx.beginPath(); ctx.moveTo(14 + i * 26, 16); ctx.lineTo(30 + i * 26, 16); ctx.lineTo(26 + i * 26, 22); ctx.lineTo(18 + i * 26, 22); ctx.fill(); ctx.fillRect(21 + i * 26, 8, 2, 8); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(W - 110, 12, 96, 8);
+    ctx.fillStyle = oil < 0.25 ? '#ff4b6e' : '#ffc857'; ctx.fillRect(W - 110, 12, 96 * oil, 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '10px system-ui'; ctx.textAlign = 'right'; ctx.fillText('FLARE OIL', W - 14, 31);
+    if (toastT > 0) { ctx.globalAlpha = Math.min(1, toastT / 20); ctx.fillStyle = toast.includes('KRAKEN') || toast.includes('WRECK') ? '#ff4b6e' : '#4fd1c5';
+      ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText(toast, W / 2, 40); ctx.globalAlpha = 1; }
+    ctx.textAlign = 'left';
+  }
+
+  // Drag anywhere on the sea to aim the lamp at your finger / cursor.
+  let aiming = false;
+  const aimAt = (e) => { const p = toLogical(e.clientX, e.clientY); aimTarget = clamp(Math.atan2(p.x - LX, LY - p.y), -ANG_MAX, ANG_MAX); };
+  canvas.addEventListener('pointerdown', e => { aiming = true; aimAt(e); });
+  canvas.addEventListener('pointermove', e => { if (aiming) aimAt(e); });
+  const endAim = () => { aiming = false; aimTarget = null; };
+  canvas.addEventListener('pointerup', endAim); canvas.addEventListener('pointercancel', endAim); canvas.addEventListener('pointerleave', endAim);
+  // Tilt steering on phones (iOS asks permission on first touch).
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') setupTilt(); }).catch(() => {});
+    } else { setupTilt(); }
+  }
+  function setupTilt() {
+    window.addEventListener('deviceorientation', e => {
+      if (!running) return; const g = e.gamma || 0;
+      held.left = g < -15; held.right = g > 15;
+    });
+  }
+  document.addEventListener('touchstart', enableTilt, { once: true });
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

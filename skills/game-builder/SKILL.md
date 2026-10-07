@@ -383,10 +383,10 @@ Logos are generated in batches by a script, not by browsing. It calls the Gemini
 ```bash
 cp .env.example .env            # once: paste GEMINI_API_KEY=... (https://aistudio.google.com/apikey)
 pip install pillow numpy        # once
-python3 scripts/gen_logos.py <slug>                 # one game (reads name + description from games.json)
-python3 scripts/gen_logos.py --missing              # every game that has no logo yet
-python3 scripts/gen_logos.py <slug> --force --hint "a smug goose in a tuxedo, oval cameo"
-python3 scripts/gen_logos.py <slug> --from-file ~/Downloads/raw.png   # key an image you made elsewhere
+cd worker && npm run logos -- <slug>              # one game (reads name + description from games.json)
+npm run logos                                     # every game that has no logo yet
+npm run logos -- <slug> --force --hint "a smug goose in a tuxedo, oval cameo"
+npm run logos -- <slug> --from-file ~/Downloads/raw.png   # key an image you made elsewhere
 ```
 
 So the `games.json` entry (step 4) should exist **before** you run it; add an optional `"logo": "<mascot / scene hint>"` field there when the description alone wouldn't give a good mascot. Open the result and sanity-check it on a light and a dark background; if the wordmark is garbled, re-run with `--force` (the prompt already spells out unusual words letter by letter). Never read or print the `.env` file; the script loads the key itself. The script can't run without a key, so if there is none, tell the user to add one and continue with the rest of the steps.

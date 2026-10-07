@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Echo, Location</title>
+<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #39f3ff; --secondary: #ff3d9a; --bg: #07060d; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  /* Logical size is W x H (below); CSS scales it to fit the viewport minus the HUD/controls (~150px reserved). */
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (640 / 400))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  /* On-screen controls: hidden until the first touch, so desktop stays clean. */
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 120px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay h2 { font-family: 'Monoton', 'Audiowide', sans-serif; font-weight: 400; letter-spacing: 2px; text-shadow: 0 0 24px rgba(57,243,255,.6), 0 0 4px #ff3d9a; }
+  .overlay button, #hud { font-family: 'Audiowide', system-ui, sans-serif; }
+  #start-overlay { background: radial-gradient(70% 60% at 50% 45%, rgba(57,243,255,.10), rgba(7,6,13,.96) 70%); }
+  #pips { color: var(--secondary); letter-spacing: 3px; }
+  .btn { font-family: 'Audiowide', system-ui, sans-serif; font-size: 15px; letter-spacing: 1px; max-width: 160px; }
+  #btn-screech.held, #btn-screech:active { background: var(--secondary); }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)),
+      url('backgrounds/echo-location.jpg') center/cover no-repeat, #07060d;
+  }
+  #start-overlay h2 { font-size: clamp(34px, 8vw, 68px); line-height: 1; color: #fff; text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(57,243,255,0.7); }
+  #start-overlay p { color: rgba(255,255,255,0.9); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button { margin-top: 22px; padding: 15px 50px; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span><span id="pips">◆◆◆</span></div>
+  <canvas id="game" width="640" height="400"></canvas>
+  <!-- Touch-only: buttons for every keyboard action, or a one-line gesture hint. -->
+  <div id="touch-controls">
+    <button class="btn" id="btn-screech">SCREECH</button>
+    <button class="btn" id="btn-flap">FLAP</button>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <h2>Echo, Location</h2>
+  <p>You are a bat. The cave is pitch black. Every flap chirps and lights up the walls for a moment.<br><b>Space / ↑ / tap</b> to flap · <b>X / Shift / SCREECH</b> for a big ping (3 charges, moths refill).</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    // Back-swipe guard: a stray edge swipe would leave the arcade; re-push so it lands back here.
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 640, H = 400;                       // logical resolution: ALL game math uses these
+  function fitCanvas() {                            // crisp at any devicePixelRatio; CSS decides the size
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  // Screen → logical coordinates for pointer/touch input.
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};                       // keyboard state + on-screen button state
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {                       // mouse + touch, multi-touch safe
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-flap', 'flap'); holdBtn('btn-screech', 'screech');
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);            // clamp long stalls (hidden tab)
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION: Echo, Location =====
+  const C1 = '57,243,255', C2 = '255,61,154';
+  const SEG = 8, BAT_X = 150, R = 6;
+  let score = 0, camX, bat, top, bot, gT, gB, genState, pings, moths, nextMoth, charges, mothsEaten,
+      dead, dieT, parts, shake, tapQ, scrQ, frame;
+  const DEATHS = [
+    'You echolocated a wall. Directly. With your face.',
+    'The cave said hello back. Firmly.',
+    'Sound travels at 343 m/s. You traveled into rock.',
+    'Bold strategy: see the stalactite by touching it.',
+    'Somewhere, a dolphin is laughing at you.',
+    'Pro tip: SCREECH is not decorative.'
+  ];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function gen(i) {                                  // cave profile for sample i (world x = i*SEG)
+    const st = genState;
+    const g = Math.max(118, 270 - i * 0.014);
+    if (i < 45) { st.c = H / 2; st.v = 0; }
+    else {
+      st.v = (st.v + rnd(-0.55, 0.55)) * 0.95; st.c += st.v;
+      const lo = g / 2 + 14, hi = H - g / 2 - 14;
+      if (st.c < lo) { st.c = lo; st.v = Math.abs(st.v); } if (st.c > hi) { st.c = hi; st.v = -Math.abs(st.v); }
+      if (!st.spike && i > 60 && Math.random() < 0.02 + Math.min(0.02, i / 400000)) {
+        st.spike = { side: Math.random() < 0.5 ? 0 : 1, h: rnd(40, Math.min(115, g - 58)), w: 4 + (Math.random() * 3 | 0), k: 0 };
+      }
+    }
+    let t = st.c - g / 2, b = st.c + g / 2;
+    if (st.spike) {
+      const sp = st.spike, f = 1 - Math.abs((sp.k - sp.w) / sp.w);  // triangle 0→1→0
+      if (sp.side === 0) t += sp.h * f; else b -= sp.h * f;
+      if (++sp.k > sp.w * 2) st.spike = null;
+    }
+    top[i] = t; bot[i] = b; gT[i] = 0; gB[i] = 0;
+  }
+  function ensure(x) { const need = Math.ceil(x / SEG) + 2; while (top.length < need) gen(top.length); }
+  function wallAt(arr, x) { const f = x / SEG, i = Math.floor(f), u = f - i; return arr[i] * (1 - u) + arr[i + 1] * u; }
+  function ping(big) {
+    pings.push({ x: camX + BAT_X, y: bat.y, r: 0, max: big ? 560 : 125, spd: big ? 9 : 5.5, big });
+  }
+  function hud() {
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    document.getElementById('pips').textContent = '◆'.repeat(charges) + '◇'.repeat(3 - charges);
+  }
+  function reset() {
+    score = 0; camX = 0; frame = 0; top = []; bot = []; gT = []; gB = []; genState = { c: H / 2, v: 0, spike: null };
+    bat = { y: H / 2, vy: -3, flapT: 0 }; pings = []; moths = []; nextMoth = 420; charges = 3; mothsEaten = 0;
+    dead = false; dieT = 0; parts = []; shake = 0; tapQ = false; scrQ = false;
+    ensure(W + 40); ping(true); hud();
+  }
+  function die() {
+    dead = true; dieT = 0; shake = 14;
+    for (let k = 0; k < 36; k++) { const a = rnd(0, 6.28), v = rnd(1, 5); parts.push({ x: BAT_X, y: bat.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1 }); }
+    ping(true);
+  }
+  function step() {
+    frame++;
+    if (shake > 0) shake *= 0.88;
+    for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += 0.12; q.life -= 0.02; }
+    parts = parts.filter(q => q.life > 0);
+    if (dead) {
+      stepPings();
+      if (++dieT === 50) gameOver('Splat.', DEATHS[Math.random() * DEATHS.length | 0]);
+      return;
+    }
+    const spd = Math.min(6.4, 2.7 + camX / 9000);
+    camX += spd; ensure(camX + W + 40);
+    // input (edge-triggered)
+    if (tapQ) { bat.vy = -4.3; bat.flapT = 1; ping(false); }
+    if (scrQ && charges > 0) { charges--; ping(true); hud(); }
+    tapQ = false; scrQ = false;
+    bat.vy = Math.min(6.5, bat.vy + 0.24); bat.y += bat.vy; bat.flapT *= 0.86;
+    // moths
+    if (camX + W > nextMoth) {
+      const i = Math.floor(nextMoth / SEG); ensure(nextMoth + 16);
+      const t = Math.max(top[i], top[i + 1]) + 22, b = Math.min(bot[i], bot[i + 1]) - 22;
+      if (b > t) moths.push({ x: nextMoth, y: rnd(t, b), ph: rnd(0, 6), lit: 0 });
+      nextMoth += rnd(260, 480);
+    }
+    const bx = camX + BAT_X;
+    for (const m of moths) {
+      m.lit *= 0.97;
+      if (!m.got && Math.hypot(m.x - bx, m.y + Math.sin(frame * 0.1 + m.ph) * 6 - bat.y) < 17) {
+        m.got = true; mothsEaten++; if (charges < 3) charges++; hud();
+        for (let k = 0; k < 10; k++) parts.push({ x: BAT_X, y: bat.y, vx: rnd(-2, 2), vy: rnd(-2, 2), life: 0.6, pink: 1 });
+      }
+    }
+    moths = moths.filter(m => !m.got && m.x > camX - 40);
+    stepPings();
+    for (let i = Math.floor((camX - 40) / SEG); i < top.length; i++) { if (i < 0) continue; gT[i] *= 0.982; gB[i] *= 0.982; }
+    // collision
+    const tY = wallAt(top, bx), bY = wallAt(bot, bx);
+    const tY2 = wallAt(top, bx + R), bY2 = wallAt(bot, bx + R);
+    if (bat.y - R < Math.max(tY, tY2) || bat.y + R > Math.min(bY, bY2) || bat.y < -10 || bat.y > H + 10) { die(); return; }
+    const s = Math.floor(camX / 10) + mothsEaten * 25;
+    if (s !== score) { score = s; hud(); }
+  }
+  function stepPings() {
+    for (const p of pings) {
+      const r0 = p.r; p.r += p.spd;
+      const str = 1 - (p.r / p.max) * 0.55;
+      const i0 = Math.max(0, Math.floor((p.x - p.r) / SEG)), i1 = Math.min(top.length - 1, Math.ceil((p.x + p.r) / SEG));
+      for (let i = i0; i <= i1; i++) {
+        const dx = i * SEG - p.x;
+        const dT = Math.hypot(dx, top[i] - p.y), dB = Math.hypot(dx, bot[i] - p.y);
+        if (dT <= p.r && dT > r0 - 1) gT[i] = Math.max(gT[i], str);
+        if (dB <= p.r && dB > r0 - 1) gB[i] = Math.max(gB[i], str);
+      }
+      for (const m of moths) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (d <= p.r && d > r0 - 1) m.lit = 1; }
+    }
+    pings = pings.filter(p => p.r < p.max);
+  }
+  function drawWall(arr, glow, isTop) {
+    const i0 = Math.max(0, Math.floor(camX / SEG) - 1), i1 = Math.min(arr.length - 2, Math.ceil((camX + W) / SEG) + 1);
+    ctx.lineWidth = 2;
+    for (let i = i0; i <= i1; i++) {
+      const g = Math.max(glow[i], glow[i + 1]);
+      const x0 = i * SEG - camX, x1 = x0 + SEG;
+      if (g > 0.02) {                                // rock mass, faint
+        ctx.fillStyle = `rgba(${C1},${(g * 0.06).toFixed(3)})`;
+        ctx.beginPath(); ctx.moveTo(x0, arr[i]); ctx.lineTo(x1, arr[i + 1]); ctx.lineTo(x1, isTop ? 0 : H); ctx.lineTo(x0, isTop ? 0 : H); ctx.fill();
+      }
+      ctx.strokeStyle = `rgba(${C1},${(0.045 + g * 0.95).toFixed(3)})`;
+      ctx.beginPath(); ctx.moveTo(x0, arr[i]); ctx.lineTo(x1, arr[i + 1]); ctx.stroke();
+    }
+  }
+  function drawBat(y, flap) {
+    const wing = Math.sin(frame * 0.35) * 0.35 + flap * 1.1;
+    ctx.save(); ctx.translate(BAT_X, y); ctx.rotate(Math.max(-0.3, Math.min(0.3, bat.vy * 0.04)));
+    ctx.shadowColor = `rgb(${C1})`; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#e9fbff';
+    for (const s of [-1, 1]) {                       // spread wings, scalloped trailing edge
+      const o = -wing * 9;
+      ctx.beginPath(); ctx.moveTo(0, -3);
+      ctx.quadraticCurveTo(8 * s, -9 + o * 0.6, 17 * s, -5 + o);
+      ctx.lineTo(15 * s, 3 + o * 0.7);
+      ctx.quadraticCurveTo(12 * s, 0 + o * 0.5, 10 * s, 4 + o * 0.4);
+      ctx.quadraticCurveTo(7 * s, 1, 4 * s, 4);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.beginPath(); ctx.ellipse(0, 1, 4.5, 6, 0, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-4, -3); ctx.lineTo(-3, -9); ctx.lineTo(-1, -4); ctx.moveTo(4, -3); ctx.lineTo(3, -9); ctx.lineTo(1, -4); ctx.fill(); // ears
+    ctx.shadowBlur = 0; ctx.fillStyle = `rgb(${C2})`; ctx.fillRect(-2.5, -1, 1.6, 1.6); ctx.fillRect(1, -1, 1.6, 1.6);   // eyes
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    ctx.fillStyle = '#07060d'; ctx.fillRect(0, 0, W, H);
+    if (!top) return;
+    ctx.save();
+    if (shake > 0.3) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+    for (const p of pings) {                          // sonar rings
+      const a = (1 - p.r / p.max) * (p.big ? 0.5 : 0.35);
+      ctx.strokeStyle = `rgba(${p.big ? C2 : C1},${a.toFixed(3)})`; ctx.lineWidth = p.big ? 2 : 1.2;
+      ctx.beginPath(); ctx.arc(p.x - camX, p.y, p.r, 0, 6.29); ctx.stroke();
+    }
+    drawWall(top, gT, true); drawWall(bot, gB, false);
+    for (const m of moths) {                          // moths glow faintly on their own
+      const x = m.x - camX, y = m.y + Math.sin(frame * 0.1 + m.ph) * 6, fl = 0.25 + 0.15 * Math.sin(frame * 0.3 + m.ph) + m.lit * 0.6;
+      ctx.fillStyle = `rgba(${C2},${fl.toFixed(3)})`; ctx.shadowColor = `rgb(${C2})`; ctx.shadowBlur = 10;
+      const w = 4 + Math.abs(Math.sin(frame * 0.5 + m.ph)) * 3;
+      ctx.beginPath(); ctx.ellipse(x - 3, y, w, 3, -0.4, 0, 6.29); ctx.ellipse(x + 3, y, w, 3, 0.4, 0, 6.29); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    if (!dead) drawBat(bat.y, bat.flapT);
+    for (const q of parts) { ctx.fillStyle = `rgba(${q.pink ? C2 : C1},${q.life.toFixed(3)})`; ctx.fillRect(q.x, q.y, 3, 3); }
+    ctx.restore();
+    if (running && frame < 160) {                     // opening nudge
+      ctx.fillStyle = `rgba(255,255,255,${(1 - frame / 160) * 0.8})`; ctx.font = '14px Audiowide, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('flap to chirp · screech to see far', W / 2, H - 24);
+    }
+  }
+  addEventListener('keydown', e => { if (e.repeat || !running || dead) return;
+    if ([' ', 'ArrowUp', 'w', 'W'].includes(e.key)) tapQ = true;
+    if (['x', 'X', 'Shift', 'ArrowDown'].includes(e.key)) scrQ = true; });
+  for (const [id, fn] of [['btn-flap', () => tapQ = true], ['btn-screech', () => scrQ = true]]) {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', () => { if (running && !dead) fn(); }, { passive: true });
+    el.addEventListener('mousedown', () => { if (running && !dead) fn(); });
+  }
+  canvas.addEventListener('pointerdown', e => { e.preventDefault(); if (running && !dead) tapQ = true; });
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);                      // started exactly once per page load
+})();
+</script>
+</body>
+</html>

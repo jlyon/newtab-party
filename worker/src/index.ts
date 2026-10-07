@@ -1,4 +1,4 @@
-import type { Env, Game } from './types';
+import type { Env, Game, GamesData, ScheduleEra } from './types';
 import * as db from './db';
 import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, esc } from './render';
 import gamesData from '../games.json';
@@ -10,8 +10,29 @@ const DAY_EPOCH = Date.UTC(2026, 4, 1);
 // (global, across all of today's plays for the game).
 const LEADERBOARD_SIZE = 10;
 
+const DATA = gamesData as GamesData;
+
 function getGames(): Game[] {
-  return (gamesData as { games: Game[] }).games ?? [];
+  return DATA.games ?? [];
+}
+
+// The schedule era in effect on a given date: the latest era whose epoch is on
+// or before the date (the earliest era for dates before any epoch). Retiring a
+// game (scripts/retire_game.mjs) starts a new era, so past dates keep the
+// mapping they aired under.
+function eraFor(dateStr: string): ScheduleEra | null {
+  const eras: ScheduleEra[] = [...(DATA.scheduleHistory ?? [])];
+  if (DATA.schedule?.length && DATA.scheduleEpoch) eras.push({ scheduleEpoch: DATA.scheduleEpoch, schedule: DATA.schedule });
+  const valid = eras.filter((e) => e.schedule?.length && e.scheduleEpoch).sort((a, b) => a.scheduleEpoch.localeCompare(b.scheduleEpoch));
+  if (!valid.length) return null;
+  let era = valid[0];
+  for (const e of valid) if (e.scheduleEpoch <= dateStr) era = e;
+  return era;
+}
+
+function isRetired(id: string, dateStr: string): boolean {
+  const since = DATA.retired?.[id];
+  return !!since && since <= dateStr;
 }
 
 // Day number since DAY_EPOCH (May 1 2026 UTC) for a YYYY-MM-DD string.
@@ -23,15 +44,17 @@ function dayNumber(dateStr: string): number {
 // The daily pick. Uses the explicit `schedule` list in games.json (anchored at
 // `scheduleEpoch`) so that APPENDING a game only adds a future slot — the games
 // already scheduled for the current cycle never move. Falls back to a plain
-// modulo over the games array if no schedule is configured. This MUST stay in
-// sync with the same logic in extension/newtab.js.
+// modulo over the games array if no schedule is configured. For past dates the
+// worker uses the era that was in effect then (`scheduleHistory`); for today
+// the current era is used, which is exactly what extension/newtab.js and the
+// inline script in render.ts compute. The per-era math MUST stay in sync.
 function getDailyGame(games: Game[], dateStr: string): Game | null {
   if (!games.length) return null;
-  const data = gamesData as { schedule?: string[]; scheduleEpoch?: string };
-  if (data.schedule?.length && data.scheduleEpoch) {
-    const off = dayNumber(dateStr) - dayNumber(data.scheduleEpoch);
-    const L = data.schedule.length;
-    const id = data.schedule[((off % L) + L) % L];
+  const era = eraFor(dateStr);
+  if (era) {
+    const off = dayNumber(dateStr) - dayNumber(era.scheduleEpoch);
+    const L = era.schedule.length;
+    const id = era.schedule[((off % L) + L) % L];
     const g = games.find((x) => x.id === id);
     if (g) return g;
   }
@@ -211,7 +234,7 @@ export default {
       const games = getGames();
       const today = todayUTC();
       const DAY = 86400000;
-      const L = (gamesData as { schedule?: string[] }).schedule?.length || games.length || 1;
+      const L = eraFor(today)?.schedule.length || games.length || 1;
       const span = Math.max(L, 28); // cover at least one full rotation so every game appears
       const todayMs = Date.UTC(
         Number(today.slice(0, 4)),
@@ -227,7 +250,18 @@ export default {
         const date = new Date(ms).toISOString().slice(0, 10);
         cells.push({ date, game: getDailyGame(games, date), isToday: date === today, isFuture: date > today });
       }
-      return html(renderGamesCalendar({ today, cells }));
+      // Retired games keep a spot in the library: link each to its last airing (a past-day replay).
+      const retired: { game: Game; lastAired: string | null }[] = [];
+      for (const g of games) {
+        if (!isRetired(g.id, today)) continue;
+        let lastAired: string | null = null;
+        for (let ms = todayMs - DAY, n = 0; n < 730; ms -= DAY, n++) {
+          const date = new Date(ms).toISOString().slice(0, 10);
+          if (getDailyGame(games, date)?.id === g.id) { lastAired = date; break; }
+        }
+        retired.push({ game: g, lastAired });
+      }
+      return html(renderGamesCalendar({ today, cells, retired }));
     }
 
     const playMatch = pathname.match(/^\/play\/(\d{4}-\d{2}-\d{2})$/);

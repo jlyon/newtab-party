@@ -1,7 +1,15 @@
 {
   "version": 1,
-  "scheduleEpoch": "2026-06-15",
+  "scheduleEpoch": "2026-10-07",
   "schedule": [
+    "weiners-and-tubs",
+    "moonslayer",
+    "burnin-glory",
+    "build-the-boardwalk",
+    "sweep-the-strait",
+    "yarrmada",
+    "deja-loop",
+    "echo-location",
     "oligarchs-dilemma",
     "fly-by-the-seat-of-your-pants",
     "frosty-freefall",
@@ -15,23 +23,58 @@
     "tippity-toes",
     "rack-attack",
     "stump-grandpa",
-    "the-sunken-signal",
     "rock-em-sock-em-wrecking-ball",
     "smithereens",
     "yedric-bombs",
     "cleanup-on-isle-11",
     "yeti-run",
-    "hognose",
     "senor-frogs-cabo",
-    "weiners-and-tubs",
-    "moonslayer",
-    "burnin-glory",
-    "build-the-boardwalk",
-    "sweep-the-strait",
-    "yarrmada",
-    "the-wildcard",
-    "coeur-brise"
+    "fogwatch"
   ],
+  "scheduleHistory": [
+    {
+      "scheduleEpoch": "2026-06-15",
+      "schedule": [
+        "oligarchs-dilemma",
+        "fly-by-the-seat-of-your-pants",
+        "frosty-freefall",
+        "penalty-panic",
+        "blouncerroozal",
+        "prompter-payday",
+        "bend-it-like-maxi",
+        "chop-till-you-drop",
+        "shootin-n-crackin",
+        "abominable-speedway",
+        "tippity-toes",
+        "rack-attack",
+        "stump-grandpa",
+        "the-sunken-signal",
+        "rock-em-sock-em-wrecking-ball",
+        "smithereens",
+        "yedric-bombs",
+        "cleanup-on-isle-11",
+        "yeti-run",
+        "hognose",
+        "senor-frogs-cabo",
+        "weiners-and-tubs",
+        "moonslayer",
+        "burnin-glory",
+        "build-the-boardwalk",
+        "sweep-the-strait",
+        "yarrmada",
+        "the-wildcard",
+        "coeur-brise",
+        "deja-loop",
+        "echo-location"
+      ]
+    }
+  ],
+  "retired": {
+    "the-wildcard": "2026-10-07",
+    "the-sunken-signal": "2026-10-07",
+    "hognose": "2026-10-07",
+    "coeur-brise": "2026-10-07"
+  },
   "games": [
     {
       "id": "blouncerroozal",
@@ -264,6 +307,33 @@
       "description": "You run the teleprompter. You also, allegedly, bet on which words appear in tonight's speech. Unscramble each word and feed it to the prompter before airtime runs out — every word you land pays out your market position.",
       "controls": "Tap letters to build the word · Tap a placed letter to send it back · Type + Enter on keyboard",
       "type": "word-unscramble"
+    },
+    {
+      "id": "deja-loop",
+      "name": "Déjà Loop",
+      "file": "games/deja-loop.html",
+      "description": "Every 4 seconds a copy of you replays your last 4 seconds, forever. Grab gold orbs while dodging an ever-growing parade of your past selves.",
+      "controls": "Mouse, drag, or WASD / arrows to steer · Gold orbs score 1 + 1 per echo · Teal rings erase your 2 oldest echoes · Don't stand still",
+      "type": "arena-dodge",
+      "logo": "a small red dot looking over its shoulder at a trail of ghostly outlined copies of itself, blueprint-grid background, circular badge"
+    },
+    {
+      "id": "echo-location",
+      "name": "Echo, Location",
+      "file": "games/echo-location.html",
+      "description": "You are a bat in a pitch-black cave. Every flap chirps and lights up the walls for a moment. Fly as far as you can without hitting anything.",
+      "controls": "Space / ↑ / tap to flap · X / Shift / SCREECH for a big ping (3 charges, moths refill)",
+      "type": "flappy",
+      "logo": "a cartoon bat mid-flap with concentric glowing sonar rings radiating from its mouth, pitch-black cave background, circular badge"
+    },
+    {
+      "id": "fogwatch",
+      "name": "Fogwatch",
+      "file": "games/fogwatch.html",
+      "description": "Keep the lighthouse: sweep your lamp over ships drifting through the fog to turn them away from the rocks, and whatever you do, don't keep the light on the kraken.",
+      "controls": "← → / A D or drag to aim the lamp · Space / ✦ flares the beam wide (burns oil). Three wrecks and it's lights out.",
+      "type": "lighthouse",
+      "logo": "a weathered lighthouse on black rocks with a golden beam cutting through fog, a kraken eye glowing in the dark water, vintage maritime crest"
     }
   ]
 }
