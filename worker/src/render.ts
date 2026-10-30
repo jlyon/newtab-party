@@ -414,54 +414,8 @@ export interface RetiredEntry {
   lastAired: string | null;   // YYYY-MM-DD of its final airing, if one is in range
 }
 
-export function renderGamesCalendar({ today, cells, retired = [] }: { today: string; cells: CalCell[]; retired?: RetiredEntry[] }): string {
-  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  const cellHtml = (c: CalCell): string => {
-    const dayNum = Number(c.date.slice(8, 10));
-    // Empty grid padding — no game scheduled on this day.
-    if (!c.game) {
-      return `<div class="cal-cell is-empty"><span class="cal-day">${dayNum}</span></div>`;
-    }
-    const name = esc(c.game.name);
-    // Upcoming games stay hidden — locked placeholder, no logo or title revealed.
-    if (c.isFuture) {
-      return `<div class="cal-cell is-future"><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
-    }
-    const logo = `<img class="cal-logo" src="/games/logos/${c.game.id}.png" alt="${name}" loading="lazy">`;
-    const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
-    const href = c.isToday ? '/' : `/play/${c.date}`;
-    const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
-    const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
-    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
-  };
-
-  // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
-  let weeks = '';
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
-  }
-
-  // Retired games: out of the rotation, still playable via their last airing.
-  const retiredHtml = retired.length ? `
-  <div class="kicker retired-kicker">Retired</div>
-  <p class="blurb">Out of the daily rotation, never out of the building. Still here for practice.</p>
-  <div class="retired-grid">${retired.map(({ game, lastAired }) => {
-    const name = esc(game.name);
-    const logo = `<img class="cal-logo" src="/games/logos/${game.id}.png" alt="${name}" loading="lazy">`;
-    if (!lastAired) return `<div class="cal-cell is-retired" title="${name}">${logo}</div>`;
-    return `<a class="cal-cell is-retired" href="/play/${lastAired}" aria-label="Practice ${name} (retired)" title="${name}">${logo}</a>`;
-  }).join('')}</div>` : '';
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>newtab.party — the practice room</title>
-${FAVICON}
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+// Shared look for the practice room (/games) and the retired wing (/games/retired).
+const PRACTICE_CSS = `  * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #080810; color: #e5e7eb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 44px 20px 80px; }
   .wrap { max-width: 1080px; margin: 0 auto; }
   .kicker { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,215,0,0.6); margin-bottom: 10px; }
@@ -498,7 +452,60 @@ ${FAVICON}
     .cal-cell { padding: 5px; border-radius: 8px; }
     .cal-badge { font-size: 8px; }
   }
-</style>
+  .retired-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; padding: 12px 18px; border-radius: 10px; background: #14141f; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.75); font-size: 14px; font-weight: 600; text-decoration: none; transition: border-color 0.12s ease, color 0.12s ease; }
+  .retired-link:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+  .retired-link .count { font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 700; }
+  .retired-page .retired-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px; margin-top: 26px; }
+  .retired-item { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: inherit; }
+  .retired-item .cal-cell { width: 100%; }
+  .retired-cap { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.8); line-height: 1.3; }
+  .retired-cap small { display: block; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  a.retired-item:hover .cal-cell { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); filter: none; opacity: 1; }
+  @media (max-width: 560px) { .retired-page .retired-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
+`;
+
+export function renderGamesCalendar({ today, cells, retiredCount = 0 }: { today: string; cells: CalCell[]; retiredCount?: number }): string {
+  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const cellHtml = (c: CalCell): string => {
+    const dayNum = Number(c.date.slice(8, 10));
+    // Empty grid padding — no game scheduled on this day.
+    if (!c.game) {
+      return `<div class="cal-cell is-empty"><span class="cal-day">${dayNum}</span></div>`;
+    }
+    const name = esc(c.game.name);
+    // Upcoming games stay hidden — locked placeholder, no logo or title revealed.
+    if (c.isFuture) {
+      return `<div class="cal-cell is-future"><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
+    }
+    const logo = `<img class="cal-logo" src="/games/logos/${c.game.id}.png" alt="${name}" loading="lazy">`;
+    const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
+    const href = c.isToday ? '/' : `/play/${c.date}`;
+    const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
+    const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
+    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
+  };
+
+  // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
+  let weeks = '';
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
+  }
+
+  // Retired games live on their own page (/games/retired).
+  const retiredHtml = retiredCount
+    ? `<a class="retired-link" href="/games/retired">Retired games <span class="count">${retiredCount}</span> →</a>`
+    : '';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newtab.party — the practice room</title>
+${FAVICON}
+<style>
+${PRACTICE_CSS}</style>
 </head>
 <body>
 <div class="wrap">
@@ -515,6 +522,41 @@ ${FAVICON}
   ${weeks}
   ${retiredHtml}
   <div class="foot"><a href="/">← Back to today's game</a></div>
+</div>
+</body>
+</html>`;
+}
+
+// ── /games/retired: games out of the rotation, still playable via their last airing ──
+export function renderRetiredGames({ retired }: { retired: RetiredEntry[] }): string {
+  const cell = ({ game, lastAired }: RetiredEntry): string => {
+    const name = esc(game.name);
+    const tile = `<div class="cal-cell is-retired"><img class="cal-logo" src="/games/logos/${game.id}.png" alt="" loading="lazy"></div>`;
+    const cap = `<div class="retired-cap">${name}<small>${lastAired ? `Last aired ${esc(fmtDate(lastAired))}` : 'Retired'}</small></div>`;
+    if (!lastAired) return `<div class="retired-item">${tile}${cap}</div>`;
+    return `<a class="retired-item" href="/play/${lastAired}" aria-label="Practice ${name} (retired)">${tile}${cap}</a>`;
+  };
+  const body = retired.length
+    ? `<div class="retired-grid">${retired.map(cell).join('')}</div>`
+    : `<p class="blurb">Nobody has retired yet. Everyone is still on the roster.</p>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newtab.party · retired games</title>
+${FAVICON}
+<style>
+${PRACTICE_CSS}
+</style>
+</head>
+<body class="retired-page">
+<div class="wrap">
+  <div class="kicker">The Practice Room</div>
+  <h1>The retired wing.</h1>
+  <p class="blurb">Out of the daily rotation, never out of the building. Every game here is still open for practice; scores just aren't saved.</p>
+  ${body}
+  <div class="foot"><a href="/games">← Back to the practice room</a> · <a href="/">Today's game</a></div>
 </div>
 </body>
 </html>`;

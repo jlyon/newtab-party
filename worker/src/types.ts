@@ -13,9 +13,10 @@ export interface ScheduleEra {
   schedule: string[];
 }
 
-// Shape of worker/games.json. `scheduleEpoch` + `schedule` are the CURRENT era
-// (what every client uses for today); `scheduleHistory` holds earlier eras so the
-// worker can resolve past dates exactly as they aired.
+// Shape of worker/games.json. `scheduleEpoch` + `schedule` are the NEWEST era,
+// which may be queued to start tomorrow (scripts/schedule_game.mjs, retire_game.mjs);
+// `scheduleHistory` holds earlier eras so past dates resolve exactly as they aired.
+// GET /games.json serves the era in effect today as the top-level one.
 export interface GamesData extends ScheduleEra {
   version?: number;
   scheduleHistory?: ScheduleEra[];     // previous eras, oldest first
