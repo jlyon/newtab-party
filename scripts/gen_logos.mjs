@@ -12,6 +12,11 @@
 //   node scripts/gen_logos.mjs <slug> --hint "a grumpy goose in a tuxedo"
 //   node scripts/gen_logos.mjs <slug> --from-file raw.png   # just key an image you already have
 //   node scripts/gen_logos.mjs --dry-run --all       # print the prompts, call nothing
+//   node scripts/gen_logos.mjs --check               # flag logos that look bad on the dark square tiles
+//
+// Each new logo is checked for the dark square tiles (/games, about modal): too wide or tall,
+// a dark outline that melts into the tile, or too sparse. Flagged attempts are retried
+// (--retries, default 3) and the best one is kept.
 //
 // Needs: sharp (already in node_modules via wrangler; otherwise `npm i sharp` at the repo root).
 // Optional games.json field per game: "logo": "prompt hint about the mascot / scene".
@@ -44,21 +49,37 @@ function loadSharp() {
 }
 
 const EMBLEMS = [
-  'round badge', 'heater shield', 'banner with a ribbon', 'pennant', 'playing-card frame',
-  'oval cameo', 'hexagonal patch', 'diamond crest', 'circular seal with a laurel', 'varsity shield with a scroll',
+  'circle roundel with the team name arched around the top',
+  'simple shield',
+  'baseball-diamond (rotated square) badge',
+  'home-plate pentagon',
+  'mascot head breaking out above a bold script wordmark with a swoosh tail underline',
+  'oval with a banner across the middle',
+  'shield with the wordmark on a ribbon across the bottom',
 ];
 
 const PROMPT = (
-  'Create ONE single centered logo (one design only, not a set), refined modern ' +
-  'minor-league-baseball-team crest style: a polished, characterful cartoon mascot plus a bold ' +
-  'athletic wordmark, cohesive limited palette, clean thick outline, die-cut sticker look, ' +
-  "emblem shape: {emblem}. Game: '{name}'. {scene} Wordmark text exactly: '{name}'{spelled}. " +
+  'Create ONE single centered primary logo (one design only, not a set) for a fictional minor league ' +
+  'baseball team, in the style of real modern minor-league-baseball primary logos: a flat vector ' +
+  'graphic you could screen-print on a cap. Rules: 3 or 4 solid spot colors plus white, no gradients, ' +
+  'no shading or highlights (at most one flat darker tone), no texture, no fine lines, no tiny ' +
+  'details, no illustration or painterly rendering. Bold, simple shapes with thick, even outlines and ' +
+  'a strong silhouette that still reads at 64 pixels wide. ' +
+  'Mascot: ONE simple iconic character or object (head or bust preferred), drawn with as few shapes as ' +
+  'possible, confident and a little cheeky, not a busy scene. Mascot idea, simplified to a single ' +
+  'icon: {scene} ' +
+  'Wordmark: big bold athletic lettering (block letters arched over the mark, or a sweeping baseball ' +
+  "script with a tail underline), text exactly: '{name}'{spelled}. Spell it exactly; no extra words. " +
+  'Layout: {emblem}. Compact and roughly SQUARE overall (about 1:1), never a wide horizontal lockup. ' +
+  'Every letter and element touches or sits inside one connected shape: no floating letters or pieces. ' +
+  'It will be shown on a very dark navy background, so wrap the whole logo in a thick white or cream ' +
+  'outer outline and avoid dark colors around the outside edge. ' +
   'Center it on a completely solid, flat, uniform pure MAGENTA background hex #FF00FF: no gradient, ' +
   'no texture, no glow, no drop shadow, nothing else in the image.'
 );
 
 const COMMON_WORDS = new Set(`the a an of and or on in it like to vs up run attack panic room party bombs glory
-build boardwalk sweep strait wild card dilemma seat pants frosty fall freefall yeti chop till you drop
+build boardwalk sweep strait deja loop wild card dilemma seat pants frosty fall freefall yeti chop till you drop
 cleanup isle signal sunken toes rack rock em sock wrecking ball shootin crackin smithereens penalty
 weiners tubs tippity stump grandpa bend maxi conga chaos prompter payday speedway abominable`.split(/\s+/));
 
@@ -92,8 +113,8 @@ function buildPrompt(game, hint) {
   // Nano Banana fumbles long or invented words; spell them out letter by letter.
   let spelled = '';
   const words = name.replace(/'/g, '').split(/\s+/).filter(w => /^[A-Za-z]+$/.test(w));
-  const odd = words.filter(w => w.length >= 9 || !COMMON_WORDS.has(w.toLowerCase()));
-  if (odd.length) spelled = ' (spelled ' + odd.slice(0, 3).map(w => `${w}: ${w.toUpperCase().split('').join('-')}`).join(', ') + ')';
+  const odd = words.filter(w => w.length >= 5 || !COMMON_WORDS.has(w.toLowerCase()));
+  if (odd.length) spelled = ' (spelled ' + odd.slice(0, 4).map(w => `${w}: ${w.toUpperCase().split('').join('-')}`).join(', ') + ')';
   return PROMPT.replaceAll('{name}', name).replace('{emblem}', emblem).replace('{scene}', scene).replace('{spelled}', spelled);
 }
 
@@ -157,19 +178,24 @@ async function keyMagenta(raw) {
   let subjectN = 0;
   for (let i = 0; i < N; i++) if (!bg[i]) { subject[i] = 1; subjectN++; }   // holes already filled
 
-  // Keep only the largest blob (drops watermarks / specks).
-  const labels = new Uint8Array(N);
-  let best = null, bestN = 0, lbl = 0;
-  for (let i = 0; i < N; i++) {
+  // Keep every blob bigger than a speck: detached wordmark letters are separate blobs and
+  // must survive (keeping only the largest blob used to delete whole team names).
+  const labels = new Int32Array(N), sizes = [0];
+  for (let i = 0, stack = []; i < N; i++) {
     if (!subject[i] || labels[i]) continue;
-    const scratch = new Uint8Array(N);
-    const n = floodFill(subject, scratch, w, h, [i], 1);
-    lbl++;
-    for (let j = 0; j < N; j++) if (scratch[j]) labels[j] = 1;   // mark visited
-    if (n > bestN) { best = scratch; bestN = n; }
-    if (bestN > subjectN * 0.6) break;
+    const id = sizes.length; let n = 0;
+    labels[i] = id; stack.push(i);
+    while (stack.length) {
+      const k = stack.pop(); n++;
+      const x = k % w;
+      for (const j of [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, k - w, k + w])
+        if (j >= 0 && j < N && subject[j] && !labels[j]) { labels[j] = id; stack.push(j); }
+    }
+    sizes.push(n);
   }
-  const subj = best || subject;
+  const minBlob = Math.max(150, subjectN * 0.002);
+  const subj = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (labels[i] && sizes[labels[i]] >= minBlob) subj[i] = 1;
 
   // Feathered alpha + magenta despill on the fringe.
   const maskBuf = Buffer.alloc(N);
@@ -207,6 +233,29 @@ async function keyMagenta(raw) {
   return { png, width, height, coverage: subjectN / N };
 }
 
+// ── Quality check: how the logo reads on the dark square tiles (/games, about modal) ──
+const TILE_BG = [20, 20, 31];   // #14141f
+/** Returns a list of problems (empty = looks fine on a dark square tile). */
+async function assessLogo(png) {
+  const sharp = loadSharp();
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const w = info.width, h = info.height, issues = [];
+  const ratio = w / h;
+  if (ratio > 1.4) issues.push(`too wide for a square tile (${ratio.toFixed(2)}:1)`);
+  if (ratio < 0.72) issues.push(`too tall for a square tile (1:${(1 / ratio).toFixed(2)})`);
+  // Share of the logo that's close to the tile color (navy/black). Above ~60% it melts into the tile.
+  let opaque = 0, nearTile = 0;
+  for (let i = 0; i < w * h * 4; i += 4) {
+    if (data[i + 3] < 128) continue;
+    opaque++;
+    const dr = data[i] - TILE_BG[0], dg = data[i + 1] - TILE_BG[1], db = data[i + 2] - TILE_BG[2];
+    if (dr * dr + dg * dg + db * db < 75 * 75) nearTile++;
+  }
+  if (opaque && nearTile / opaque > 0.6) issues.push(`mostly dark (${Math.round((100 * nearTile) / opaque)}% near-black/navy), it blends into the dark tiles`);
+  if (opaque / (w * h) < 0.3) issues.push(`sparse (${Math.round((100 * opaque) / (w * h))}% filled), will look small or scattered`);
+  return issues;
+}
+
 // ── main ──────────────────────────────────────────────────────────────────
 async function main() {
   const { values: args, positionals: slugs } = parseArgs({
@@ -221,6 +270,7 @@ async function main() {
       retries: { type: 'string', default: '3' },
       'keep-raw': { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
+      check: { type: 'boolean', default: false },     // report logos that look bad on the dark square tiles
       help: { type: 'boolean', short: 'h', default: false },
     },
   });
@@ -233,6 +283,19 @@ async function main() {
   const fromFile = args['from-file'];
 
   const games = Object.fromEntries(loadGames().map(g => [g.id, g]));
+  if (args.check) {
+    const ids = slugs.length ? slugs : Object.keys(games);
+    const bad = [];
+    for (const slug of ids) {
+      const f = path.join(LOGO_DIR, `${slug}.png`);
+      if (!fs.existsSync(f)) { console.log(`✗ ${slug}: no logo`); bad.push(slug); continue; }
+      const issues = await assessLogo(fs.readFileSync(f));
+      if (issues.length) { console.log(`✗ ${slug}: ${issues.join('; ')}`); bad.push(slug); }
+    }
+    console.log(`\n${ids.length - bad.length}/${ids.length} look fine on the dark tiles.`);
+    if (bad.length) console.log(`Fix with:\n  npm run logos -- ${bad.join(' ')} --force\nAlso eyeball every logo: this can't catch misspelled wordmarks.`);
+    return 0;
+  }
   let targets;
   if (args.all) targets = Object.keys(games);
   else if (args.missing || !slugs.length) targets = Object.keys(games).filter(s => !fs.existsSync(path.join(LOGO_DIR, `${s}.png`)));
@@ -255,7 +318,7 @@ async function main() {
     const prompt = buildPrompt(games[slug], args.hint);
     if (args['dry-run']) { console.log(`\n[${slug}]\n${prompt}`); continue; }
     if (fs.existsSync(dest) && !args.force && !fromFile) { console.log(`skip  ${slug} (exists; use --force)`); continue; }
-    let ok = false;
+    let ok = false, best = null;
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         let raw;
@@ -275,8 +338,12 @@ async function main() {
         if (!fromFile && !(coverage >= 0.08 && coverage <= 0.92)) {
           throw new Error(`keyed subject covers ${Math.round(coverage * 100)}% of the frame; background probably wasn't flat magenta`);
         }
-        fs.writeFileSync(dest, png);
-        console.log(`saved ${path.relative(ROOT, dest)}  ${width}x${height}  subject ${Math.round(coverage * 100)}%`);
+        const issues = await assessLogo(png);
+        if (!best || issues.length < best.issues.length) best = { png, width, height, coverage, issues };
+        if (issues.length && !fromFile && attempt < retries) { console.log(`      ${slug}: ${issues.join('; ')}; trying again`); continue; }
+        fs.writeFileSync(dest, best.png);
+        console.log(`saved ${path.relative(ROOT, dest)}  ${best.width}x${best.height}  subject ${Math.round(best.coverage * 100)}%`);
+        if (best.issues.length) console.log(`      warning: ${best.issues.join('; ')}`);
         ok = true;
         break;
       } catch (e) {
