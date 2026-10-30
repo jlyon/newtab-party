@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Slingshot Sally</title>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ffc83d; --secondary: #9b5cff; --bg: #07061a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (360 / 580))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #hint { display: none; font-size: 13px; opacity: .75; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay { background: radial-gradient(80% 60% at 50% 40%, rgba(155,92,255,.35), rgba(7,6,26,.92) 70%); }
+  #start-overlay h2 { font-family: 'Audiowide', sans-serif; font-weight: 400; font-size: clamp(30px, 8vw, 60px); line-height: 1.05; text-shadow: 0 0 24px rgba(255,200,61,.5); }
+  #start-overlay button { font-family: 'Audiowide', sans-serif; }
+  /* ── Landing screen: gameplay background ── */
+  #start-overlay { background: radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/slingshot-sally.jpg') center/cover no-repeat, #000; }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,10,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
+  #start-overlay h2 { text-shadow: 0 3px 30px rgba(0,0,0,0.85); }
+  #start-logo { display: none; width: min(82%, 400px); max-height: 40vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="360" height="580"></canvas>
+  <div id="hint">Tap anywhere to launch</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img id="start-logo" src="logos/slingshot-sally.png" alt="Slingshot Sally" onload="this.style.display='block';this.nextElementSibling.style.display='none'">
+  <h2>Slingshot Sally</h2>
+  <p>Sally is orbiting a planet. Tap / Space to let go and fly off on a tangent. Get caught by the next planet's gravity and rescue the stray astro-cats along the way. If you miss every planet, it's the void for you.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 360, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+
+  const keys = {};
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); }
+    if (!keys[e.key] && running && [' ', 'ArrowUp'].includes(e.key)) launch();
+    keys[e.key] = true;
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const G = 0.18, CAP = 34, PCOLS = [['#ff7a59', '#7a2a1a'], ['#4fd1c5', '#14524c'], ['#c084fc', '#4c1d95'], ['#f472b6', '#7a1f4f'], ['#60a5fa', '#1e3a8a'], ['#a3e635', '#3f6212']];
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: rand(0.1, 1) }));
+  const LINES = ['Sally has entered the void. She\'s fine. Probably.', 'Lost in space, but at least she\'s out of the house.', 'Houston, Sally is freelancing now.', 'The cats will tell stories about her.'];
+  let score, hops, cats, planets, catsArr, sx, sy, vx, vy, mode, cur, from, ang, R, w, flyT, camY, trail, t, pops, lastP;
+
+  function reset() {
+    score = 0; hops = 0; cats = 0; t = 0; pops = []; trail = [];
+    planets = [{ x: W / 2, y: 0, r: 30, col: PCOLS[0], ring: false, dir: 1, w: 0.045, visited: true }];
+    lastP = planets[0]; catsArr = [];
+    camY = -H * 0.72;
+    while (lastP.y > camY - 260) genPlanet();
+    cur = planets[0]; from = cur; R = cur.r + 24; ang = Math.PI; w = cur.w; mode = 'orbit'; flyT = 0;
+    sx = cur.x + Math.cos(ang) * R; sy = cur.y + Math.sin(ang) * R; vx = vy = 0;
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  function genPlanet() {
+    const d = Math.min(1, hops / 40);
+    const y = lastP.y - rand(150, 200 + 30 * d);
+    let x = lastP.x + rand(-170, 170); x = Math.max(55, Math.min(W - 55, x));
+    if (Math.abs(x - lastP.x) < 50) x = lastP.x < W / 2 ? Math.min(W - 55, lastP.x + rand(70, 140)) : Math.max(55, lastP.x - rand(70, 140));
+    const r = rand(16, 30 - 6 * d), dir = Math.random() < 0.5 ? -1 : 1;
+    const p = { x, y, r, col: PCOLS[Math.floor(Math.random() * PCOLS.length)], ring: Math.random() < 0.3, w: dir * (0.035 + Math.random() * 0.02 + d * 0.02), visited: false };
+    if (Math.random() < 0.6) catsArr.push({ x: (x + lastP.x) / 2 + rand(-30, 30), y: (y + lastP.y) / 2 + rand(-20, 20), got: false, ph: Math.random() * 6 });
+    planets.push(p); lastP = p;
+  }
+  function launch() {
+    if (!running || mode !== 'orbit') return;
+    const s = Math.sign(w), sp = Math.max(3, Math.abs(w) * R * 1.5);
+    vx = -Math.sin(ang) * s * sp; vy = Math.cos(ang) * s * sp;
+    mode = 'fly'; from = cur; flyT = 0; trail = [];
+  }
+  document.addEventListener('pointerdown', e => { if (running && e.target.tagName !== 'BUTTON') launch(); });
+
+  function step() {
+    t++;
+    if (mode === 'orbit') {
+      ang += w; sx = cur.x + Math.cos(ang) * R; sy = cur.y + Math.sin(ang) * R;
+    } else {
+      flyT++;
+      let ax = 0, ay = 0;
+      for (const p of planets) {
+        const dx = p.x - sx, dy = p.y - sy, d2 = dx * dx + dy * dy;
+        if (d2 > 230 * 230) continue;
+        const d = Math.sqrt(d2), a = G * p.r * p.r / Math.max(d2, 400);
+        ax += a * dx / d; ay += a * dy / d;
+      }
+      vx += ax; vy += ay; sx += vx; sy += vy;
+      trail.push({ x: sx, y: sy }); if (trail.length > 24) trail.shift();
+      for (const p of planets) {
+        if (p === from && flyT < 45) continue;
+        const dx = sx - p.x, dy = sy - p.y, d = Math.hypot(dx, dy);
+        if (d < p.r + CAP) {
+          R = Math.max(p.r + 16, Math.min(p.r + CAP, d)); ang = Math.atan2(dy, dx);
+          const cross = dx * vy - dy * vx, dir = cross >= 0 ? 1 : -1;
+          w = dir * Math.max(0.03, Math.min(0.08, Math.hypot(vx, vy) / R));
+          cur = p; mode = 'orbit';
+          if (!p.visited) { p.visited = true; hops++; pops.push({ x: p.x, y: p.y - p.r - 14, txt: '+10', life: 45, col: '#ffc83d' }); }
+          break;
+        }
+      }
+      for (const c of catsArr) {
+        if (!c.got && (c.x - sx) ** 2 + (c.y - sy) ** 2 < 20 * 20) { c.got = true; cats++; pops.push({ x: c.x, y: c.y - 14, txt: '+25 meow', life: 50, col: '#ffd6a5' }); }
+      }
+      if (sx < -30 || sx > W + 30 || sy > camY + H + 30 || flyT > 420) {
+        gameOver('Lost in the void', LINES[Math.floor(Math.random() * LINES.length)]); return;
+      }
+    }
+    const target = sy - H * 0.62;
+    if (target < camY) camY += (target - camY) * 0.05;
+    while (lastP.y > camY - 260) genPlanet();
+    planets = planets.filter(p => p.y < camY + H + 300 || p === cur || p === from);
+    catsArr = catsArr.filter(c => c.y < camY + H + 60);
+    for (const p of pops) { p.life--; p.y -= 0.5; }
+    pops = pops.filter(p => p.life > 0);
+    const ns = hops * 10 + cats * 25;
+    if (ns !== score) { score = ns; document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+  }
+
+  function drawCat(x, y, s) {
+    ctx.strokeStyle = 'rgba(200,230,255,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, s + 5, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#ffb347';
+    ctx.beginPath(); ctx.moveTo(x - s, y - s * 0.2); ctx.lineTo(x - s * 0.7, y - s * 1.2); ctx.lineTo(x - s * 0.15, y - s * 0.7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + s, y - s * 0.2); ctx.lineTo(x + s * 0.7, y - s * 1.2); ctx.lineTo(x + s * 0.15, y - s * 0.7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - s * 0.38, y - s * 0.1, 1.4, 0, 7); ctx.arc(x + s * 0.38, y - s * 0.1, 1.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff7aa2'; ctx.beginPath(); ctx.arc(x, y + s * 0.25, 1.2, 0, 7); ctx.fill();
+  }
+  function draw() {
+    const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#07061a'); bg.addColorStop(1, '#120a30');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    const neb = ctx.createRadialGradient(W * 0.7, H * 0.3, 10, W * 0.7, H * 0.3, 260);
+    neb.addColorStop(0, 'rgba(155,92,255,0.22)'); neb.addColorStop(1, 'rgba(155,92,255,0)');
+    ctx.fillStyle = neb; ctx.fillRect(0, 0, W, H);
+    for (const s of stars) {
+      const y = ((s.y - camY * s.z * 0.3) % H + H) % H;
+      ctx.globalAlpha = 0.3 + s.z * 0.7; ctx.fillStyle = '#fff'; ctx.fillRect(s.x, y, s.z * 2, s.z * 2);
+    }
+    ctx.globalAlpha = 1;
+    const Y = y => y - camY;
+    for (const p of planets) {
+      const y = Y(p.y); if (y < -80 || y > H + 80) continue;
+      ctx.strokeStyle = p === cur ? 'rgba(255,200,61,0.25)' : 'rgba(155,92,255,0.35)'; ctx.setLineDash([3, 6]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, y, p.r + CAP, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      const g = ctx.createRadialGradient(p.x - p.r * 0.4, y - p.r * 0.4, 2, p.x, y, p.r);
+      g.addColorStop(0, p.col[0]); g.addColorStop(1, p.col[1]);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, p.r, 0, 7); ctx.fill();
+      if (p.ring) { ctx.strokeStyle = 'rgba(255,230,180,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, y, p.r * 1.6, p.r * 0.4, -0.3, 0, 7); ctx.stroke(); }
+      if (p.visited) { ctx.fillStyle = '#ffc83d'; ctx.fillRect(p.x - 1, y - p.r - 12, 2, 12); ctx.fillRect(p.x + 1, y - p.r - 12, 8, 5); }
+    }
+    for (const c of catsArr) { if (!c.got) drawCat(c.x, Y(c.y) + Math.sin(t * 0.06 + c.ph) * 3, 7); }
+    for (let i = 0; i < trail.length; i++) { ctx.globalAlpha = i / trail.length * 0.6; ctx.fillStyle = '#ffc83d'; ctx.beginPath(); ctx.arc(trail[i].x, Y(trail[i].y), 2.5, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    if (mode === 'orbit') {
+      const s = Math.sign(w), tx = -Math.sin(ang) * s, ty = Math.cos(ang) * s;
+      ctx.strokeStyle = 'rgba(255,200,61,0.7)'; ctx.setLineDash([4, 5]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx, Y(sy)); ctx.lineTo(sx + tx * 55, Y(sy) + ty * 55); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // Sally
+    const y = Y(sy);
+    ctx.shadowColor = '#ffc83d'; ctx.shadowBlur = 14; ctx.fillStyle = '#ffc83d'; ctx.beginPath(); ctx.arc(sx, y, 8, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#9b5cff'; ctx.beginPath(); ctx.ellipse(sx + 1.5, y - 1, 4.5, 3.2, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(sx + 2, y - 3, 2, 1.5);
+    ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    for (const p of pops) { ctx.globalAlpha = Math.min(1, p.life / 20); ctx.fillStyle = p.col; ctx.fillText(p.txt, p.x, Y(p.y)); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(10, 10, 140, 26);
+    ctx.fillStyle = '#ffc83d'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Hops ' + hops + '   🐱 ' + cats, 18, 24);
+    ctx.textBaseline = 'alphabetic';
+  }
+  // =================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

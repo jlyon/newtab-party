@@ -4,579 +4,365 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <title>Build the Boardwalk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --primary: #C8102E;      /* boardwalk red */
-    --secondary: #0A3161;    /* deep ocean blue */
-    --bg: #F2D49B;           /* warm sand */
-    --white: #FFFFFF;
-  }
+  :root { --primary: #C8102E; --secondary: #0A3161; --bg: #0f3d56; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; height: 100%; touch-action: none; overscroll-behavior: none;
-    font-family: system-ui, -apple-system, sans-serif; color: var(--secondary);
-    overflow: hidden; background: #0A3161; }
-  #wrap { display: flex; flex-direction: column; align-items: center; height: 100%; gap: 7px;
-    padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); max-width: 540px; margin: 0 auto; }
-  /* Phones: keep tray drags starting >= 24px from the screen edge (browser back gesture). */
-  @media (max-width: 600px) { body.touch #wrap { padding-left: 24px; padding-right: 24px; } }
-  /* Wide screens (desktop, tablet landscape): tray beside the canvas so the park can use the full height. */
-  @media (min-width: 900px) and (orientation: landscape) {
-    #wrap { max-width: none; display: grid; grid-template-columns: auto 400px; grid-template-rows: auto auto auto auto;
-      column-gap: 24px; justify-content: center; align-content: center; align-items: start; }
-    h1, #hud, #hint { grid-column: 1 / -1; justify-self: center; }
-    #hud { max-width: 540px; }
-    canvas { grid-column: 1; grid-row: 3; }
-    #shop { grid-column: 2; grid-row: 3; max-width: 400px; }
-    .item { min-height: 64px; }
-    .item .nm { font-size: 12px; } .item .pr { font-size: 13px; } .item .ic { font-size: 24px; }
-  }
-  h1 { margin: 0; font-size: clamp(16px, 4.6vw, 24px); color: var(--white);
-    letter-spacing: 1px; text-align: center; }
-  #hud { display: flex; gap: 8px; width: 100%; justify-content: center; }
-  .stat { background: var(--white); border: 2px solid var(--secondary); border-radius: 10px;
-    padding: 4px 10px; font-size: clamp(13px, 3.4vw, 17px); font-weight: 800; flex: 1; text-align: center; max-width: 150px; }
-  .stat small { display: block; font-size: 9px; font-weight: 700; opacity: 0.55; letter-spacing: 1px; }
-  #cash .v { color: #1a7a36; }
-  #crowd .v { color: var(--secondary); }
-  #timer .v { color: var(--primary); }
-  /* Square canvas: JS (fitLayout) sets the exact width so title + HUD + canvas + shop + hint fit in the viewport. */
-  canvas { width: min(94vw, calc(100dvh - 350px), 520px); height: auto; display: block; border-radius: 12px; cursor: pointer;
-    border: 3px solid var(--secondary); box-shadow: 0 6px 20px rgba(0,0,0,0.4); touch-action: none; flex: none; }
-  #shop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; max-width: 480px; flex: none; }
-  .item { background: var(--white); border: 2px solid var(--secondary); border-radius: 8px; padding: 3px 2px;
-    cursor: grab; user-select: none; -webkit-touch-callout: none; touch-action: none; text-align: center; min-height: 46px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; transition: all 0.1s; }
-  .item:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
-  .item:active { transform: scale(0.97); }
-  .item .ic { font-size: clamp(15px, 4.4vw, 21px); line-height: 1.05; }
-  .item .nm { font-size: clamp(8.5px, 2.4vw, 11px); font-weight: 700; line-height: 1; }
-  .item .pr { font-size: clamp(9.5px, 2.6vw, 12px); font-weight: 800; color: #1a7a36; }
-  .item.sel { border-color: var(--primary); background: #fff3f4; box-shadow: 0 0 0 2px var(--primary) inset; }
-  .item.broke { opacity: 0.4; }
-  #hint { font-size: 12px; font-weight: 600; color: var(--white); opacity: 0.85; text-align: center; min-height: 15px; }
-  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(10,49,97,0.93); flex-direction: column; text-align: center; padding: 24px; z-index: 10; }
-  .card { max-width: 440px; }
-  .card h2 { color: var(--white); font-size: clamp(24px, 7vw, 40px); margin: 0 0 10px; letter-spacing: 1px; }
-  .card p { color: #d7e6f5; font-size: clamp(13px, 3.6vw, 16px); line-height: 1.6; margin: 0 0 20px; }
-  .card .big { color: #FFD166; font-size: clamp(30px, 10vw, 52px); font-weight: 800; margin: 4px 0 14px; }
-  .card button { padding: 13px 38px; min-height: 52px; font-size: 17px; font-weight: 800; letter-spacing: 1px;
-    background: var(--primary); color: var(--white); border: none; cursor: pointer; border-radius: 8px; font-family: inherit;
-    user-select: none; -webkit-touch-callout: none; transition: transform 0.12s, opacity 0.12s; }
-  .card button:hover { opacity: 0.9; }
-  .card button:active { transform: scale(0.97); }
-  .card .score { color: #d7e6f5; font-size: clamp(13px, 3.6vw, 16px); font-weight: 700; margin: -6px 0 14px; }
-  #endOverlay { display: none; }
-  .item.dragging { opacity: 0.5; }
-  #dragGhost { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 30; display: none;
-    font-size: 38px; transform: translate(-50%, -55%); filter: drop-shadow(0 4px 5px rgba(0,0,0,0.45)); }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; }
+  #hud .cash { color: #ffd166; }
+  canvas { display: block; width: min(95vw - 24px, calc(100dvh - 190px)); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.45); border: 3px solid #f4e3c1; cursor: pointer; }
+  #tray { display: flex; gap: 6px; justify-content: center; width: min(95vw - 24px, 520px); }
+  .ride { flex: 1; min-width: 52px; max-width: 110px; height: 56px; border: 3px solid transparent; border-radius: 12px; background: #f4e3c1; color: #0f3d56;
+          font: 800 clamp(10px, 2.7vw, 13px)/1.1 system-ui, sans-serif; user-select: none; -webkit-touch-callout: none; cursor: grab; padding: 2px 3px; touch-action: none; }
+  .ride small { display: block; font-weight: 700; color: var(--primary); }
+  .ride.sel { border-color: var(--primary); box-shadow: 0 0 0 2px #fff inset; }
+  .ride.poor { opacity: .45; }
+  #hint { display: none; font-size: 12px; font-weight: 600; opacity: .8; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,30,44,.92); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-family: 'Lobster', system-ui, sans-serif; font-weight: 400; font-size: clamp(28px, 7vw, 56px); line-height: 1.05; color: #ffd166; text-shadow: 0 4px 0 var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); margin: 6px 0; }
+  .overlay button { margin-top: 18px; padding: 14px 44px; font-family: 'Lobster', system-ui, sans-serif; font-size: clamp(15px, 3.8vw, 20px); letter-spacing: 1px; border: 0; border-radius: 40px; background: var(--primary); color: #fff; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 
-  /* ── Landing page (start screen) — themed redesign ────────────── */
-  #startOverlay {
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
     background:
-      radial-gradient(88% 74% at 50% 44%, rgba(0,0,0,0.42), rgba(10,49,97,0.34) 70%, rgba(0,0,0,0.6)),
-      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/build-the-boardwalk.jpg') center/cover no-repeat;
+      radial-gradient(84% 68% at 50% 45%, rgba(8,30,44,0.45), rgba(8,30,44,0.36) 72%, rgba(8,30,44,0.7)),
+      url('backgrounds/build-the-boardwalk.jpg') center/cover no-repeat, #0f3d56;
   }
-  #startOverlay .card {
-    max-width: 520px;
-    background: rgba(8,30,58,0.6);
-    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 18px; padding: 30px 30px 34px;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-  }
-  #startOverlay .card h2 {
-    font-family: 'Lobster', cursive;
-    font-size: clamp(40px, 11vw, 82px); font-weight: 400;
-    line-height: 0.98; margin: 0 0 14px; color: #fff;
-    text-shadow: 0 3px 30px rgba(0,0,0,0.8), 0 0 24px rgba(200,16,46,0.5);
-  }
-  #startOverlay .card p { color: rgba(255,255,255,0.9); text-shadow: 0 2px 10px rgba(0,0,0,0.85); }
-  #startBtn {
-    font-family: 'Lobster', cursive;
-    padding: 14px 46px; font-size: clamp(17px,4.5vw,24px); letter-spacing: 1px;
-    border: none; border-radius: 40px; cursor: pointer;
-    color: #fff; background: var(--primary, #C8102E);
-    box-shadow: 0 12px 44px rgba(0,0,0,0.5);
-    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease, opacity 0.14s ease;
-  }
-  #startBtn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); opacity: 1; }
+  #start-overlay .panel { background: rgba(8,30,44,0.66); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 5vw, 32px); max-width: 560px; max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+  #start-logo { display: block; width: min(82%, 400px); max-height: 32vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  #start-overlay h2 { font-size: clamp(28px, 7vw, 56px); text-shadow: 0 4px 0 var(--primary), 0 3px 34px rgba(0,0,0,0.85); }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button { margin-top: 22px; padding: 15px 50px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <h1>🎡 Build the Boardwalk</h1>
-  <div id="hud">
-    <div class="stat" id="cash"><small>CASH</small><span class="v">$300</span></div>
-    <div class="stat" id="crowd"><small>CROWD</small><span class="v">0</span></div>
-    <div class="stat" id="timer"><small>TIME</small><span class="v">60</span></div>
-  </div>
+  <div id="hud"><span id="clock">9:00 AM</span><span class="cash" id="cash">Cash $400</span><span id="score">Score: 400</span><span id="best">Best: 0</span></div>
   <canvas id="game" width="480" height="480"></canvas>
-  <div id="shop"></div>
-  <div id="hint">Drag a ride onto the sand to build it.</div>
-</div>
-<div id="dragGhost"></div>
-
-<div class="overlay" id="startOverlay">
-  <div class="card">
-    <img src="logos/build-the-boardwalk.png" alt="Build the Boardwalk" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
-    <p>Santa Cruz, baby. You've got <b>60 seconds</b> and an empty beach.
-       <b>Drag attractions</b> from the tray onto the sand, and watch tourists stream in and spend their cash.
-       The more you build, the bigger the crowd. Tap a ride to <b>upgrade</b> it.
-       End with the fattest wallet on the coast.</p>
-    <button id="startBtn">▶ Open the gates</button>
+  <div id="tray">
+    <button class="ride sel" data-t="churro">Churros<small>$100</small></button>
+    <button class="ride" data-t="arcade">Arcade<small>$250</small></button>
+    <button class="ride" data-t="surf">Surf Shack<small>$350</small></button>
+    <button class="ride" data-t="carousel">Carousel<small>$600</small></button>
+    <button class="ride" data-t="dipper">Big Dipper<small>$1,500</small></button>
   </div>
+  <div id="hint">Drag a ride onto the sand · tap a ride to upgrade it</div>
 </div>
-
-<div class="overlay" id="endOverlay">
-  <div class="card">
-    <h2 id="endTitle">Park's closed!</h2>
-    <div class="big" id="endCash">$0</div>
-    <div class="score" id="endScore">Score: 0</div>
-    <p id="endMsg"></p>
-    <button id="restartBtn">Run it back</button>
-  </div>
+<div id="start-overlay" class="overlay show"><div class="panel">
+  <img id="start-logo" src="logos/build-the-boardwalk.png" alt="Build the Boardwalk" onerror="this.remove(); document.getElementById('start-h2').style.display='block';">
+  <h2 id="start-h2" style="display:none">Build the Boardwalk</h2>
+  <p>One summer day on the Santa Cruz sand, 9 AM to 9 PM. Build attractions, pull in tourists, and be worth the most when the sun goes down.</p>
+  <p>Drag a ride from the tray onto the sand (or pick one with 1-5 and click / tap a spot). Click / tap a ride to upgrade it. Churro stands boost the rides next to them; surf shacks only work at the water's edge.</p>
+  <button id="start-btn">Play</button>
+</div></div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Sunset!</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
 </div>
-
 <script>
 (() => {
-  const START_CASH = 300;
-  const GAME_SECONDS = 60;
-  const COLS = 8, ROWS = 8, TILE = 60;       // 480x480
-  const W = COLS * TILE, H = ROWS * TILE;
-  const OCEAN_ROWS = 2;                       // top rows = sea (not buildable)
-  const MAX_TOURISTS = 280;
-  const TOURIST_SPEED = 195;
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
 
-  // ===== GAME-SPECIFIC SECTION =====
-  // cost = build price; payout = $ per visitor; draw = how many tourists it pulls in.
-  // Upgrades multiply payout and draw by the new level.
-  const TYPES = [
-    { id:'dog',     emoji:'🌭', name:'Hot Dogs',    cost:120,   payout:15,   draw:3   },
-    { id:'pop',     emoji:'🍿', name:'Popcorn',     cost:190,   payout:22,   draw:4   },
-    { id:'cream',   emoji:'🍦', name:'Ice Cream',   cost:280,   payout:32,   draw:6   },
-    { id:'ring',    emoji:'🎯', name:'Ring Toss',   cost:420,   payout:46,   draw:8   },
-    { id:'cotton',  emoji:'🍭', name:'Candy',       cost:600,   payout:64,   draw:11  },
-    { id:'crab',    emoji:'🦀', name:'Crab Shack',  cost:850,   payout:88,   draw:15  },
-    { id:'carousel',emoji:'🎠', name:'Carousel',    cost:1200,  payout:120,  draw:20  },
-    { id:'fun',     emoji:'🎪', name:'Funhouse',    cost:1700,  payout:168,  draw:27  },
-    { id:'bumper',  emoji:'🚗', name:'Bumpers',     cost:2400,  payout:235,  draw:36  },
-    { id:'arcade',  emoji:'🕹️', name:'Arcade',      cost:3400,  payout:330,  draw:48  },
-    { id:'wheel',   emoji:'🎡', name:'Ferris',      cost:4800,  payout:460,  draw:64  },
-    { id:'band',    emoji:'🎤', name:'Bandstand',   cost:6800,  payout:650,  draw:88  },
-    { id:'coaster', emoji:'🎢', name:'Giant Dipper',cost:9500,  payout:910,  draw:118 },
-    { id:'haunt',   emoji:'🏰', name:'Haunt House', cost:13500, payout:1300, draw:160 },
-    { id:'splash',  emoji:'🌊', name:'Log Splash',  cost:19000, payout:1850, draw:215 },
-    { id:'ship',    emoji:'🚢', name:'Pirate Ship', cost:28000, payout:2750, draw:300 },
-  ];
-  const endLines = [
-    "Stan Lee himself would tip his hat. Empire status.",
-    "The seagulls have unionized. This is your legacy.",
-    "Funnel-cake futures just hit an all-time high.",
-    "Not bad for a pile of sand and pure ambition.",
-  ];
-  // little beachgoers that wander the park
-  const PEOPLE = ['🧍','🚶','🧍‍♀️','🚶‍♀️','👨','👩','🧒','👧','👦','🧑','👴','👵','🏃','🏃‍♀️'];
-  // ==================================
-
-  const fmt = n => '$' + Math.floor(n).toLocaleString('en-US');
-  const cv = document.getElementById('game');
-  const ctx = cv.getContext('2d');
-  const wrap = document.getElementById('wrap');
-  // Logical size W x H for all game math; the backing store is sized to CSS size x DPR
-  // and the context scaled to match, so rendering stays crisp at any size / DPR.
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 480, H = 480;
   function fitCanvas() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = cv.getBoundingClientRect().width || W;
-    cv.width  = Math.max(1, Math.round(cssW * dpr));
-    cv.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
-    ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
-  // Fit the square canvas into whatever height the title, HUD, shop and hint leave over (no page scroll).
-  const wideMQ = matchMedia('(min-width: 900px) and (orientation: landscape)');
-  function fitLayout() {
-    const cs = getComputedStyle(wrap);
-    const wide = wideMQ.matches;   // tray sits beside the canvas (see the CSS grid rule)
-    let used = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const gap = parseFloat(cs.rowGap) || 0;
-    const shop = document.getElementById('shop');
-    for (const el of wrap.children) if (el !== cv && !(wide && el === shop)) used += el.getBoundingClientRect().height;
-    used += gap * (wrap.children.length - (wide ? 2 : 1));
-    const availH = window.innerHeight - used;
-    const availW = wide ? window.innerWidth - 400 - 24 - 32 : wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    const size = Math.max(140, Math.floor(Math.min(availW, availH, wide ? 720 : 520)));
-    cv.style.width = size + 'px';
-    fitCanvas();
-  }
-  window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitLayout, 0); }, { once: true, passive: true });
-  // Back-swipe guard: a stray edge swipe stays on the page instead of leaving the arcade.
-  window.addEventListener('touchstart', () => {
-    try { history.pushState(null, '', location.href); } catch (e) {}
-    window.addEventListener('popstate', () => { try { history.pushState(null, '', location.href); } catch (e) {} });
-  }, { once: true, passive: true });
-  addEventListener('resize', fitLayout);
-  addEventListener('orientationchange', () => setTimeout(fitLayout, 50));
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLayout).catch(() => {});
-  const shop = document.getElementById('shop');
-  const cashV = document.querySelector('#cash .v');
-  const crowdV = document.querySelector('#crowd .v');
-  const timerV = document.querySelector('#timer .v');
-  const hint = document.getElementById('hint');
-  const startOverlay = document.getElementById('startOverlay');
-  const endOverlay = document.getElementById('endOverlay');
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height), inside: clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom }; };
 
-  const typeById = id => TYPES.find(t => t.id === id);
-  const tileCX = c => c * TILE + TILE/2;
-  const tileCY = r => r * TILE + TILE/2;
-  const ENTRANCE = { x: W/2, y: H + 14 };
-
-  let cash = START_CASH, selected = TYPES[0].id, running = false, timeLeft = GAME_SECONDS, lastT = 0, hiScore = 0, bestCash = 0;
-  let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-  let tourists = [], floats = [], spawnAcc = 0, t0 = 0;
-
-  function init() {
-    cash = START_CASH;
-    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null)); // {type,level}
-    selected = TYPES[0].id;
-    running = true; timeLeft = GAME_SECONDS;
-    tourists = []; floats = []; spawnAcc = 0; t0 = 0;
-    lastT = 0;
-    buildShop();
-    endOverlay.style.display = 'none';
-    renderHud();
-    fitLayout();
-  }
-
-  function buildShop() {
-    shop.innerHTML = '';
-    TYPES.forEach(t => {
-      const el = document.createElement('div');
-      el.className = 'item'; el.dataset.id = t.id;
-      el.innerHTML = `<span class="ic">${t.emoji}</span><span class="nm">${t.name}</span><span class="pr">${fmt(t.cost)}</span>`;
-      el.addEventListener('pointerdown', e => {
-        e.preventDefault();
-        el.classList.add('dragging');
-        flashHint(`${t.name}: ${fmt(t.cost)}. Drag onto the sand. Pays ${fmt(t.payout)}/visitor.`);
-        startDrag(t.id, e.clientX, e.clientY);
-      });
-      shop.appendChild(el);
-    });
-    renderShop();
-  }
-
-  function attractions() {
-    const a = [];
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
-      if (grid[r][c]) a.push({ r, c, p: grid[r][c] });
-    return a;
-  }
-  function totalDraw() { return attractions().reduce((s, a) => s + typeById(a.p.type).draw * a.p.level, 0); }
-  function upgradeCost(p) { return Math.floor(typeById(p.type).cost * p.level * 0.85); }
-
-  // ---- input ----
-  function canvasToTile(clientX, clientY) {
-    const rect = cv.getBoundingClientRect();
-    const x = (clientX - rect.left) * (W / rect.width);
-    const y = (clientY - rect.top) * (H / rect.height);
-    return { c: Math.floor(x / TILE), r: Math.floor(y / TILE), x, y };
-  }
-  // Build the selected ride on an empty tile, or upgrade an existing one.
-  function placeAt(c, r) {
-    if (!running) return false;
-    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
-    if (r < OCEAN_ROWS) { flashHint("Can't build in the ocean. Tourists hate swimming for a corndog."); return false; }
-    const cell = grid[r][c];
-    if (!cell) {
-      const t = typeById(selected);
-      if (cash >= t.cost) { cash -= t.cost; grid[r][c] = { type: t.id, level: 1, bob: Math.random()*6 };
-        popText(tileCX(c), tileCY(r), 'NEW!', '#0A3161'); renderHud(); return true; }
-      flashHint(`Need ${fmt(t.cost)} for a ${t.name}. Sell more hot dogs first.`); return false;
-    } else {
-      const uc = upgradeCost(cell);
-      if (cash >= uc) { cash -= uc; cell.level++; popText(tileCX(c), tileCY(r), 'LV '+cell.level, '#C8102E'); renderHud();
-        flashHint(`${typeById(cell.type).name} upgraded to Lv ${cell.level}.`); return true; }
-      flashHint(`Upgrade costs ${fmt(uc)}. So close.`); return false;
-    }
-  }
-
-  // status for a tile while dragging: 'build' (green), 'upgrade' (blue), 'no' (red)
-  function tileStatus(c, r) {
-    if (c < 0 || c >= COLS || r < 0 || r >= ROWS || r < OCEAN_ROWS) return 'no';
-    const cell = grid[r][c];
-    if (!cell) return cash >= typeById(selected).cost ? 'build' : 'no';
-    return cash >= upgradeCost(cell) ? 'upgrade' : 'no';
-  }
-
-  // ---- unified pointer input: drag rides from the tray, or tap the canvas ----
-  const ghost = document.getElementById('dragGhost');
-  let drag = null;       // { type } while dragging from the tray
-  let tapInfo = null;    // { x0, y0, moved } while a canvas press is in progress
-  let hoverTile = null;  // {c,r,status} shown as a preview during drag
-
-  function startDrag(typeId, clientX, clientY) {
-    selected = typeId; renderShop();
-    drag = { type: typeId };
-    ghost.textContent = typeById(typeId).emoji;
-    ghost.style.display = 'block';
-    moveGhost(clientX, clientY);
-  }
-  function moveGhost(x, y) { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; }
-  function tileAt(clientX, clientY) {
-    const rect = cv.getBoundingClientRect();
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
-    const t = canvasToTile(clientX, clientY); return { c: t.c, r: t.r };
-  }
-
-  window.addEventListener('pointermove', e => {
-    if (drag) {
-      moveGhost(e.clientX, e.clientY);
-      const t = tileAt(e.clientX, e.clientY);
-      hoverTile = t ? { c: t.c, r: t.r, status: tileStatus(t.c, t.r) } : null;
-    } else if (tapInfo) {
-      if (Math.abs(e.clientX - tapInfo.x0) > 8 || Math.abs(e.clientY - tapInfo.y0) > 8) tapInfo.moved = true;
-    }
+  const keys = {};
+  addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); return; }
+    if (!running) return;
+    const n = '12345'.indexOf(e.key); if (n >= 0) select(ORDER[n]);
+    const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (mv) { kbd = true; cur.c = Math.max(0, Math.min(COLS - 1, cur.c + mv[0])); cur.r = Math.max(0, Math.min(ROWS - 1, cur.r + mv[1])); }
+    if (e.key === ' ') { kbd = true; act(cur.c, cur.r); }
   });
-  window.addEventListener('pointerup', e => {
-    if (drag) {
-      const t = tileAt(e.clientX, e.clientY);
-      if (t) placeAt(t.c, t.r);
-      ghost.style.display = 'none';
-      [...shop.children].forEach(el => el.classList.remove('dragging'));
-      drag = null; hoverTile = null;
-    } else if (tapInfo) {
-      if (!tapInfo.moved) { const tl = canvasToTile(e.clientX, e.clientY); placeAt(tl.c, tl.r); }
-      tapInfo = null;
-    }
-  });
-  window.addEventListener('pointercancel', () => {
-    if (drag) { ghost.style.display = 'none'; [...shop.children].forEach(el => el.classList.remove('dragging')); }
-    drag = null; hoverTile = null; tapInfo = null;
-  });
-  // canvas press = potential tap-to-build/upgrade (only if it doesn't turn into a scroll/drag)
-  cv.addEventListener('pointerdown', e => { if (drag) return; tapInfo = { x0: e.clientX, y0: e.clientY, moved: false }; });
+  addEventListener('keyup', e => { keys[e.key] = false; });
 
-  // ---- tourists ----
-  function spawnTourist() {
-    const list = attractions();
-    if (!list.length || tourists.length >= MAX_TOURISTS) return;
-    // weighted pick by draw
-    let total = 0; for (const a of list) total += typeById(a.p.type).draw * a.p.level;
-    let roll = Math.random() * total, target = list[0];
-    for (const a of list) { roll -= typeById(a.p.type).draw * a.p.level; if (roll <= 0) { target = a; break; } }
-    tourists.push({
-      x: ENTRANCE.x + (Math.random()*40-20), y: ENTRANCE.y,
-      tx: tileCX(target.c) + (Math.random()*26-13), ty: tileCY(target.r) + (Math.random()*26-13),
-      target, state: 'toRide', paid: false, t: Math.random()*Math.PI*2,
-      face: PEOPLE[Math.floor(Math.random()*PEOPLE.length)],
-      size: 15 + Math.random()*4, lastX: ENTRANCE.x,
-    });
-  }
-  function popText(x, y, txt, col) { floats.push({ x, y, txt, col, life: 1 }); }
-
-  function stepTourists(dt) {
-    const speed = TOURIST_SPEED;
-    for (let i = tourists.length - 1; i >= 0; i--) {
-      const u = tourists[i];
-      u.t += dt * 8;
-      let gx, gy;
-      if (u.state === 'toRide') { gx = u.tx; gy = u.ty; } else { gx = u.exitX; gy = u.exitY; }
-      const dx = gx - u.x, dy = gy - u.y, d = Math.hypot(dx, dy) || 1;
-      u.dir = dx < -0.5 ? -1 : (dx > 0.5 ? 1 : (u.dir || 1));
-      const mv = speed * dt;
-      if (d <= mv) {
-        u.x = gx; u.y = gy;
-        if (u.state === 'toRide') {
-          // pay out (ride may have been there; if removed, still pay base)
-          const a = u.target; const cell = grid[a.r] && grid[a.r][a.c];
-          const pay = cell ? typeById(cell.type).payout * cell.level : 0;
-          if (pay > 0) { cash += pay; popText(tileCX(a.c), tileCY(a.r) - 6, '+' + fmt(pay), '#1a7a36'); }
-          u.state = 'leaving';
-          u.exitX = (Math.random() < 0.5 ? -20 : W + 20); u.exitY = H + 20;
-        } else { tourists.splice(i, 1); }
-      } else { u.x += dx / d * mv; u.y += dy / d * mv; }
-    }
-  }
-
-  function stepFloats(dt) {
-    for (let i = floats.length - 1; i >= 0; i--) {
-      const f = floats[i]; f.y -= 26 * dt; f.life -= dt * 1.1;
-      if (f.life <= 0) floats.splice(i, 1);
-    }
-  }
-
-  // ---- draw ----
-  function draw(now) {
-    // sea
-    const seaH = OCEAN_ROWS * TILE;
-    const sea = ctx.createLinearGradient(0, 0, 0, seaH);
-    sea.addColorStop(0, '#1f6fa8'); sea.addColorStop(1, '#3f9bd4');
-    ctx.fillStyle = sea; ctx.fillRect(0, 0, W, seaH);
-    // sun glint on the water
-    const glint = ctx.createRadialGradient(W * 0.78, seaH * 0.35, 4, W * 0.78, seaH * 0.35, seaH * 0.9);
-    glint.addColorStop(0, 'rgba(255,245,200,0.45)'); glint.addColorStop(1, 'rgba(255,245,200,0)');
-    ctx.fillStyle = glint; ctx.fillRect(0, 0, W, seaH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
-    for (let k = 0; k < 4; k++) {
-      ctx.beginPath();
-      const yy = 14 + k * 14;
-      for (let x = 0; x <= W; x += 8) ctx.lineTo(x, yy + Math.sin((x + now/260 + k*30) / 22) * 3);
-      ctx.stroke();
-    }
-    // sand
-    ctx.fillStyle = '#F2D49B'; ctx.fillRect(0, seaH, W, H - seaH);
-    // wet sand line + boardwalk planks on first sand row
-    ctx.fillStyle = '#E7C079'; ctx.fillRect(0, seaH, W, 10);
-    ctx.fillStyle = '#D9A441';
-    for (let c = 0; c < COLS; c++) { ctx.fillRect(c*TILE+2, seaH+12, TILE-4, 6); }
-    // faint tile lines on sand
-    ctx.strokeStyle = 'rgba(10,49,97,0.07)'; ctx.lineWidth = 1;
-    for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c*TILE, seaH); ctx.lineTo(c*TILE, H); ctx.stroke(); }
-    for (let r = OCEAN_ROWS; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*TILE); ctx.lineTo(W, r*TILE); ctx.stroke(); }
-
-    // drag drop-target preview
-    if (drag && hoverTile) {
-      const { c, r, status } = hoverTile;
-      const fill = status === 'no' ? 'rgba(200,16,46,0.30)' : status === 'upgrade' ? 'rgba(10,49,97,0.28)' : 'rgba(26,122,54,0.32)';
-      const stroke = status === 'no' ? '#C8102E' : status === 'upgrade' ? '#0A3161' : '#1a7a36';
-      ctx.fillStyle = fill; ctx.fillRect(c*TILE+2, r*TILE+2, TILE-4, TILE-4);
-      ctx.strokeStyle = stroke; ctx.lineWidth = 3; ctx.strokeRect(c*TILE+2, r*TILE+2, TILE-4, TILE-4);
-      if (status !== 'no') {
-        ctx.globalAlpha = 0.5; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.font = (TILE*0.42|0) + 'px serif';
-        ctx.fillText(typeById(selected).emoji, tileCX(c), tileCY(r));
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    // attractions
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const a of attractions()) {
-      const x = tileCX(a.c), y = tileCY(a.r), p = a.p;
-      const bob = Math.sin(now/300 + (p.bob||0)) * 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
-      ctx.beginPath(); ctx.ellipse(x, y + TILE*0.32, TILE*0.28, TILE*0.1, 0, 0, Math.PI*2); ctx.fill();
-      // platform
-      ctx.fillStyle = (p.level > 1) ? '#C8102E' : '#FFFFFF';
-      roundRect(x - TILE*0.34, y - TILE*0.30 + bob, TILE*0.68, TILE*0.60, 7); ctx.fill();
-      ctx.strokeStyle = '#0A3161'; ctx.lineWidth = 2; roundRect(x - TILE*0.34, y - TILE*0.30 + bob, TILE*0.68, TILE*0.60, 7); ctx.stroke();
-      ctx.font = (TILE*0.42|0) + 'px serif';
-      ctx.fillText(typeById(p.type).emoji, x, y + bob);
-      if (p.level > 1) {
-        ctx.font = 'bold 11px system-ui'; ctx.fillStyle = '#FFFFFF';
-        ctx.fillText('L' + p.level, x + TILE*0.22, y - TILE*0.20 + bob);
-      }
-    }
-    // tourists (little beachgoers)
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    for (const u of tourists) {
-      const wob = Math.abs(Math.sin(u.t)) * 2.4;     // bouncy walking step
-      ctx.fillStyle = 'rgba(0,0,0,0.16)';
-      ctx.beginPath(); ctx.ellipse(u.x, u.y + 2, u.size*0.26, u.size*0.11, 0, 0, Math.PI*2); ctx.fill();
-      ctx.font = (u.size|0) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",serif';
-      ctx.save();
-      ctx.translate(u.x, u.y - wob);
-      if ((u.dir || 1) < 0) ctx.scale(-1, 1);
-      ctx.fillText(u.face, 0, 0);
-      ctx.restore();
-    }
-    ctx.textBaseline = 'middle';
-    // floating money
-    ctx.textAlign = 'center';
-    for (const f of floats) {
-      ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
-      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = f.col;
-      ctx.fillText(f.txt, f.x, f.y);
-    }
-    ctx.globalAlpha = 1;
-    // entrance marker
-    ctx.fillStyle = '#0A3161'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('▲ ENTRANCE ▲', W/2, H - 6);
-  }
-  function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
-    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
-  }
-
-  function renderHud() {
-    cashV.textContent = fmt(cash);
-    crowdV.textContent = tourists ? tourists.length : 0;
-    timerV.textContent = Math.ceil(timeLeft);
-  }
-  function renderShop() {
-    [...shop.children].forEach(el => {
-      const t = typeById(el.dataset.id);
-      el.classList.toggle('sel', el.dataset.id === selected);
-      el.classList.toggle('broke', cash < t.cost);
-    });
-  }
-  let hintTimer;
-  function flashHint(msg) { hint.textContent = msg; clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => { hint.textContent = 'Tap the sand to build. Tap a ride to upgrade it.'; }, 2600); }
-
-  // Score = final cash in whole dollars (the $ readout on screen), posted as that integer.
-  let _hi = 0;   // in-game "best" readout only
-  // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
+  let _hi = 0;
   function postHi(n) {
     n = Math.max(0, Math.round(Number(n) || 0));
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
-  function endGame() {
-    running = false;
-    const score = Math.floor(cash);
-    if (score > hiScore) hiScore = score;
-    if (cash > bestCash) bestCash = cash;
-    postHi(score);
-    document.getElementById('endCash').textContent = fmt(cash);
-    document.getElementById('endScore').textContent = 'Score: ' + score.toLocaleString('en-US');
-    document.getElementById('endMsg').textContent =
-      endLines[Math.floor(Math.random()*endLines.length)] + `  (Best: ${fmt(bestCash)})`;
-    endOverlay.style.display = 'flex';
-  }
 
-  // FRAME_INDEPENDENT_DT: every motion, spawn timer and animation is scaled by dt (clamped to 0.05 s),
-  // so the game runs at the same speed on 60 / 120 / 144 Hz displays. The loop starts once per page
-  // load and keeps rendering (idle waves) while not running; sim steps only while `running`.
-  let hudAcc = 0;
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
   function loop(now) {
-    if (!lastT) lastT = now;
-    const dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
-    lastT = now;
-    if (running) {
-      timeLeft -= dt;
-      // spawn pacing scales with how much draw the park has
-      const drawAmt = totalDraw();
-      if (drawAmt > 0) {
-        const interval = Math.max(0.03, 0.85 / (1 + drawAmt * 0.16));
-        spawnAcc += dt;
-        while (spawnAcc >= interval) { spawnAcc -= interval; spawnTourist(); }
-      }
-      stepTourists(dt); stepFloats(dt);
-      hudAcc += dt; if (hudAcc >= 0.1) { renderHud(); renderShop(); hudAcc = 0; }
-      if (timeLeft <= 0) { timeLeft = 0; renderHud(); endGame(); }
-    }
-    draw(now);
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
     requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
 
-  document.getElementById('startBtn').addEventListener('click', () => { startOverlay.style.display = 'none'; init(); });
-  document.getElementById('restartBtn').addEventListener('click', init);
-  addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      if (startOverlay.style.display !== 'none') document.getElementById('startBtn').click();
-      else if (endOverlay.style.display === 'flex') document.getElementById('restartBtn').click();
+  // ===== GAME-SPECIFIC SECTION =====
+  const T = 60, COLS = 8, ROWS = 5, GY = 60, SHORE = GY + ROWS * T;   // boardwalk 0-60, sand 60-360, ocean below
+  const DAY_TICKS = 150 * 60;                                          // 9 AM to 9 PM in 150 s
+  const TYPES = {
+    churro:   { name: 'Churros',    cost: 100,  price: 5,  cap: 3, dur: 60,  appeal: 1, food: true },
+    arcade:   { name: 'Arcade',     cost: 250,  price: 8,  cap: 4, dur: 170, appeal: 2 },
+    surf:     { name: 'Surf Shack', cost: 350,  price: 15, cap: 2, dur: 230, appeal: 2, shore: true },
+    carousel: { name: 'Carousel',   cost: 600,  price: 12, cap: 8, dur: 280, appeal: 3 },
+    dipper:   { name: 'Big Dipper', cost: 1500, price: 25, cap: 6, dur: 330, appeal: 6 },
+  };
+  const ORDER = ['churro', 'arcade', 'surf', 'carousel', 'dipper'];
+  const SHIRTS = ['#d7263d', '#1b998b', '#ffd166', '#ef476f', '#118ab2', '#f78c6b', '#8338ec', '#fff'];
+
+  let score, cash, invested, tick, rides, people, floats, sel, ghost, cur, kbd, spawnT, fog, fogNext, served, visitors;
+  const $ = id => document.getElementById(id);
+  const at = (c, r) => rides.find(o => o.c === c && o.r === r);
+  const stat = o => { const b = TYPES[o.t], k = o.lvl - 1; return { price: Math.round(b.price * Math.pow(1.5, k)), cap: Math.round(b.cap * (1 + 0.5 * k)), dur: b.dur, appeal: b.appeal + k }; };
+  const foodNear = o => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => { const n = at(o.c + dx, o.r + dy); return n && TYPES[n.t].food; }).length;
+  const ridesNear = o => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => { const n = at(o.c + dx, o.r + dy); return n && !TYPES[n.t].food; }).length;
+  const appealOf = o => stat(o).appeal + (TYPES[o.t].food ? ridesNear(o) : 0);
+
+  function hud() {
+    score = Math.round(cash + invested * 0.5);
+    $('cash').textContent = 'Cash $' + Math.floor(cash).toLocaleString();
+    $('score').textContent = 'Score: ' + score.toLocaleString();
+    const mins = 9 * 60 + Math.floor(tick / DAY_TICKS * 720), h = Math.floor(mins / 60), m = mins % 60;
+    $('clock').textContent = ((h - 1) % 12 + 1) + ':' + String(m - m % 10).padStart(2, '0') + (h < 12 ? ' AM' : ' PM');
+    document.querySelectorAll('.ride').forEach(b => b.classList.toggle('poor', cash < TYPES[b.dataset.t].cost));
+  }
+  function select(t) { sel = t; document.querySelectorAll('.ride').forEach(b => b.classList.toggle('sel', b.dataset.t === t)); }
+
+  function reset() {
+    cash = 400; invested = 0; tick = 0; rides = []; people = []; floats = []; ghost = null; cur = { c: 3, r: 2 }; kbd = false;
+    spawnT = 60; fog = 0; fogNext = 2400 + Math.random() * 3000; served = 0; visitors = 0;
+    select('churro'); hud();
+  }
+  function float(x, y, text, color) { floats.push({ x, y, text, color: color || '#fff', t: 55 }); }
+
+  function canPlace(t, c, r) { return c >= 0 && r >= 0 && c < COLS && r < ROWS && !at(c, r) && (!TYPES[t].shore || r === ROWS - 1); }
+  function act(c, r) {                                // place the selected ride, or upgrade the one that's there
+    if (!running || c < 0 || r < 0 || c >= COLS || r >= ROWS) return;
+    const x = c * T + T / 2, y = GY + r * T + T / 2, o = at(c, r);
+    if (o) {
+      if (o.lvl >= 3) { float(x, y - 22, 'Max level', '#fff'); return; }
+      const cost = TYPES[o.t].cost * o.lvl;
+      if (cash < cost) { float(x, y - 22, 'Need $' + cost, '#ff9aa2'); return; }
+      cash -= cost; invested += cost; o.lvl++; o.pop = 20; float(x, y - 22, 'Level ' + o.lvl + '!', '#9ef0c8'); hud(); return;
     }
-  });
+    const ty = TYPES[sel];
+    if (ty.shore && r !== ROWS - 1) { float(x, y - 16, 'Surf shacks go by the water', '#fff'); return; }
+    if (cash < ty.cost) { float(x, y - 16, 'Need $' + ty.cost, '#ff9aa2'); return; }
+    cash -= ty.cost; invested += ty.cost;
+    rides.push({ t: sel, c, r, x: c * T, y: GY + r * T, lvl: 1, queue: [], riding: [], coming: 0, pop: 20, earned: 0 });
+    hud();
+  }
 
-  // Build the tray now so the layout (and the canvas size) is right before the first game starts.
-  buildShop();
-  fitLayout();
-  draw(0);
+  // Drag from the tray (mouse or finger), or tap a tray button then tap the sand.
+  let drag = null;
+  document.querySelectorAll('.ride').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); select(b.dataset.t); drag = { t: b.dataset.t }; }));
+  addEventListener('pointermove', e => {
+    const p = toLogical(e.clientX, e.clientY);
+    ghost = p.inside && p.y >= GY && p.y < SHORE ? { c: Math.floor(p.x / T), r: Math.floor((p.y - GY) / T) } : null;
+    if (ghost) kbd = false;
+  });
+  addEventListener('pointerup', e => {
+    if (!drag) return;
+    const p = toLogical(e.clientX, e.clientY); drag = null;
+    if (p.inside && p.y >= GY && p.y < SHORE) act(Math.floor(p.x / T), Math.floor((p.y - GY) / T));
+  });
+  canvas.addEventListener('pointerdown', e => {
+    const p = toLogical(e.clientX, e.clientY); kbd = false;
+    if (p.y >= GY && p.y < SHORE) act(Math.floor(p.x / T), Math.floor((p.y - GY) / T));
+  });
+  canvas.addEventListener('pointerleave', () => { if (!drag) ghost = null; });
+
+  // ── Tourists ──
+  function spawn() {
+    const left = Math.random() < 0.5;
+    people.push({ x: left ? -10 : W + 10, y: 18 + Math.random() * 30, wallet: 25 + Math.random() * 75 + tick / DAY_TICKS * 50,
+                  shirt: SHIRTS[(Math.random() * SHIRTS.length) | 0], st: 'pick', tgt: null, seen: {}, sp: 0.9 + Math.random() * 0.5, bob: Math.random() * 6 });
+    visitors++;
+  }
+  function pick(p) {
+    let best = null, tot = 0; const opts = [];
+    for (const o of rides) {
+      const s = stat(o), q = o.queue.length + o.coming;
+      if (s.price > p.wallet || q >= 6) continue;
+      const w = appealOf(o) / (1 + q * 0.6) * (p.seen[o.t] ? 0.35 : 1);
+      opts.push([o, w]); tot += w;
+    }
+    let r = Math.random() * tot;
+    for (const [o, w] of opts) { r -= w; if (r <= 0) { best = o; break; } }
+    if (!best) { p.st = 'leave'; p.tgt = { x: p.x < W / 2 ? -20 : W + 20, y: 30 }; return; }
+    p.st = 'walk'; p.ride = best; best.coming++;
+  }
+  function moveTo(p, tx, ty) { const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy); if (d < p.sp) { p.x = tx; p.y = ty; return true; } p.x += dx / d * p.sp; p.y += dy / d * p.sp; return false; }
+  const qSpot = (o, i) => ({ x: o.x + 10 + (i % 6) * 8, y: o.y + T - 4 + Math.floor(i / 6) * 6 });
+
+  function step() {
+    tick++;
+    if (tick % 6 === 0) hud();
+    // fog bank rolls in once in a while: fewer tourists for a few seconds
+    if (fog > 0) fog--; else if (tick > fogNext) { fog = 480; fogNext = tick + 3000 + Math.random() * 3000; float(W / 2, GY + 30, 'Fog rolling in...', '#e0f2f1'); }
+    const buzz = rides.reduce((a, o) => a + appealOf(o), 0);
+    if (--spawnT <= 0 && people.length < 90) { spawn(); spawnT = Math.max(9, 100 / (1 + buzz * 0.35)) * (fog > 0 ? 2.2 : 1) * (0.7 + Math.random() * 0.6); }
+    for (const p of people) {
+      if (p.st === 'pick') pick(p);
+      else if (p.st === 'walk') {
+        const o = p.ride, s = qSpot(o, o.queue.length);
+        if (moveTo(p, s.x, s.y)) { o.coming--; o.queue.push(p); p.st = 'queue'; }
+      } else if (p.st === 'queue') { const i = p.ride.queue.indexOf(p), s = qSpot(p.ride, i); moveTo(p, s.x, s.y); }
+      else if (p.st === 'leave') { if (moveTo(p, p.tgt.x, p.tgt.y)) p.gone = true; }
+    }
+    for (const o of rides) {
+      const s = stat(o);
+      if (o.pop > 0) o.pop--;
+      while (o.riding.length < s.cap && o.queue.length) { const p = o.queue.shift(); p.st = 'ride'; o.riding.push({ p, left: s.dur }); }
+      for (const r of o.riding) {
+        if (--r.left > 0) continue;
+        const bonus = TYPES[o.t].food ? 1 : 1 + 0.2 * foodNear(o), pay = s.price * bonus;
+        r.p.wallet -= s.price; r.p.seen[o.t] = 1; cash += pay; o.earned += pay; served++;
+        r.p.x = o.x + T / 2; r.p.y = o.y + T - 6;
+        if (Math.random() < 0.15 || pay >= 20) float(o.x + T / 2, o.y + 8, '+$' + Math.round(pay), '#ffd166');
+        r.p.st = Math.random() < 0.8 ? 'pick' : 'leave';
+        if (r.p.st === 'leave') r.p.tgt = { x: r.p.x < W / 2 ? -20 : W + 20, y: 30 };
+        r.done = true;
+      }
+      o.riding = o.riding.filter(r => !r.done);
+    }
+    people = people.filter(p => !p.gone);
+    floats.forEach(f => { f.t--; f.y -= 0.45; }); floats = floats.filter(f => f.t > 0);
+    if (tick >= DAY_TICKS) {
+      hud();
+      gameOver('Sunset!', 'Cash $' + Math.floor(cash).toLocaleString() + ' + rides worth $' + Math.round(invested / 2).toLocaleString() + '. ' + visitors + ' tourists, ' + served + ' tickets sold.');
+    }
+  }
+
+  // ── Drawing ──
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function awning(x, y, w, n) { for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#d7263d'; ctx.beginPath(); ctx.moveTo(x + i * w / n, y); ctx.lineTo(x + (i + 1) * w / n, y); ctx.lineTo(x + (i + 0.5) * w / n, y + 9); ctx.fill(); } }
+  function drawRide(o) {
+    const x = o.x, y = o.y, t = tick, s = o.pop ? 1 + o.pop / 80 : 1;
+    ctx.save(); ctx.translate(x + T / 2, y + T / 2); ctx.scale(s, s); ctx.translate(-T / 2, -T / 2);
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(T / 2, T - 8, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (o.t === 'churro') {
+      ctx.fillStyle = '#8d5524'; rr(14, 26, 32, 22, 4); ctx.fill();
+      ctx.fillStyle = '#c68642'; for (let i = 0; i < 4; i++) { ctx.save(); ctx.translate(20 + i * 6, 26); ctx.rotate(-0.25 + i * 0.15); ctx.fillRect(-1.5, -12, 3, 12); ctx.restore(); }
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(20, 50, 3, 0, 7); ctx.arc(40, 50, 3, 0, 7); ctx.fill();
+      ctx.fillStyle = '#d7263d'; ctx.fillRect(12, 10, 2, 16); ctx.fillRect(46, 10, 2, 16); awning(8, 8, 44, 6);
+    } else if (o.t === 'arcade') {
+      ctx.fillStyle = '#3a2e6b'; rr(8, 14, 44, 38, 4); ctx.fill();
+      ctx.fillStyle = '#1b1240'; ctx.fillRect(22, 34, 16, 18);
+      const on = (t >> 4) % 2; ctx.fillStyle = on ? '#ff4fd8' : '#7a2a6c'; ctx.font = '800 10px system-ui'; ctx.textAlign = 'center'; ctx.fillText('ARCADE', 30, 28);
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = ((t >> 3) + i) % 2 ? '#ffd166' : '#5c4a00'; ctx.beginPath(); ctx.arc(12 + i * 9, 16, 2, 0, 7); ctx.fill(); }
+    } else if (o.t === 'surf') {
+      ctx.fillStyle = '#b07d48'; ctx.fillRect(12, 24, 30, 26); ctx.fillStyle = '#e9c46a';
+      ctx.beginPath(); ctx.moveTo(8, 26); ctx.lineTo(27, 8); ctx.lineTo(46, 26); ctx.fill();
+      ['#ef476f', '#118ab2', '#ffd166'].forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(46 + i * 4, 32 + i * 2, 3, 13, 0.15, 0, 7); ctx.fill(); });
+      ctx.fillStyle = '#3d2914'; ctx.fillRect(22, 36, 10, 14);
+    } else if (o.t === 'carousel') {
+      ctx.fillStyle = '#f4e3c1'; ctx.beginPath(); ctx.arc(30, 32, 22, 0, 7); ctx.fill();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + t / 40; ctx.fillStyle = i % 2 ? '#1b998b' : '#ffd166'; ctx.beginPath(); ctx.arc(30 + Math.cos(a) * 15, 32 + Math.sin(a) * 15, 4, 0, 7); ctx.fill(); }
+      for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#d7263d'; ctx.beginPath(); ctx.moveTo(30, 32); ctx.arc(30, 32, 9, i / 10 * Math.PI * 2, (i + 1) / 10 * Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(30, 32, 2.5, 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#f4e3c1'; ctx.lineWidth = 1;
+      for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.moveTo(6 + i * 8, 54); ctx.lineTo(6 + i * 8, 54 - [10, 30, 40, 20, 34, 16, 8][i]); ctx.stroke(); }
+      ctx.strokeStyle = '#d7263d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(2, 46);
+      const track = u => ({ x: 2 + u * 56, y: 46 - Math.max(0, Math.sin(u * Math.PI * 2.2)) * 32 - u * 4 });
+      for (let u = 0; u <= 1.001; u += 0.05) { const q = track(u); ctx.lineTo(q.x, q.y); } ctx.stroke();
+      const q = track(((t / 140) % 1)); ctx.fillStyle = '#ffd166'; rr(q.x - 5, q.y - 7, 10, 6, 2); ctx.fill();
+    }
+    ctx.restore();
+    for (let i = 0; i < o.lvl; i++) { ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x + T - 8 - i * 7, y + 6, 2.6, 0, 7); ctx.fill(); }
+    if (!TYPES[o.t].food && foodNear(o)) { ctx.fillStyle = '#1b998b'; ctx.font = '800 9px system-ui'; ctx.textAlign = 'left'; ctx.fillText('+' + foodNear(o) * 20 + '%', x + 3, y + 9); }
+  }
+  function drawPerson(p) {
+    const b = Math.sin(tick / 6 + p.bob) * 1.2;
+    ctx.fillStyle = p.shirt; ctx.beginPath(); ctx.arc(p.x, p.y + 2 + b, 3.6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(p.x, p.y - 3 + b, 2.6, 0, 7); ctx.fill();
+  }
+  function draw() {
+    // boardwalk planks + railing
+    ctx.fillStyle = '#a0703c'; ctx.fillRect(0, 0, W, GY);
+    ctx.strokeStyle = 'rgba(60,35,10,.35)'; ctx.lineWidth = 1;
+    for (let x = (tick * 0) % 24; x < W; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GY); ctx.stroke(); }
+    ctx.fillStyle = '#f4e3c1'; ctx.fillRect(0, GY - 6, W, 4); for (let x = 6; x < W; x += 30) ctx.fillRect(x, GY - 14, 3, 10);
+    // sand
+    const sg = ctx.createLinearGradient(0, GY, 0, SHORE); sg.addColorStop(0, '#f6dfa8'); sg.addColorStop(1, '#ecc98a');
+    ctx.fillStyle = sg; ctx.fillRect(0, GY, W, SHORE - GY);
+    ctx.fillStyle = 'rgba(160,112,60,.18)'; for (let i = 0; i < 90; i++) { const x = (i * 97) % W, y = GY + (i * 53) % (SHORE - GY); ctx.fillRect(x, y, 2, 1); }
+    // ocean + waves
+    const og = ctx.createLinearGradient(0, SHORE, 0, H); og.addColorStop(0, '#2bb3a6'); og.addColorStop(1, '#0f3d56');
+    ctx.fillStyle = og; ctx.fillRect(0, SHORE, W, H - SHORE);
+    ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3; ctx.beginPath();
+    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, SHORE + 3 + Math.sin(x / 30 + tick / 25) * 3);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 2;
+    for (let k = 0; k < 3; k++) { ctx.beginPath(); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, SHORE + 34 + k * 30 + Math.sin(x / 40 + tick / 35 + k) * 4); ctx.stroke(); }
+    // surf-row hint + placement ghost
+    const hover = kbd ? cur : ghost;
+    if (running && hover && hover.c >= 0 && hover.c < COLS && hover.r >= 0 && hover.r < ROWS) {
+      const o = at(hover.c, hover.r), x = hover.c * T, y = GY + hover.r * T;
+      if (TYPES[sel].shore && !o) { ctx.fillStyle = 'rgba(27,153,139,.18)'; ctx.fillRect(0, GY + (ROWS - 1) * T, W, T); }
+      ctx.fillStyle = o ? 'rgba(255,209,102,.25)' : canPlace(sel, hover.c, hover.r) && cash >= TYPES[sel].cost ? 'rgba(27,153,139,.35)' : 'rgba(215,38,61,.3)';
+      ctx.fillRect(x, y, T, T); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, T - 2, T - 2);
+      if (o) { ctx.fillStyle = 'rgba(15,61,86,.9)'; rr(x - 10, y - 18, 80, 16, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '700 10px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText(o.lvl >= 3 ? 'Max level' : 'Upgrade $' + TYPES[o.t].cost * o.lvl, x + 30, y - 6); }
+    }
+    if (rides) {
+      for (const o of rides) drawRide(o);
+      for (const p of people) if (p.st !== 'ride') drawPerson(p);
+      ctx.textAlign = 'center';
+      for (const f of floats) { ctx.globalAlpha = Math.min(1, f.t / 20); ctx.font = '800 12px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,61,86,.9)'; ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
+      ctx.globalAlpha = 1;
+      if (fog > 0) { ctx.fillStyle = 'rgba(230,240,240,' + Math.min(0.45, fog / 200, (480 - fog) / 200) + ')'; ctx.fillRect(0, 0, W, H); }
+      const dusk = Math.max(0, (tick / DAY_TICKS - 0.7) / 0.3);            // sunset tint for the last stretch
+      if (dusk > 0) { ctx.fillStyle = 'rgba(255,110,60,' + dusk * 0.28 + ')'; ctx.fillRect(0, 0, W, H); }
+      if (running && !rides.length) { ctx.fillStyle = 'rgba(15,61,86,.85)'; rr(W / 2 - 150, GY + 120, 300, 30, 15); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.font = "13px 'Lobster', system-ui"; ctx.fillText('Drag churros onto the sand to open!', W / 2, GY + 140); }
+    }
+  }
+  // ==================================
+
+  reset();
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>

@@ -412,11 +412,11 @@ Add an entry to `worker/games.json` under the `"games"` array:
      "type": "<game-type>"
    }
    ```
-Then **append `<slug>` to the end of the `schedule` array** in `worker/games.json` so the game debuts at the end of the current cycle without shifting existing days. Append only — never insert earlier or reorder (see CLAUDE.md rotation rules).
+Then schedule it with **`npm run schedule -- <slug>`** from the repo root. New games air **tomorrow** by default; if the user named a specific debut date, add `--date YYYY-MM-DD`. It never moves today or a day that has aired, and prints the air date. Never hand-edit or reorder `schedule` (see CLAUDE.md rotation rules).
 
 ### 5. Ship
 
-Tell the user to run `npm run deploy` from `worker/` to go live (house habit: deploy at midnight UTC). Then one sentence on how to play (controls + win condition), and a line of post-game sass — "Don't @ me when you can't stop playing it."
+Tell the user the air date and to run `npm run deploy` from the repo root before 00:00 UTC that night so it airs on time (it checks that today's and past days' games don't change before shipping). Then one sentence on how to play (controls + win condition), and a line of post-game sass — "Don't @ me when you can't stop playing it."
 
 Do **not** write a long postamble explaining the code. The user wants to play, not read.
 

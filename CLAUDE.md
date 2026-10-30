@@ -14,15 +14,18 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/public/games/*.html` | Self-contained game files. Served as Cloudflare edge assets at `/games/*`. |
 | `worker/src/index.ts` | Fetch handler + all routes. Intercepts `/games/*` to strip `X-Frame-Options`. |
 | `worker/src/db.ts` | All D1 query logic (async). |
-| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()` — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
+| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()`, `renderGamesCalendar()` (`/games`), `renderRetiredGames()` (`/games/retired`) — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
 | `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
-| `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `retire`, `today`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
+| `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `schedule`, `retire`, `today`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
 | `scripts/gen_logos.mjs` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG via `sharp`). No args = generate every missing logo. |
-| `scripts/retire_game.mjs` | Retires games from the rotation by starting a new schedule era (see Rotation rules). |
+| `scripts/schedule_game.mjs` | Adds games to the rotation without moving today or any aired day (`npm run schedule -- <id>`): airs tomorrow by default, `--date YYYY-MM-DD` for a specific day, `--end` for the end of the cycle. |
+| `scripts/retire_game.mjs` | Retires games from the rotation by starting a new schedule era from tomorrow (see Rotation rules). |
+| `scripts/deploy.mjs` | `npm run deploy`: diffs local `games.json` against the live one and refuses if today's or any past day's game would change, then runs `wrangler deploy`. |
+| `scripts/lib/rotation.mjs` | Shared rotation math for the scripts (mirrors `eraFor`/`getDailyGame` in `index.ts`). |
 | `scripts/set_today.mjs` | Makes a given game today's game by swapping it into today's slot (`npm run today -- <id>`). |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
@@ -52,7 +55,7 @@ game      = games.find(g => g.id === id)
 
 If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumber % games.length) + games.length) % games.length`.
 
-**Why a schedule instead of `day % games.length`?** With plain modulo, changing the game count re-maps *every* day at once (adding a game reshuffled the whole rotation). Indexing an explicit, append-only `schedule` means appending a game only adds a slot at the end — the days already scheduled for the current cycle never move. The double-modulo still handles negative offsets (pre-epoch replay dates) safely. Scores are date-scoped using D1's `date(played_at)` in UTC.
+**Why a schedule instead of `day % games.length`?** With plain modulo, changing the game count re-maps *every* day at once (adding a game reshuffled the whole rotation). Indexing an explicit, append-only `schedule` means appending a game only adds a slot at the end — the days already scheduled for the current cycle never move. That only holds during an era's first cycle: once the offset passes `L`, appending re-maps days that already aired. `npm run schedule` sidesteps this by always slotting new games into a new era that starts tomorrow. The double-modulo still handles negative offsets (pre-epoch replay dates) safely. Scores are date-scoped using D1's `date(played_at)` in UTC.
 
 **Why eras?** Removing an id from `schedule` changes `L`, which re-maps every date, past ones included. Retiring instead freezes the old era in `scheduleHistory` and starts a new one anchored at the retire date, rotated so that day's game is first and the retired ids are gone. Past dates resolve exactly as they aired, and the rotation simply continues with the retired games skipped.
 
@@ -61,9 +64,9 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 1. Build with the `game-builder` Claude Code skill (`/newtab-party:game-builder` once the plugin is installed); it starts from `skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
 2. Copy `.html` to `worker/public/games/` and run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
-4. **Append the new game's id to the end of the `schedule` array** in `worker/games.json` — this is what schedules it. Appending means it debuts at the end of the current cycle and nothing already scheduled shifts.
+4. **`npm run schedule -- <id>`** — this is what schedules it. **New games air tomorrow by default** (house rule); pass `--date YYYY-MM-DD` only when a specific debut day is wanted (`--end` = end of the cycle). It starts a new era from tomorrow with the game slotted in, so later days shift back one and today and every aired day keep their game. It prints the air date. Deploy before 00:00 UTC so it airs on time.
 5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`)
-6. `npm run deploy` — live immediately, no extension update needed
+6. `npm run deploy` — any time of day; live immediately, no extension update needed
 
 Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
 
@@ -72,20 +75,20 @@ Every game carries its own title screen with instructions (see the game-builder 
 Rotation is driven by the `schedule` array (game ids in air order), anchored at `scheduleEpoch`. The pick for a date is `schedule[(offset % L) + L) % L]` where `offset = dayNumber(date) - dayNumber(scheduleEpoch)`.
 
 **Critical constraints:**
-- **Append schedule entries to the end only.** Appending adds a future slot, so the current cycle stays frozen — that's the whole point. Inserting/reordering earlier entries WILL shift upcoming days.
+- **Change the rotation only with the scripts:** `npm run schedule` (add), `npm run retire` (remove), `npm run today` (force today). Hand-appending works only during an era's first cycle; inserting/reordering always shifts days.
 - Every id in `schedule` must exist in the `games` array. A game listed in `games` but absent from `schedule` simply never airs; an id in `schedule` with no matching game falls through to the legacy modulo pick.
 - **Don't remove ids from `schedule` by hand** — that re-maps every date. Use `scripts/retire_game.mjs` (below), which starts a new era instead.
-- **Deploy at midnight UTC.** Appending to `schedule` doesn't move the current cycle, but still deploy at the boundary as a habit so nothing changes mid-session.
-- Don't move `scheduleEpoch` by hand — it's the anchor. Changing it shifts everything. (`retire_game.mjs` and `set_today.mjs` are the only things that may start a new era.)
+- **Deploy any time.** `schedule` and `retire` only change tomorrow onward (a new era's epoch may be tomorrow; `GET /games.json` serves clients the era in effect today, so a queued era never leaks into today). `npm run deploy` diffs against the live `games.json?raw=1` and refuses if today's or any past day's game would change. The one window: a queued change must ship before 00:00 UTC on its epoch day; if it misses it, the deploy check fails, so restore `games.json` and re-run the script.
+- Don't move `scheduleEpoch` by hand — it's the anchor. Changing it shifts everything. (`schedule_game.mjs`, `retire_game.mjs` and `set_today.mjs` are the only things that may start a new era.)
 - Past leaderboard records are stored in D1 by `game_id` and are unaffected — only the computed date→game mapping changes.
 
 ### Retiring a game
 
-Run `npm run retire -- <id> [<id> ...]` (add `--dry-run` to preview) and deploy the same UTC day. It moves the current era into `scheduleHistory`, writes a new `schedule`/`scheduleEpoch` anchored at today (rotated so today's game is unchanged, retired ids removed), and records the id in `retired`. Keep the entry in `games` and the file in `public/games/`: the game stays in the library (`/games` lists retired games in a Retired section linked to their last airing) and past replays/records still resolve. **Never hand-edit `scheduleHistory` or an old era's `schedule`**: those are what past dates resolve against. If the game being retired is today's, the script anchors the new era at tomorrow and you must deploy after 00:00 UTC. To bring a retired game back, append its id to `schedule` and delete its `retired` entry.
+Run `npm run retire -- <id> [<id> ...]` (add `--dry-run` to preview) and deploy any time before 00:00 UTC. It moves the current era into `scheduleHistory`, writes a new `schedule`/`scheduleEpoch` anchored at tomorrow (rotated so tomorrow continues the old order, retired ids removed; if a change is already queued for tomorrow it edits that instead), and records the id in `retired`. Keep the entry in `games` and the file in `public/games/`: the game stays in the library (`/games` links to `/games/retired`, which lists retired games, each linked to its last airing) and past replays/records still resolve. **Never hand-edit `scheduleHistory` or an old era's `schedule`**: those are what past dates resolve against. Today's game can be retired too: it finishes its day and drops out from tomorrow. To bring a retired game back, `npm run schedule -- <id>` (it removes the `retired` entry).
 
 ### Forcing today's game
 
-`npm run today -- <id>` (with `--dry-run` to preview) swaps `<id>` into today's UTC slot; the game that was scheduled for today takes `<id>`'s old slot, so no other day moves. If the current era started before today it starts a new era first (old one into `scheduleHistory`). Deploy the same UTC day. Doing this mid-day means the plays already recorded for the previous game stay in D1 but leave today's leaderboard page, so prefer running it right after 00:00 UTC.
+`npm run today -- <id>` (with `--dry-run` to preview) swaps `<id>` into today's UTC slot; the game that was scheduled for today takes `<id>`'s old slot, so no other day moves. If the current era started before today it starts a new era first (old one into `scheduleHistory`). This is the one change that moves today, so deploy the same UTC day with `npm run deploy -- --allow-today-change`. Doing this mid-day means the plays already recorded for the previous game stay in D1 but leave today's leaderboard page, so prefer running it right after 00:00 UTC.
 
 ### postHi() protocol
 
@@ -154,8 +157,10 @@ For extension dev, set `SERVER_URL = 'http://localhost:8787'` in `newtab.js` and
 ```bash
 npx wrangler d1 create newtab-party --cwd worker   # first time only — paste database_id into worker/wrangler.toml
 npm run db:init:remote                              # first time only — runs schema.sql against prod D1
-npm run deploy                                      # wrangler deploy
+npm run deploy                                      # schedule check + wrangler deploy (any time of day)
 ```
+
+`npm run deploy` fetches `https://newtab.party/games.json?raw=1` (override with `NEWTAB_URL`) and blocks if the local `games.json` would change today's or any past day's game. Flags: `--check` (verify only), `--allow-today-change` (after `npm run today`), `--force` (skip the check, e.g. the live site is down). Other args pass through to `wrangler deploy`.
 
 ## Common tasks
 

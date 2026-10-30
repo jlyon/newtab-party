@@ -1,13 +1,20 @@
 {
   "version": 1,
-  "scheduleEpoch": "2026-10-07",
+  "scheduleEpoch": "2026-10-31",
   "schedule": [
+    "maze-muncher-sugar-rush",
+    "fogwatch",
+    "vertigo",
+    "wild-cats",
+    "opposites-attract",
+    "slingshot-sally",
+    "swingin-safari",
+    "red-light-green-fight",
     "echo-location",
     "moonslayer",
     "burnin-glory",
     "build-the-boardwalk",
     "sweep-the-strait",
-    "yarrmada",
     "deja-loop",
     "weiners-and-tubs",
     "oligarchs-dilemma",
@@ -17,20 +24,10 @@
     "blouncerroozal",
     "prompter-payday",
     "bend-it-like-maxi",
-    "chop-till-you-drop",
-    "shootin-n-crackin",
     "abominable-speedway",
-    "tippity-toes",
     "rack-attack",
-    "stump-grandpa",
-    "rock-em-sock-em-wrecking-ball",
     "smithereens",
-    "yedric-bombs",
-    "cleanup-on-isle-11",
-    "yeti-run",
-    "senor-frogs-cabo",
-    "fogwatch",
-    "vertigo"
+    "yedric-bombs"
   ],
   "scheduleHistory": [
     {
@@ -68,13 +65,62 @@
         "deja-loop",
         "echo-location"
       ]
+    },
+    {
+      "scheduleEpoch": "2026-10-07",
+      "schedule": [
+        "echo-location",
+        "moonslayer",
+        "burnin-glory",
+        "build-the-boardwalk",
+        "sweep-the-strait",
+        "yarrmada",
+        "deja-loop",
+        "weiners-and-tubs",
+        "oligarchs-dilemma",
+        "fly-by-the-seat-of-your-pants",
+        "frosty-freefall",
+        "penalty-panic",
+        "blouncerroozal",
+        "prompter-payday",
+        "bend-it-like-maxi",
+        "chop-till-you-drop",
+        "shootin-n-crackin",
+        "abominable-speedway",
+        "tippity-toes",
+        "rack-attack",
+        "stump-grandpa",
+        "rock-em-sock-em-wrecking-ball",
+        "smithereens",
+        "yedric-bombs",
+        "maze-muncher-sugar-rush",
+        "cleanup-on-isle-11",
+        "yeti-run",
+        "senor-frogs-cabo",
+        "fogwatch",
+        "vertigo",
+        "wild-cats",
+        "opposites-attract",
+        "slingshot-sally",
+        "swingin-safari",
+        "red-light-green-fight"
+      ]
     }
   ],
   "retired": {
     "the-wildcard": "2026-10-07",
     "the-sunken-signal": "2026-10-07",
     "hognose": "2026-10-07",
-    "coeur-brise": "2026-10-07"
+    "coeur-brise": "2026-10-07",
+    "cleanup-on-isle-11": "2026-10-31",
+    "yeti-run": "2026-10-31",
+    "senor-frogs-cabo": "2026-10-31",
+    "yarrmada": "2026-10-31",
+    "chop-till-you-drop": "2026-10-31",
+    "shootin-n-crackin": "2026-10-31",
+    "tippity-toes": "2026-10-31",
+    "stump-grandpa": "2026-10-31",
+    "rock-em-sock-em-wrecking-ball": "2026-10-31"
   },
   "games": [
     {
@@ -121,8 +167,8 @@
       "id": "smithereens",
       "name": "Smithereens",
       "file": "games/smithereens.html",
-      "description": "Turn-based artillery. Adjust angle, charge your shot, and blast TANGO into lawn confetti. Wind changes every round. Four weapons to choose from.",
-      "controls": "← → to adjust angle · Hold Space/Fire to charge · 1–4 to switch weapons",
+      "description": "Backyard artillery: your lawnmower has a cannon and so does TANGO's. Aim, charge, and blast every TANGO into lawn confetti. Wind changes every round, the lawn craters under every hit, and each new TANGO aims sharper.",
+      "controls": "← → / A D or drag the lawn to aim · Hold Space / FIRE to charge, release to shoot · 1–4 or WPN to switch weapons (Pinecone, Sprinkler, Garden Gnome, Bouncy Ball)",
       "type": "artillery"
     },
     {
@@ -186,8 +232,8 @@
       "name": "Frosty Freefall",
       "file": "games/frosty-freefall.html",
       "type": "Catcher",
-      "description": "Catch falling snowman parts in your mitten to rebuild Frosty — and dodge everything else.",
-      "controls": "← → arrows to move · Swipe or tilt on mobile"
+      "description": "Frosty fell apart in the sky. Catch his pieces in order (base, middle, head, hat) as they stack up on your mitten, grab carrots, coal and scarves for bonus points, and dodge fireballs and road salt.",
+      "controls": "← → / A D to move the mitten. On touch, drag, tilt or hold ◀ ▶. Build Frostys in a row to raise your multiplier. Three hits and he melts."
     },
     {
       "id": "rack-attack",
@@ -226,8 +272,8 @@
       "name": "Build the Boardwalk",
       "file": "games/build-the-boardwalk.html",
       "type": "Tycoon",
-      "description": "Santa Cruz beach tycoon. Drag attractions onto the sand, pull in tourists, and stack up the fattest wallet on the coast before the clock runs out.",
-      "controls": "Drag a ride from the tray onto the sand to build · Tap a ride to upgrade it"
+      "description": "Santa Cruz beach tycoon. Build churro stands, arcades, surf shacks and coasters on the sand, keep the tourist lines moving, and be worth the most when the sun sets at 9 PM.",
+      "controls": "Drag a ride from the tray onto the sand (or press 1-5 and click / tap a spot) · Tap a ride to upgrade it · Churros next to rides boost them; surf shacks go by the water"
     },
     {
       "id": "sweep-the-strait",
@@ -344,6 +390,60 @@
       "controls": "← → / A D, hold either half of the arena, or tilt your phone to spin the world. Grab gems fast for combos. Touch a spike and it's over.",
       "type": "tilt-maze",
       "logo": "a glossy orange ball balanced on a tilted neon-cyan square arena spinning in space, dizzy spiral motion lines, retro arcade crest"
+    },
+    {
+      "id": "wild-cats",
+      "name": "Wild Cats",
+      "file": "games/wild-cats.html",
+      "description": "Savanna tower defense: place tabbies, hairball-hacking kittens and roaring lions to stop mice, cucumbers, warthogs and one very good boy from reaching the food bowl. One leak and it's over.",
+      "controls": "Pick a cat (click/tap or 1 2 3), click/tap the grass to place it, click/tap a cat to upgrade. Space / Go! sends the next wave early for bonus points.",
+      "type": "tower-defense",
+      "logo": "a fierce cartoon lion and a tiny grey kitten coughing up a hairball, back to back on golden savanna grass under an acacia tree, navy and green sports crest"
+    },
+    {
+      "id": "maze-muncher-sugar-rush",
+      "name": "Maze Muncher: Sugar Rush",
+      "file": "games/maze-muncher-sugar-rush.html",
+      "description": "A first-person corn maze where you hoard Halloween candy while dentists hunt you down.",
+      "controls": "Arrows / WASD to walk and turn. Touch: hold the arrows or drag the maze.",
+      "type": "maze-muncher",
+      "logo": "a masked dentist with a head mirror and drill lurking in a moonlit cornfield, candy corn border"
+    },
+    {
+      "id": "opposites-attract",
+      "name": "Opposites Attract",
+      "file": "games/opposites-attract.html",
+      "description": "You're a lovesick electron. Flip your charge to get pulled toward or shoved away from charged particles, and ride that attraction through the gaps.",
+      "controls": "Tap / Space to flip your charge between + and −.",
+      "type": "polarity",
+      "logo": "a cute blue electron with blushing cheeks and heart eyes, orbited by a red plus proton, little hearts"
+    },
+    {
+      "id": "slingshot-sally",
+      "name": "Slingshot Sally",
+      "file": "games/slingshot-sally.html",
+      "description": "Astronaut Sally slingshots from planet to planet, rescuing stray astro-cats and trying hard not to drift into the void.",
+      "controls": "Tap / Space to let go of your orbit and launch.",
+      "type": "orbit-hop",
+      "logo": "a gold-suited astronaut girl with violet visor holding a cat in a space helmet, ringed planet behind"
+    },
+    {
+      "id": "swingin-safari",
+      "name": "Swingin' Safari",
+      "file": "games/swingin-safari.html",
+      "description": "Swing a monkey up an endless jungle on vines while the lava rises below you.",
+      "controls": "Hold mouse / Space / finger to grab a vine and reel in, then let go to fling.",
+      "type": "grapple-swing",
+      "logo": "an orange monkey swinging on a lime green vine above bubbling lava, banana in hand"
+    },
+    {
+      "id": "red-light-green-fight",
+      "name": "Red Light Green Fight",
+      "file": "games/red-light-green-fight.html",
+      "description": "Run the stoplights for a growing grid of intersections. One crash ends it, and so does letting road rage boil over.",
+      "controls": "Click / tap an intersection (or press 1–4) to flip its light.",
+      "type": "traffic",
+      "logo": "an angry boxing-glove traffic light with red and green lamps, tiny cars honking"
     }
   ]
 }
