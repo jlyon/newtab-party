@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Red Light Green Fight</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ff3b30; --secondary: #2ee86a; --bg: #26282c; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (440 / 440))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #hint { display: none; font-size: 13px; opacity: .75; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay h2 { font-family: 'Bungee', sans-serif; font-weight: 400; font-size: clamp(28px, 7.5vw, 58px); line-height: 1.05; color: #fff; }
+  #start-overlay h2 .r { color: var(--primary); } #start-overlay h2 .g { color: var(--secondary); }
+  #start-overlay button { font-family: 'Bungee', sans-serif; background: var(--secondary); color: #0b1a10; }
+  /* ── Landing screen: gameplay background ── */
+  #start-overlay { background: radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/red-light-green-fight.jpg') center/cover no-repeat, #000; }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,10,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
+  #start-overlay h2 { text-shadow: 0 3px 30px rgba(0,0,0,0.85); }
+  #start-logo { display: none; width: min(82%, 400px); max-height: 40vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="440" height="440"></canvas>
+  <div id="hint">Tap an intersection to flip its light</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img id="start-logo" src="logos/red-light-green-fight.png" alt="Red Light Green Fight" onload="this.style.display='block';this.nextElementSibling.style.display='none'">
+  <h2><span class="r">Red Light</span><br><span class="g">Green</span> Fight</h2>
+  <p>You run the stoplights. Click or tap an intersection (or press 1&ndash;4) to flip which way gets green. Every car that makes it through scores a point. One crash and it's over. Leave people waiting too long and the rage meter blows, which also ends it. More roads open as you go.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 440, H = 440;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (cx, cy) => { const r = canvas.getBoundingClientRect(); return { x: (cx - r.left) * (W / r.width), y: (cy - r.top) * (H / r.height) }; };
+
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); }
+    if (running && !e.repeat && '1234'.includes(e.key) && e.key.length === 1) toggle(inters[+e.key - 1]);
+  });
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const HALF = 17, CL = 26, CW = 14, RED = '#ff3b30', GREEN = '#2ee86a';
+  const CARCOLS = ['#f5f5f5', '#ffd23f', '#4dabf7', '#b197fc', '#ff922b', '#63e6be', '#adb5bd'];
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const OPEN_AT = [25 * 60, 55 * 60];
+  let score, roads, inters, cars, rage, t, dying, crashAt, toast, sparks;
+
+  function reset() {
+    score = 0; rage = 0; t = 0; dying = 0; crashAt = null; toast = { txt: 'Rush hour begins', life: 120 }; sparks = [];
+    roads = [
+      { axis: 'H', c: 150, dir: 1, active: true, timer: 30 },
+      { axis: 'V', c: 150, dir: 1, active: true, timer: 90 },
+      { axis: 'V', c: 290, dir: -1, active: false, timer: 60 },
+      { axis: 'H', c: 290, dir: -1, active: false, timer: 60 },
+    ];
+    const Hs = roads.filter(r => r.axis === 'H').sort((a, b) => a.c - b.c), Vs = roads.filter(r => r.axis === 'V').sort((a, b) => a.c - b.c);
+    inters = [];
+    for (const h of Hs) for (const v of Vs) inters.push({ h, v, x: v.c, y: h.c, light: 'H', pulse: 0 });
+    cars = [];
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  const live = i => i.h.active && i.v.active;
+  function toggle(i) { if (!i || !live(i) || dying) return; i.light = i.light === 'H' ? 'V' : 'H'; i.pulse = 12; }
+  canvas.addEventListener('pointerdown', e => {
+    if (!running) return;
+    const p = toLogical(e.clientX, e.clientY);
+    let best = null, bd = 60;
+    for (const i of inters) { if (!live(i)) continue; const d = Math.hypot(i.x - p.x, i.y - p.y); if (d < bd) { bd = d; best = i; } }
+    toggle(best);
+  });
+
+  function carRect(c) {
+    return c.road.axis === 'H' ? { x: c.pos - CL / 2, y: c.road.c - CW / 2, w: CL, h: CW } : { x: c.road.c - CW / 2, y: c.pos - CL / 2, w: CW, h: CL };
+  }
+  function step() {
+    t++;
+    if (dying) {
+      dying--;
+      for (const s of sparks) { s.x += s.vx; s.y += s.vy; s.vx *= 0.95; s.vy *= 0.95; s.life--; }
+      if (!dying) gameOver(crashAt ? 'CRASH!' : 'Road rage!', crashAt ? 'Fender-bender at your intersection. Insurance is going to have questions.' : 'The honking reached a frequency only dogs and lawyers can hear.');
+      return;
+    }
+    OPEN_AT.forEach((at, k) => { if (t === at) { roads[2 + k].active = true; roads[2 + k].timer = 40; toast = { txt: 'New road open!', life: 150 }; } });
+    if (toast && --toast.life <= 0) toast = null;
+    const mins = t / 3600;
+    for (const r of roads) {
+      if (!r.active || --r.timer > 0) continue;
+      const sp = r.dir > 0 ? -20 : W + 20;
+      if (cars.some(c => c.road === r && Math.abs(c.pos - sp) < 38)) { rage += 3; r.timer = 40; continue; }
+      const fast = Math.random() < 0.15;
+      cars.push({ road: r, pos: sp, v: 1, max: fast ? 2.3 : rand(1.1, 1.7), wait: 0, col: fast ? '#e03131' : CARCOLS[Math.floor(Math.random() * CARCOLS.length)], fast });
+      r.timer = Math.max(48, 150 - mins * 55) * rand(0.7, 1.3);
+    }
+    for (const c of cars) {
+      const r = c.road, prog = c.pos * r.dir, front = c.pos + r.dir * CL / 2;
+      let target = c.max;
+      let ahead = null, ag = 1e9;
+      for (const o of cars) { if (o.road !== r || o === c) continue; const g = o.pos * r.dir - prog; if (g > 0 && g < ag) { ag = g; ahead = o; } }
+      if (ahead) target = Math.min(target, Math.max(0, (ag - CL - 8) * 0.12));
+      let nd = 1e9, ni = null;
+      for (const i of inters) {
+        if (i.h !== r && i.v !== r) continue;
+        const cross = r.axis === 'H' ? i.x : i.y, stopLine = cross - r.dir * (HALF + 3);
+        const d = (stopLine - front) * r.dir;
+        if (d >= -1 && d < nd) { nd = d; ni = i; }
+      }
+      if (ni && live(ni) && ni.light !== r.axis) target = Math.min(target, Math.max(0, nd) * 0.12);
+      c.v = target < c.v ? target : Math.min(target, c.v + 0.05);
+      c.pos += c.v * r.dir;
+      if (c.v < 0.15) { c.wait++; rage += c.wait > 360 ? 0.05 : 0.011; } else c.wait = Math.max(0, c.wait - 3);
+    }
+    const before = cars.length;
+    cars = cars.filter(c => c.road.dir > 0 ? c.pos < (c.road.axis === 'H' ? W : H) + 40 : c.pos > -40);
+    if (cars.length !== before) { score += before - cars.length; document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+    rage = Math.max(0, rage - 0.015);
+    for (const i of inters) if (i.pulse) i.pulse--;
+    for (let a = 0; a < cars.length; a++) for (let b = a + 1; b < cars.length; b++) {
+      if (cars[a].road.axis === cars[b].road.axis) continue;
+      const A = carRect(cars[a]), B = carRect(cars[b]);
+      if (A.x + 2 < B.x + B.w && B.x + 2 < A.x + A.w && A.y + 2 < B.y + B.h && B.y + 2 < A.y + A.h) {
+        crashAt = { x: (A.x + A.w / 2 + B.x + B.w / 2) / 2, y: (A.y + A.h / 2 + B.y + B.h / 2) / 2 };
+        for (let k = 0; k < 30; k++) { const an = Math.random() * 6.28, v = rand(1, 5); sparks.push({ x: crashAt.x, y: crashAt.y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, life: rand(20, 50) }); }
+        dying = 70; return;
+      }
+    }
+    if (rage >= 100) { rage = 100; dying = 40; }
+  }
+
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function draw() {
+    ctx.fillStyle = '#1e3b22'; ctx.fillRect(0, 0, W, H);
+    // city blocks
+    const edges = [0, 150 - HALF, 150 + HALF, 290 - HALF, 290 + HALF, W];
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const x0 = edges[a * 2], x1 = edges[a * 2 + 1], y0 = edges[b * 2], y1 = edges[b * 2 + 1];
+      ctx.fillStyle = '#3a3d44'; ctx.fillRect(x0 + 6, y0 + 6, x1 - x0 - 12, y1 - y0 - 12);
+      ctx.fillStyle = '#4a4e57'; ctx.fillRect(x0 + 14, y0 + 14, (x1 - x0) * 0.35, (y1 - y0) * 0.3); ctx.fillRect(x0 + (x1 - x0) * 0.55, y0 + (y1 - y0) * 0.5, (x1 - x0) * 0.3, (y1 - y0) * 0.35);
+    }
+    // roads
+    for (const r of roads) {
+      ctx.fillStyle = r.active ? '#26282c' : '#34363b';
+      if (r.axis === 'H') ctx.fillRect(0, r.c - HALF, W, HALF * 2); else ctx.fillRect(r.c - HALF, 0, HALF * 2, H);
+    }
+    for (const r of roads) {
+      ctx.fillStyle = r.active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)';
+      for (let k = 30; k < W; k += 70) {
+        if (r.axis === 'H') { ctx.save(); ctx.translate(k, r.c); if (r.dir < 0) ctx.rotate(Math.PI); } else { ctx.save(); ctx.translate(r.c, k); ctx.rotate(r.dir > 0 ? Math.PI / 2 : -Math.PI / 2); }
+        ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-2, -5); ctx.lineTo(-2, 5); ctx.fill(); ctx.fillRect(-10, -1.5, 8, 3); ctx.restore();
+      }
+      if (!r.active) {
+        ctx.fillStyle = '#ff922b';
+        for (let k = 0; k < 2; k++) { const e = k ? (r.dir > 0 ? W - 12 : 12) : (r.dir > 0 ? 12 : W - 12); const cx = r.axis === 'H' ? e : r.c, cy = r.axis === 'H' ? r.c : e;
+          for (let q = -1; q <= 1; q++) { const ox = r.axis === 'H' ? 0 : q * 10, oy = r.axis === 'H' ? q * 10 : 0; ctx.beginPath(); ctx.moveTo(cx + ox, cy + oy - 5); ctx.lineTo(cx + ox - 4, cy + oy + 4); ctx.lineTo(cx + ox + 4, cy + oy + 4); ctx.fill(); } }
+      }
+    }
+    // intersections + lights
+    inters.forEach((i, idx) => {
+      if (!live(i)) return;
+      ctx.fillStyle = i.pulse ? `rgba(255,255,255,${i.pulse / 40})` : '#2c2e33'; ctx.fillRect(i.x - HALF, i.y - HALF, HALF * 2, HALF * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+      const hs = i.h.dir, vs = i.v.dir;
+      ctx.beginPath(); ctx.moveTo(i.x - hs * (HALF + 2), i.y - HALF); ctx.lineTo(i.x - hs * (HALF + 2), i.y + HALF); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i.x - HALF, i.y - vs * (HALF + 2)); ctx.lineTo(i.x + HALF, i.y - vs * (HALF + 2)); ctx.stroke();
+      const lamp = (x, y, on) => { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.shadowColor = on ? GREEN : RED; ctx.shadowBlur = 12; ctx.fillStyle = on ? GREEN : RED; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); ctx.shadowBlur = 0; };
+      lamp(i.x - hs * (HALF + 10), i.y - hs * (HALF + 10), i.light === 'H');
+      lamp(i.x + vs * (HALF + 10), i.y - vs * (HALF + 10), i.light === 'V');
+      if (!document.body.classList.contains('touch')) { ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(idx + 1, i.x + hs * (HALF + 10), i.y + hs * (HALF + 10)); }
+    });
+    // cars
+    for (const c of cars) {
+      const R = carRect(c);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; rr(R.x + 2, R.y + 2, R.w, R.h, 4); ctx.fill();
+      ctx.fillStyle = c.col; rr(R.x, R.y, R.w, R.h, 4); ctx.fill();
+      ctx.fillStyle = 'rgba(20,30,50,0.75)';
+      const d = c.road.dir;
+      if (c.road.axis === 'H') ctx.fillRect(d > 0 ? R.x + R.w - 10 : R.x + 4, R.y + 2, 6, R.h - 4); else ctx.fillRect(R.x + 2, d > 0 ? R.y + R.h - 10 : R.y + 4, R.w - 4, 6);
+      if (c.wait > 240) {
+        ctx.fillStyle = c.wait > 360 ? RED : '#ffd23f'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if ((t >> 3) % 2) ctx.fillText(c.wait > 360 ? 'HONK!!' : 'honk', R.x + R.w / 2, R.y - 7);
+      }
+    }
+    for (const s of sparks) { ctx.globalAlpha = Math.min(1, s.life / 20); ctx.fillStyle = s.life % 2 ? '#ffd23f' : RED; ctx.fillRect(s.x - 2, s.y - 2, 4, 4); }
+    ctx.globalAlpha = 1;
+    if (crashAt && dying) { ctx.font = "22px 'Bungee', sans-serif"; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('CRUNCH', crashAt.x, crashAt.y - 30); }
+    // rage meter
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; rr(10, 8, W - 20, 20, 10); ctx.fill();
+    const g = ctx.createLinearGradient(14, 0, W - 14, 0); g.addColorStop(0, GREEN); g.addColorStop(0.55, '#ffd23f'); g.addColorStop(1, RED);
+    ctx.fillStyle = g; rr(14, 12, Math.max(12, (W - 28) * rage / 100), 12, 6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('ROAD RAGE', W - 20, 18.5);
+    if (toast) { ctx.globalAlpha = Math.min(1, toast.life / 30); ctx.fillStyle = 'rgba(0,0,0,0.6)'; rr(W / 2 - 100, H - 46, 200, 30, 15); ctx.fill(); ctx.fillStyle = '#ffd23f'; ctx.textAlign = 'center'; ctx.font = "13px 'Bungee', sans-serif"; ctx.fillText(toast.txt, W / 2, H - 31); ctx.globalAlpha = 1; }
+    ctx.textBaseline = 'alphabetic';
+  }
+  // =================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

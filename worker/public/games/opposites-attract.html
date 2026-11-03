@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Opposites Attract</title>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ff3b4e; --secondary: #3b82ff; --bg: #0c0e18; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (360 / 580))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #hint { display: none; font-size: 13px; opacity: .75; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay h2 { font-family: 'Pacifico', cursive; font-weight: 400; font-size: clamp(34px, 9vw, 64px); line-height: 1.3;
+    background: linear-gradient(90deg, var(--primary), #ff8fd0, var(--secondary)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #start-overlay button { font-family: 'Pacifico', cursive; text-transform: none; letter-spacing: 1px; }
+  /* ── Landing screen: gameplay background ── */
+  #start-overlay { background: radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/opposites-attract.jpg') center/cover no-repeat, #000; }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,10,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
+  #start-overlay h2 { text-shadow: 0 3px 30px rgba(0,0,0,0.85); }
+  #start-logo { display: none; width: min(82%, 400px); max-height: 40vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="360" height="580"></canvas>
+  <div id="hint">Tap anywhere to flip your charge</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img id="start-logo" src="logos/opposites-attract.png" alt="Opposites Attract" onload="this.style.display='block';this.nextElementSibling.style.display='none'">
+  <h2>Opposites Attract</h2>
+  <p>You're a lovesick electron. Tap / Space to flip your charge between + and &minus;. Opposites pull you in, likes shove you away. Ride the attraction through the gaps, collect hearts, and don't smack into the walls.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 360, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+
+  const keys = {};
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); }
+    if (!keys[e.key] && running && [' ', 'ArrowUp', 'x', 'X'].includes(e.key)) flip();
+    keys[e.key] = true;
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const RED = '#ff3b4e', BLUE = '#3b82ff', PR = 10, K = 1000, RANGE = 220;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  let score, dist, hearts, px, py, vx, charge, speed, t, flash, parts, barriers, orbs, pickups, nextGen, dying, msgPop;
+  const LINES = ['Rejected. It\'s not you, it\'s your charge.', 'Friend-zoned by a proton.', 'Some electrons just aren\'t meant to be.', 'Swiped left by the laws of physics.'];
+
+  function reset() {
+    score = 0; dist = 0; hearts = 0; px = W / 2; py = 0; vx = 0; charge = -1; speed = 1.6; t = 0; flash = 0;
+    parts = []; barriers = []; orbs = []; pickups = []; nextGen = -300; dying = 0; msgPop = null;
+    while (nextGen > py - H - 100) genRow();
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  function genRow() {
+    const y = nextGen, d = Math.min(1, -y / 14000);
+    const gw = 124 - 44 * d;
+    const gx = rand(gw / 2 + 16, W - gw / 2 - 16);
+    barriers.push({ y, gx, gw });
+    orbs.push({ x: gx, y: y - 6, c: Math.random() < 0.5 ? 1 : -1 });
+    if (Math.random() < 0.3 + 0.45 * d) {
+      let dx = rand(30, W - 30); if (Math.abs(dx - gx) < 50) dx = gx < W / 2 ? gx + rand(80, 140) : gx - rand(80, 140);
+      orbs.push({ x: dx, y: y - 115, c: Math.random() < 0.5 ? 1 : -1 });
+    }
+    if (Math.random() < 0.65) pickups.push({ x: rand(30, W - 30), y: y - rand(70, 160), got: false });
+    nextGen -= 225 - 45 * d;
+  }
+  function flip() {
+    if (!running || dying) return;
+    charge = -charge; flash = 12;
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; parts.push({ x: px, y: py, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2 - speed, life: 18, col: charge > 0 ? RED : BLUE }); }
+  }
+  document.addEventListener('pointerdown', e => { if (running && e.target.tagName !== 'BUTTON') flip(); });
+
+  function hitsRect(cx, cy, r, x0, y0, x1, y1) {
+    const nx = Math.max(x0, Math.min(cx, x1)), ny = Math.max(y0, Math.min(cy, y1));
+    return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
+  }
+  function stepParts() {
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.life--; }
+    parts = parts.filter(p => p.life > 0);
+  }
+  function step() {
+    if (dying) { dying--; stepParts(); if (!dying) gameOver('Rejected!', LINES[Math.floor(Math.random() * LINES.length)]); return; }
+    t++;
+    speed = 1.6 + Math.min(2.4, t * 0.0005);
+    py -= speed; dist += speed;
+    let ax = 0;
+    for (const o of orbs) {
+      const dx = o.x - px, dy = o.y - py, d2 = dx * dx + dy * dy;
+      if (d2 > RANGE * RANGE) continue;
+      const d = Math.sqrt(d2) || 1, f = K / (d2 + 500), s = o.c * charge < 0 ? 1 : -1;
+      ax += s * f * dx / d;
+    }
+    vx = (vx + ax) * 0.96; vx = Math.max(-6, Math.min(6, vx)); px += vx;
+    if (px < PR + 6) { px = PR + 6; vx = Math.abs(vx) * 0.5; }
+    if (px > W - PR - 6) { px = W - PR - 6; vx = -Math.abs(vx) * 0.5; }
+    if (flash) flash--;
+    for (const b of barriers) {
+      if (Math.abs(b.y - py) > 20) continue;
+      if (hitsRect(px, py, PR - 1, 0, b.y - 5, b.gx - b.gw / 2, b.y + 5) || hitsRect(px, py, PR - 1, b.gx + b.gw / 2, b.y - 5, W, b.y + 5)) {
+        dying = 50;
+        for (let i = 0; i < 24; i++) { const a = Math.random() * Math.PI * 2, v = rand(1, 4); parts.push({ x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(20, 45), col: i % 2 ? '#ff8fd0' : (charge > 0 ? RED : BLUE) }); }
+        return;
+      }
+    }
+    for (const h of pickups) {
+      if (!h.got && (h.x - px) ** 2 + (h.y - py) ** 2 < 20 * 20) {
+        h.got = true; hearts++; msgPop = { x: h.x, y: h.y, life: 40 };
+        for (let i = 0; i < 10; i++) { const a = Math.random() * Math.PI * 2; parts.push({ x: h.x, y: h.y, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, life: 25, col: '#ff8fd0' }); }
+      }
+    }
+    if (msgPop && --msgPop.life <= 0) msgPop = null;
+    stepParts();
+    while (nextGen > py - H - 100) genRow();
+    barriers = barriers.filter(b => b.y < py + H); orbs = orbs.filter(o => o.y < py + H); pickups = pickups.filter(h => h.y < py + H);
+    const ns = Math.floor(dist / 10) + hearts * 25;
+    if (ns !== score) { score = ns; document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+  }
+
+  const sy = wy => wy - py + H * 0.72;
+  function heart(x, y, s, col) {
+    ctx.fillStyle = col; ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.9);
+    ctx.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.7, y - s * 1.2, x, y - s * 0.35);
+    ctx.bezierCurveTo(x + s * 0.7, y - s * 1.2, x + s * 1.4, y - s * 0.1, x, y + s * 0.9);
+    ctx.fill();
+  }
+  function draw() {
+    ctx.fillStyle = '#0c0e18'; ctx.fillRect(0, 0, W, H);
+    // accelerator rings
+    ctx.strokeStyle = 'rgba(140,150,255,0.07)'; ctx.lineWidth = 2;
+    const off = ((-py) % 60 + 60) % 60;
+    for (let y = off - 60; y < H + 60; y += 60) { ctx.beginPath(); ctx.ellipse(W / 2, y, W / 2 - 4, 10, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(160,170,255,0.12)'; ctx.fillRect(0, 0, 4, H); ctx.fillRect(W - 4, 0, 4, H);
+    // field lines
+    for (const o of orbs) {
+      const dx = o.x - px, dy = o.y - py, d2 = dx * dx + dy * dy;
+      if (d2 > RANGE * RANGE) continue;
+      const a = Math.min(0.7, 1 - Math.sqrt(d2) / RANGE + 0.1), att = o.c * charge < 0;
+      ctx.strokeStyle = att ? `rgba(255,143,208,${a})` : `rgba(200,200,220,${a * 0.6})`;
+      ctx.lineWidth = att ? 2 : 1.5; ctx.setLineDash(att ? [] : [4, 5]);
+      ctx.beginPath(); ctx.moveTo(px, sy(py)); ctx.lineTo(o.x, sy(o.y)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // barriers
+    for (const b of barriers) {
+      const y = sy(b.y); if (y < -20 || y > H + 20) continue;
+      ctx.shadowColor = '#b9a8ff'; ctx.shadowBlur = 10; ctx.fillStyle = '#cfc6ff';
+      ctx.fillRect(0, y - 5, b.gx - b.gw / 2, 10); ctx.fillRect(b.gx + b.gw / 2, y - 5, W - b.gx - b.gw / 2, 10);
+      ctx.shadowBlur = 0;
+    }
+    // hearts
+    for (const h of pickups) { if (h.got) continue; const y = sy(h.y) + Math.sin(t * 0.08 + h.x) * 3; if (y > -20 && y < H + 20) heart(h.x, y, 8, '#ff8fd0'); }
+    // orbs
+    ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const o of orbs) {
+      const y = sy(o.y); if (y < -30 || y > H + 30) continue;
+      const col = o.c > 0 ? RED : BLUE;
+      ctx.shadowColor = col; ctx.shadowBlur = 18; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(o.x, y, 14, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff'; ctx.fillText(o.c > 0 ? '+' : '−', o.x, y + 1);
+    }
+    for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life / 20); ctx.fillStyle = p.col; ctx.fillRect(p.x - 2, sy(p.y) - 2, 4, 4); }
+    ctx.globalAlpha = 1;
+    if (msgPop) { ctx.fillStyle = '#ff8fd0'; ctx.font = 'bold 14px system-ui'; ctx.fillText('+25 ♥', msgPop.x, sy(msgPop.y) - (40 - msgPop.life)); }
+    // player
+    if (!dying) {
+      const y = sy(py), col = charge > 0 ? RED : BLUE;
+      if (flash) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = flash / 12; ctx.beginPath(); ctx.arc(px, y, PR + (12 - flash) * 2, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, y, PR, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - 3.5, y - 2, 2.4, 0, 7); ctx.arc(px + 3.5, y - 2, 2.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px - 3.2, y - 1.6, 1.2, 0, 7); ctx.arc(px + 3.8, y - 1.6, 1.2, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,170,210,0.8)'; ctx.beginPath(); ctx.arc(px - 6, y + 3, 1.8, 0, 7); ctx.arc(px + 6, y + 3, 1.8, 0, 7); ctx.fill();
+    }
+    // charge badge
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(10, 10, 92, 26);
+    ctx.fillStyle = charge > 0 ? RED : BLUE; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText('You: ' + (charge > 0 ? '+' : '−'), 18, 24);
+    ctx.fillStyle = '#ff8fd0'; ctx.textAlign = 'right'; ctx.fillText('♥ ' + hearts, W - 14, 24);
+  }
+  // =================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

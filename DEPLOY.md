@@ -45,7 +45,11 @@ newtab-party/
 │   ├── qa/lint.mjs            # Static rules every game must pass
 │   ├── qa/smoke.mjs           # Playwright run on desktop, iPhone and iPad
 │   ├── gen_logos.mjs          # Batch logo generator (Gemini API)
-│   └── retire_game.mjs        # Retire games from the rotation
+│   ├── schedule_game.mjs      # Add games to the rotation (npm run schedule)
+│   ├── retire_game.mjs        # Retire games from the rotation (npm run retire)
+│   ├── set_today.mjs          # Force today's game (npm run today)
+│   ├── deploy.mjs             # npm run deploy: schedule safety check + wrangler deploy
+│   └── lib/rotation.mjs       # Shared rotation math
 └── worker/
     ├── src/
     │   ├── index.ts           # Fetch handler and all routes
@@ -138,17 +142,17 @@ Then reload the extension in `chrome://extensions`.
 1. Put the file in `worker/public/games/<id>.html`.
 2. Run the QA gate: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>`.
 3. Add an entry to the `games` array in `worker/games.json`.
-4. Append the id to the **end** of the `schedule` array.
+4. `npm run schedule -- <id>` to add it to the rotation. It airs tomorrow by default; add `--date YYYY-MM-DD` for a specific day or `--end` for the end of the cycle. Later days shift back one; today and past days never move.
 5. Generate its logo (see below).
-6. `npm run deploy`. No extension update is needed.
+6. `npm run deploy`, any time of day. No extension update is needed.
 
 ### Rotation rules
 
-- **Append to `schedule` only.** Appending adds a slot at the end of the cycle, so days already scheduled never move. Inserting or reordering earlier entries shifts every upcoming day.
+- **Use the scripts, not hand edits.** `npm run schedule -- <id>` adds a game, `npm run retire -- <id>` removes one, `npm run today -- <id>` forces today's game. Schedule and retire only change tomorrow onward. Hand-appending to `schedule` is only safe during an era's first cycle; after the rotation wraps it re-maps days that already aired.
 - **Don't change `scheduleEpoch`.** It's the anchor; moving it shifts everything.
 - **Every id in `schedule` must exist in `games`.** A game in `games` but not in `schedule` never airs.
-- **Retire a game** by removing its id from `schedule`. Keep its `games` entry and its file so past replays still work.
-- **Deploy at midnight UTC** as a habit, so nothing changes mid-day.
+- **Retiring keeps the game in the library.** Leave its `games` entry and its file so past replays still work.
+- **Deploy any time.** `npm run deploy` compares your `games.json` with the live one and refuses if today's or any past day's game would change (`--check` to verify only, `--allow-today-change` after `npm run today`, `--force` to skip). A change queued by `schedule`/`retire` must ship before 00:00 UTC on the day it starts; if it misses that, the check fails and you re-run the script.
 - Past leaderboards are stored by `game_id` and are never affected by schedule changes.
 
 ## Logos
@@ -188,7 +192,7 @@ It needs Playwright. Run `npm i -D playwright` in `scripts/qa`, or set `CHROMIUM
 | `GET /leaderboard` | Today's leaderboard and the previous 7 days |
 | `GET /play/:date` | Replay a past game (practice, scores not saved) |
 | `GET /games` | Practice room calendar of every game |
-| `GET /games.json` | Game registry and schedule |
+| `GET /games.json` | Game registry and schedule, with the era in effect today as the top-level `schedule` (`?raw=1` for the file verbatim) |
 | `GET /games/:file` | Static game files |
 | `GET /api/daily` | Today's game and scores as JSON |
 | `GET /api/qualify?gameId=&score=` | Whether a score would make today's top 10 |

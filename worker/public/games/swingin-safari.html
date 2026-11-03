@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Swingin' Safari</title>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #a6ff3c; --secondary: #ff8a1f; --bg: #0d2b17; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (360 / 580))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #hint { display: none; font-size: 13px; opacity: .75; }
+  body.touch #hint { display: block; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay { background: linear-gradient(180deg, rgba(13,43,23,.94) 55%, rgba(255,90,20,.55)); }
+  #start-overlay h2 { font-family: 'Luckiest Guy', cursive; font-weight: 400; font-size: clamp(36px, 9vw, 70px); line-height: 1; letter-spacing: 1px; text-shadow: 0 4px 0 #3b6d10, 0 0 26px rgba(255,138,31,.5); }
+  #start-overlay button { font-family: 'Luckiest Guy', cursive; background: var(--secondary); color: #1a0d00; }
+  /* ── Landing screen: gameplay background ── */
+  #start-overlay { background: radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/swingin-safari.jpg') center/cover no-repeat, #000; }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,10,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
+  #start-overlay h2 { text-shadow: 0 3px 30px rgba(0,0,0,0.85); }
+  #start-logo { display: none; width: min(82%, 400px); max-height: 40vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="360" height="580"></canvas>
+  <div id="hint">Hold anywhere to grab a vine, let go to fling</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img id="start-logo" src="logos/swingin-safari.png" alt="Swingin&#39; Safari" onload="this.style.display='block';this.nextElementSibling.style.display='none'">
+  <h2>Swingin' Safari</h2>
+  <p>The floor is lava, and it's rising. Hold the mouse, Space, or your finger to grab the nearest vine above you. While you hold, you reel in. Let go to fling yourself upward. Grab bananas, and keep climbing.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 360, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+
+  const keys = {};
+  let pointerHeld = false;
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); }
+    keys[e.key] = true;
+  });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  document.addEventListener('pointerdown', e => { if (running && e.target.tagName !== 'BUTTON') pointerHeld = true; });
+  addEventListener('pointerup', () => { pointerHeld = false; });
+  addEventListener('pointercancel', () => { pointerHeld = false; });
+  addEventListener('blur', () => { pointerHeld = false; });
+  const holding = () => keys[' '] || keys['ArrowUp'] || pointerHeld;
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); pointerHeld = false; running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const GRAV = 0.32, REACH = 230, GROUND = 150, MR = 11;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const LINES = ['The floor was lava. You knew that.', 'Monkey flambé, extra crispy.', 'You had one job: hold on.', 'Bananas foster, but it\'s you.'];
+  const decor = Array.from({ length: 9 }, (_, i) => ({ x: 20 + i * 42 + rand(-10, 10), len: rand(60, 200), ph: Math.random() * 6 }));
+  let score, x, y, px, py, att, L, anchors, bananas, nanas, lavaY, camY, t, nextY, minY, wasHeld, dying, pops, bubbles;
+
+  function reset() {
+    score = 0; t = 0; nanas = 0; att = null; L = 0; wasHeld = false; dying = 0; pops = []; bubbles = [];
+    x = px = W / 2; y = py = GROUND - MR; minY = y;
+    anchors = []; bananas = []; nextY = 30;
+    while (nextY > -H) genAnchor();
+    lavaY = GROUND + 260; camY = y - H * 0.6;
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  function genAnchor() {
+    const prev = anchors[anchors.length - 1];
+    let ax = rand(40, W - 40);
+    if (prev && Math.abs(ax - prev.x) < 60) ax = prev.x < W / 2 ? prev.x + rand(70, 150) : prev.x - rand(70, 150);
+    ax = Math.max(30, Math.min(W - 30, ax));
+    anchors.push({ x: ax, y: nextY });
+    if (Math.random() < 0.5) bananas.push({ x: Math.max(24, Math.min(W - 24, ax + rand(-80, 80))), y: nextY + rand(30, 80), got: false });
+    const d = Math.min(1, (GROUND - nextY) / 15000);
+    nextY -= rand(85, 120 + 25 * d);
+  }
+  function bestAnchor() {
+    let best = null, bd = REACH;
+    for (const a of anchors) {
+      if (a.y > y - 12) continue;
+      const d = Math.hypot(a.x - x, a.y - y);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best;
+  }
+  function step() {
+    t++;
+    if (dying) { dying--; for (const b of bubbles) b.y -= 1; if (!dying) gameOver('Toasted!', LINES[Math.floor(Math.random() * LINES.length)]); return; }
+    const h = holding();
+    if (h && !wasHeld) { const a = bestAnchor(); if (a) { att = a; L = Math.max(40, Math.hypot(a.x - x, a.y - y)); } }
+    if (!h) att = null;
+    wasHeld = h;
+    let vx = (x - px) * 0.995, vy = (y - py) * 0.995;
+    const sp = Math.hypot(vx, vy); if (sp > 15) { vx *= 15 / sp; vy *= 15 / sp; }
+    px = x; py = y; x += vx; y += vy + GRAV;
+    if (att) {
+      L = Math.max(40, L - 0.7);
+      const dx = x - att.x, dy = y - att.y, d = Math.hypot(dx, dy);
+      if (d > L) { x = att.x + dx / d * L; y = att.y + dy / d * L; }
+    }
+    if (x < MR + 4) { x = MR + 4; px = x + vx * 0.5; }
+    if (x > W - MR - 4) { x = W - MR - 4; px = x + vx * 0.5; }
+    if (!att && y > GROUND - MR && lavaY > GROUND) { y = GROUND - MR; py = y; px = x - vx * 0.8; }
+    if (y < minY) minY = y;
+    for (const b of bananas) {
+      if (!b.got && (b.x - x) ** 2 + (b.y - y) ** 2 < 22 * 22) { b.got = true; nanas++; pops.push({ x: b.x, y: b.y, life: 45 }); }
+    }
+    for (const p of pops) p.life--;
+    pops = pops.filter(p => p.life > 0);
+    const lavaSpeed = Math.min(1.5, 0.35 + t * 0.00012);
+    lavaY -= lavaSpeed; lavaY = Math.min(lavaY, minY + 520);
+    if (Math.random() < 0.15) bubbles.push({ x: Math.random() * W, y: lavaY + rand(4, 40), life: 40 });
+    for (const b of bubbles) { b.life--; b.y -= 0.3; }
+    bubbles = bubbles.filter(b => b.life > 0);
+    camY += (y - H * 0.5 - camY) * 0.08;
+    while (nextY > camY - 200) genAnchor();
+    anchors = anchors.filter(a => a.y < lavaY + 40 || a === att);
+    bananas = bananas.filter(b => b.y < lavaY + 40);
+    const ns = Math.max(0, Math.floor((GROUND - MR - minY) / 10)) + nanas * 25;
+    if (ns !== score) { score = ns; document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+    if (y + MR * 0.5 > lavaY) { dying = 45; att = null; }
+  }
+
+  function drawMonkey(mx, my, ang) {
+    ctx.save(); ctx.translate(mx, my); ctx.rotate(ang);
+    ctx.strokeStyle = '#c85f00'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, 8); ctx.quadraticCurveTo(-18, 14, -14, 2); ctx.quadraticCurveTo(-11, -4, -16, -6); ctx.stroke();
+    ctx.fillStyle = '#ff8a1f'; ctx.beginPath(); ctx.arc(0, 0, MR, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-MR, -3, 4, 0, 7); ctx.arc(MR, -3, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd3a1'; ctx.beginPath(); ctx.ellipse(0, 2, 7.5, 6.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1a0d00'; ctx.beginPath(); ctx.arc(-3, -1, 1.6, 0, 7); ctx.arc(3, -1, 1.6, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#1a0d00'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 3, 3, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+  }
+  function drawBanana(bx, by) {
+    ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(bx, by - 6, 9, 0.5, Math.PI - 0.5); ctx.stroke();
+    ctx.strokeStyle = '#6b4b00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx + 7, by - 1); ctx.lineTo(bx + 9, by - 3); ctx.stroke();
+  }
+  function draw() {
+    const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#0a2413'); bg.addColorStop(1, '#16401f');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    const Y = v => v - camY;
+    // parallax background vines
+    for (const d of decor) {
+      ctx.strokeStyle = 'rgba(80,140,60,0.25)'; ctx.lineWidth = 3;
+      const off = ((-camY * 0.3) % 300 + 300) % 300;
+      for (let k = -1; k < 3; k++) {
+        const top = k * 300 + off - 150;
+        ctx.beginPath(); ctx.moveTo(d.x, top); ctx.quadraticCurveTo(d.x + Math.sin(t * 0.01 + d.ph) * 12, top + d.len / 2, d.x, top + d.len); ctx.stroke();
+      }
+    }
+    // ground
+    const gy = Y(GROUND);
+    if (gy < H + 10) { ctx.fillStyle = '#4a2f12'; ctx.fillRect(0, gy, W, H); ctx.fillStyle = '#3b8a1e'; ctx.fillRect(0, gy, W, 6); }
+    // anchors
+    const target = !att ? bestAnchor() : null;
+    for (const a of anchors) {
+      const ay = Y(a.y); if (ay < -20 || ay > H + 20) continue;
+      ctx.strokeStyle = '#5a3a14'; ctx.lineWidth = 5; ctx.beginPath();
+      ctx.moveTo(a.x < W / 2 ? 0 : W, ay - 14); ctx.quadraticCurveTo((a.x + (a.x < W / 2 ? 0 : W)) / 2, ay - 18, a.x, ay - 4); ctx.stroke();
+      ctx.fillStyle = '#a6ff3c'; ctx.beginPath(); ctx.arc(a.x, ay, 6, 0, 7); ctx.fill();
+      if (a === target && running) { ctx.strokeStyle = 'rgba(166,255,60,0.8)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(a.x, ay, 13 + Math.sin(t * 0.2) * 2, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    for (const b of bananas) if (!b.got) drawBanana(b.x, Y(b.y) + Math.sin(t * 0.07 + b.x) * 2);
+    if (att) {
+      ctx.strokeStyle = '#a6ff3c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(att.x, Y(att.y)); ctx.lineTo(x, Y(y)); ctx.stroke();
+      ctx.fillStyle = '#7fd12a'; for (let i = 1; i < 4; i++) { const k = i / 4; ctx.beginPath(); ctx.ellipse(att.x + (x - att.x) * k, Y(att.y + (y - att.y) * k), 4, 2, 0.6, 0, 7); ctx.fill(); }
+    }
+    if (!dying) drawMonkey(x, Y(y), att ? Math.atan2(att.x - x, y - att.y) * 0.6 : (x - px) * 0.05);
+    ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    for (const p of pops) { ctx.globalAlpha = Math.min(1, p.life / 20); ctx.fillStyle = '#ffe14a'; ctx.fillText('+25', p.x, Y(p.y) - (45 - p.life) * 0.6); }
+    ctx.globalAlpha = 1;
+    // lava
+    const ly = Y(lavaY);
+    if (ly < H + 20) {
+      const lg = ctx.createLinearGradient(0, ly, 0, ly + 120); lg.addColorStop(0, '#ffb020'); lg.addColorStop(0.3, '#ff5a14'); lg.addColorStop(1, '#8a1505');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(0, H + 10);
+      for (let sx = 0; sx <= W; sx += 12) ctx.lineTo(sx, ly + Math.sin(sx * 0.05 + t * 0.08) * 4);
+      ctx.lineTo(W, H + 10); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,220,120,0.7)';
+      for (const b of bubbles) { const by = Y(b.y); ctx.beginPath(); ctx.arc(b.x, by, 2 + (40 - b.life) * 0.05, 0, 7); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,90,20,0.12)'; ctx.fillRect(0, Math.max(0, ly - 80), W, 80);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(10, 10, 104, 26);
+    ctx.fillStyle = '#ffe14a'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('🍌 ' + nanas + '   ↑' + Math.max(0, Math.floor((GROUND - MR - minY) / 10)), 18, 24);
+    ctx.textBaseline = 'alphabetic';
+  }
+  // =================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

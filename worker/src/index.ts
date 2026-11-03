@@ -1,6 +1,6 @@
 import type { Env, Game, GamesData, ScheduleEra } from './types';
 import * as db from './db';
-import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, esc } from './render';
+import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, renderRetiredGames, esc } from './render';
 import gamesData from '../games.json';
 
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
@@ -30,6 +30,33 @@ function eraFor(dateStr: string): ScheduleEra | null {
   return era;
 }
 
+// games.json as clients see it on `dateStr`: the top-level era is the one in effect
+// that day, so a queued (future-dated) era never leaks into today's pick.
+function servedGamesData(dateStr: string): GamesData {
+  const era = eraFor(dateStr);
+  if (!era || era.scheduleEpoch === DATA.scheduleEpoch) return DATA;
+  return { ...DATA, scheduleEpoch: era.scheduleEpoch, schedule: era.schedule };
+}
+
+// Retired games keep a spot in the library: each links to its last airing (a past-day replay).
+function retiredEntries(today: string): { game: Game; lastAired: string | null }[] {
+  const games = getGames();
+  const DAY = 86400000;
+  const todayMs = Date.parse(today + 'T00:00:00Z');
+  const out: { game: Game; lastAired: string | null }[] = [];
+  for (const g of games) {
+    if (!isRetired(g.id, today)) continue;
+    let lastAired: string | null = null;
+    for (let ms = todayMs - DAY, n = 0; n < 730; ms -= DAY, n++) {
+      const date = new Date(ms).toISOString().slice(0, 10);
+      if (getDailyGame(games, date)?.id === g.id) { lastAired = date; break; }
+    }
+    out.push({ game: g, lastAired });
+  }
+  // Most recently retired first.
+  return out.sort((a, b) => (b.lastAired ?? '').localeCompare(a.lastAired ?? ''));
+}
+
 function isRetired(id: string, dateStr: string): boolean {
   const since = DATA.retired?.[id];
   return !!since && since <= dateStr;
@@ -45,9 +72,10 @@ function dayNumber(dateStr: string): number {
 // `scheduleEpoch`) so that APPENDING a game only adds a future slot — the games
 // already scheduled for the current cycle never move. Falls back to a plain
 // modulo over the games array if no schedule is configured. For past dates the
-// worker uses the era that was in effect then (`scheduleHistory`); for today
-// the current era is used, which is exactly what extension/newtab.js and the
-// inline script in render.ts compute. The per-era math MUST stay in sync.
+// worker uses the era that was in effect then (`scheduleHistory`). The top-level
+// era may be queued for a future date; /games.json resolves the era in effect
+// today for extension/newtab.js and the inline script in render.ts, which run the
+// same math. The per-era math (and scripts/lib/rotation.mjs) MUST stay in sync.
 function getDailyGame(games: Game[], dateStr: string): Game | null {
   if (!games.length) return null;
   const era = eraFor(dateStr);
@@ -96,9 +124,13 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
-    // ── Static-ish: serve bundled games.json for extension ──
+    // ── games.json for the extension + arcade page ──
+    // Clients use `schedule`/`scheduleEpoch` as-is for today, so serve the era in
+    // effect TODAY. That lets a schedule change dated tomorrow (npm run schedule /
+    // retire) ship at any time of day without moving today's game. `?raw=1` returns
+    // the bundled file verbatim; scripts/deploy.mjs diffs against it.
     if (pathname === '/games.json' && method === 'GET') {
-      return new Response(JSON.stringify(gamesData), {
+      return new Response(JSON.stringify(url.searchParams.has('raw') ? gamesData : servedGamesData(todayUTC())), {
         headers: { 'Content-Type': 'application/json', ...CORS },
       });
     }
@@ -189,6 +221,11 @@ export default {
       return json(plays);
     }
 
+    // ── /games/retired — retired games, linked from /games (checked before the asset passthrough) ──
+    if (pathname === '/games/retired' && method === 'GET') {
+      return html(renderRetiredGames({ retired: retiredEntries(todayUTC()) }));
+    }
+
     // ── Game files — strip X-Frame-Options so iframes work from the extension ──
     if (pathname.startsWith('/games/') && method === 'GET') {
       const asset = await env.ASSETS.fetch(request);
@@ -250,18 +287,8 @@ export default {
         const date = new Date(ms).toISOString().slice(0, 10);
         cells.push({ date, game: getDailyGame(games, date), isToday: date === today, isFuture: date > today });
       }
-      // Retired games keep a spot in the library: link each to its last airing (a past-day replay).
-      const retired: { game: Game; lastAired: string | null }[] = [];
-      for (const g of games) {
-        if (!isRetired(g.id, today)) continue;
-        let lastAired: string | null = null;
-        for (let ms = todayMs - DAY, n = 0; n < 730; ms -= DAY, n++) {
-          const date = new Date(ms).toISOString().slice(0, 10);
-          if (getDailyGame(games, date)?.id === g.id) { lastAired = date; break; }
-        }
-        retired.push({ game: g, lastAired });
-      }
-      return html(renderGamesCalendar({ today, cells, retired }));
+      const retiredCount = games.filter((g) => isRetired(g.id, today)).length;
+      return html(renderGamesCalendar({ today, cells, retiredCount }));
     }
 
     const playMatch = pathname.match(/^\/play\/(\d{4}-\d{2}-\d{2})$/);

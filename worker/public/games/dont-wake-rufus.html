@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Don't Wake Rufus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ffd24a; --secondary: #ff5470; --bg: #0b0e18; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 16px; font-size: clamp(11px, 3vw, 14px); opacity: .9; letter-spacing: .5px; }
+  #hud b { color: var(--primary); font-weight: 700; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (400 / 560))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  #hint { font-size: 12px; opacity: .7; text-align: center; padding: 6px 0; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(4,5,10,.9); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 44ch; line-height: 1.55; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: #1a1205; cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay h2 { font-family: 'Luckiest Guy', system-ui, sans-serif; font-size: clamp(34px, 9vw, 62px); line-height: 1.02; letter-spacing: 1px; text-shadow: 0 4px 24px rgba(0,0,0,.8), 0 0 22px rgba(255,210,74,.35); }
+  #start-overlay button { font-family: 'Luckiest Guy', system-ui, sans-serif; letter-spacing: 3px; }
+  #start-overlay .rules { margin-top: 14px; font-size: clamp(12px, 2.8vw, 14px); opacity: .85; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="level">Kitchen 1</span><span id="mult">x1.0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="400" height="560"></canvas>
+  <div id="touch-controls"><div id="hint">Hold anywhere on the floor to creep &middot; let go to freeze</div></div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <h2>Don't Wake Rufus</h2>
+  <p>You are a raccoon. It is 3am. The snacks are right there. So is the dog.</p>
+  <p class="rules"><b>Hold</b> arrows / WASD &mdash; or hold a finger on the floor &mdash; to creep. <b>Let go to freeze.</b><br>Rufus only catches things that are <i>moving</i> when his eyes open. Creaky boards are loud. Greed pays: your multiplier climbs while you move and drains while you hide.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Busted</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 400, H = 560;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  const kLeft = () => keys['ArrowLeft'] || keys['a'] || keys['A'];
+  const kRight = () => keys['ArrowRight'] || keys['d'] || keys['D'];
+  const kUp = () => keys['ArrowUp'] || keys['w'] || keys['W'];
+  const kDown = () => keys['ArrowDown'] || keys['s'] || keys['S'];
+
+  let drag = null;
+  const dn = e => { const t = e.touches ? e.touches[0] : e; drag = toLogical(t.clientX, t.clientY); e.preventDefault(); };
+  const mv = e => { if (!drag) return; const t = e.touches ? e.touches[0] : e; drag = toLogical(t.clientX, t.clientY); e.preventDefault(); };
+  const up = () => { drag = null; };
+  canvas.addEventListener('mousedown', dn); addEventListener('mousemove', mv); addEventListener('mouseup', up);
+  canvas.addEventListener('touchstart', dn, { passive: false });
+  canvas.addEventListener('touchmove', mv, { passive: false });
+  canvas.addEventListener('touchend', up, { passive: false });
+  canvas.addEventListener('touchcancel', up, { passive: false });
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  const elScore = document.getElementById('score'), elLevel = document.getElementById('level'), elMult = document.getElementById('mult');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const TS = 50, COLS = 8, ROWS = 11, OFFY = 10;   // floorboard grid
+  const SPEED = 2.15, PR = 11;
+  const RUF = { x: 200, y: 452, r: 42 };
+  const SNACKS = ['🍕', '🍩', '🍗', '🧀', '🍪', '🥓', '🍔', '🌮'];
+  const BUST = [
+    'He heard the floorboards. He always hears the floorboards.',
+    'You froze half a second late. Rufus does not grade on a curve.',
+    'Eye contact with a dog at 3am is a binding legal agreement.',
+    'The tail wag was not friendly. That was a tail wag of justice.',
+    'You moved. He saw. The kitchen is his again.'
+  ];
+
+  let score, level, mult, noise, px, py, moving, creak, snacks, phase, phaseT, parts, shake, flash, tiles, lastGrab, wokeBy;
+  // phase: 0 asleep, 1 stirring, 2 awake
+
+  function tileAt(x, y) { const c = Math.floor(x / TS), r = Math.floor((y - OFFY) / TS); if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return null; return tiles[r * COLS + c]; }
+
+  function buildFloor() {
+    tiles = new Array(COLS * ROWS).fill(0);
+    const want = 11 + level * 2;
+    for (let i = 0; i < want; i++) {
+      const c = Math.floor(Math.random() * COLS), r = Math.floor(Math.random() * ROWS);
+      const cx = c * TS + TS / 2, cy = OFFY + r * TS + TS / 2;
+      if (Math.hypot(cx - RUF.x, cy - RUF.y) < RUF.r + 40) continue;
+      if (cy < 90) continue;
+      tiles[r * COLS + c] = 1;
+    }
+  }
+
+  function spawnSnacks() {
+    snacks = [];
+    const want = 5;
+    let guard = 0;
+    while (snacks.length < want && guard++ < 600) {
+      const x = 28 + Math.random() * (W - 56), y = 96 + Math.random() * (H - 150);
+      if (Math.hypot(x - RUF.x, y - RUF.y) < RUF.r + 34) continue;
+      if (Math.hypot(x - px, y - py) < 70) continue;
+      if (snacks.some(s => Math.hypot(s.x - x, s.y - y) < 54)) continue;
+      snacks.push({ x, y, e: SNACKS[Math.floor(Math.random() * SNACKS.length)], t: Math.random() * 100 });
+    }
+  }
+
+  function cycleAsleep() { return Math.max(110, 300 - level * 16); }
+  function cycleAwake() { return Math.min(200, 108 + level * 7); }
+
+  function reset() {
+    score = 0; level = 1; mult = 1; noise = 0;
+    px = W / 2; py = 62; moving = false; creak = false;
+    phase = 0; phaseT = cycleAsleep(); parts = []; shake = 0; flash = 0; lastGrab = 0; wokeBy = '';
+    buildFloor(); spawnSnacks();
+    sync();
+  }
+
+  function sync() {
+    elScore.textContent = 'Score: ' + score.toLocaleString();
+    elLevel.textContent = 'Kitchen ' + level;
+    elMult.textContent = 'x' + mult.toFixed(1);
+  }
+
+  function burst(x, y, col, n, sp) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = sp * (0.3 + Math.random());
+      parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 26 + Math.random() * 20, col });
+    }
+  }
+
+  function step() {
+    // ── input → movement (no inertia: letting go freezes you instantly) ──
+    let dx = 0, dy = 0;
+    if (kLeft()) dx -= 1; if (kRight()) dx += 1; if (kUp()) dy -= 1; if (kDown()) dy += 1;
+    if (!dx && !dy && drag) {
+      const ax = drag.x - px, ay = drag.y - py;
+      if (Math.hypot(ax, ay) > 4) { dx = ax; dy = ay; }
+    }
+    const m = Math.hypot(dx, dy);
+    moving = m > 0;
+    if (moving) {
+      const nx = px + (dx / m) * SPEED, ny = py + (dy / m) * SPEED;
+      if (Math.hypot(nx - RUF.x, ny - RUF.y) < RUF.r + PR - 4) {
+        shake = 18; burst(px, py, '#ff5470', 22, 3);
+        return gameOver('You stepped on the dog', 'Of all the places in the kitchen, you chose the dog.');
+      }
+      px = Math.max(PR, Math.min(W - PR, nx));
+      py = Math.max(PR + 24, Math.min(H - PR, ny));
+    }
+
+    const t = tileAt(px, py);
+    creak = moving && t === 1;
+
+    // ── noise ──
+    if (moving) noise += creak ? 2.5 : 0.5; else noise -= 1.1;
+    noise = Math.max(0, Math.min(100, noise));
+    if (creak && Math.random() < 0.2) parts.push({ x: px + (Math.random() - .5) * 14, y: py + 10, vx: 0, vy: -0.5, life: 24, col: '#ffd24a' });
+
+    // ── greed multiplier ──
+    if (moving) mult = Math.min(5, mult + 0.011); else mult = Math.max(1, mult - 0.028);
+
+    // ── Rufus sleep cycle ──
+    phaseT--;
+    if (phase === 0) {
+      if (noise >= 100) { phase = 1; phaseT = 48; noise = 70; wokeBy = 'noise'; }
+      else if (phaseT <= 0) { phase = 1; phaseT = 52; wokeBy = 'cycle'; }
+    } else if (phase === 1) {
+      if (phaseT <= 0) { phase = 2; phaseT = cycleAwake(); flash = 10; }
+    } else {
+      if (moving) {
+        shake = 20; burst(px, py, '#ff5470', 26, 3.4);
+        return gameOver('Busted', BUST[Math.floor(Math.random() * BUST.length)]);
+      }
+      noise = Math.max(0, noise - 1.6);
+      if (phaseT <= 0) { phase = 0; phaseT = cycleAsleep(); }
+    }
+
+    // ── snacks ──
+    for (let i = snacks.length - 1; i >= 0; i--) {
+      const s = snacks[i]; s.t++;
+      if (Math.hypot(s.x - px, s.y - py) < PR + 13) {
+        const gain = Math.round(100 * mult);
+        score += gain; snacks.splice(i, 1);
+        burst(s.x, s.y, '#ffd24a', 14, 2.2); lastGrab = 40;
+        noise += 6;
+      }
+    }
+    if (snacks.length === 0) {
+      score += 250 * level; level++; mult = Math.min(5, mult + 0.5);
+      buildFloor(); spawnSnacks(); burst(px, py, '#7fe3ff', 20, 2.6); lastGrab = 50;
+    }
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy = p.vy * 0.93 + 0.04; p.life--;
+      if (p.life <= 0) parts.splice(i, 1);
+    }
+    if (shake > 0) shake--;
+    if (flash > 0) flash--;
+    if (lastGrab > 0) lastGrab--;
+    sync();
+  }
+
+  // ── drawing ──
+  let anim = 0;
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function drawRaccoon(x, y, mv) {
+    const bob = mv ? Math.sin(anim * 0.3) * 1.6 : 0;
+    ctx.save(); ctx.translate(x, y + bob);
+    // tail
+    ctx.strokeStyle = '#6b7183'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, 6); ctx.quadraticCurveTo(-18, 10, -17, 0); ctx.stroke();
+    ctx.strokeStyle = '#2b3040'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-13, 9); ctx.lineTo(-16, 5); ctx.stroke();
+    // body
+    ctx.fillStyle = '#9aa2b5'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, 7); ctx.fill();
+    // ears
+    ctx.beginPath(); ctx.arc(-6, -8, 3.6, 0, 7); ctx.arc(6, -8, 3.6, 0, 7); ctx.fill();
+    // mask
+    ctx.fillStyle = '#20242f'; roundRect(-8, -4, 16, 6, 3); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-3.6, -1, 1.5, 0, 7); ctx.arc(3.6, -1, 1.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#20242f'; ctx.beginPath(); ctx.arc(0, 4, 2, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRufus() {
+    const br = Math.sin(anim * 0.04) * 1.6;
+    ctx.save(); ctx.translate(RUF.x, RUF.y);
+    // rug
+    ctx.fillStyle = 'rgba(120,70,60,.35)'; ctx.beginPath(); ctx.ellipse(0, 8, 62, 34, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(180,110,90,.35)'; ctx.lineWidth = 2; ctx.stroke();
+    // body
+    ctx.fillStyle = phase === 2 ? '#8a6b4a' : '#6f573c';
+    ctx.beginPath(); ctx.ellipse(0, 2 + br, 40, 28, 0, 0, 7); ctx.fill();
+    // head
+    ctx.beginPath(); ctx.ellipse(-30, -8 + br, 20, 17, -0.2, 0, 7); ctx.fill();
+    // snout
+    ctx.fillStyle = phase === 2 ? '#a4835e' : '#866a49';
+    ctx.beginPath(); ctx.ellipse(-44, -3 + br, 11, 8, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a2016'; ctx.beginPath(); ctx.arc(-53, -4 + br, 3.2, 0, 7); ctx.fill();
+    // ears
+    ctx.fillStyle = phase === 0 ? '#5b472f' : '#7d6243';
+    ctx.save(); ctx.translate(-24, -20 + br); ctx.rotate(phase === 0 ? 0.9 : -0.1);
+    ctx.beginPath(); ctx.ellipse(0, 0, 7, 13, 0, 0, 7); ctx.fill(); ctx.restore();
+    // tail
+    ctx.strokeStyle = phase === 2 ? '#8a6b4a' : '#6f573c'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    const tw = phase === 2 ? Math.sin(anim * 0.4) * 10 : 0;
+    ctx.beginPath(); ctx.moveTo(36, 4 + br); ctx.quadraticCurveTo(54, -4 + tw, 50, -16 + tw); ctx.stroke();
+    // eyes
+    if (phase === 2) {
+      ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(-36, -12 + br, 4.4, 0, 7); ctx.arc(-24, -14 + br, 4.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a1208'; ctx.beginPath(); ctx.arc(-36.5, -12 + br, 2.2, 0, 7); ctx.arc(-24.5, -14 + br, 2.2, 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#3a2c1c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(-36, -13 + br, 4, 0.2, Math.PI - 0.2); ctx.arc(-24, -15 + br, 4, 0.2, Math.PI - 0.2); ctx.stroke();
+    }
+    ctx.restore();
+
+    // state glyphs
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (phase === 0) {
+      ctx.fillStyle = 'rgba(200,220,255,' + (0.3 + 0.25 * Math.sin(anim * 0.05)) + ')';
+      ctx.font = 'bold 17px system-ui';
+      ctx.fillText('z', RUF.x - 48, RUF.y - 40 + Math.sin(anim * 0.05) * 4);
+      ctx.font = 'bold 12px system-ui';
+      ctx.fillText('z', RUF.x - 60, RUF.y - 54 + Math.sin(anim * 0.05 + 1) * 4);
+    } else if (phase === 1) {
+      const k = 1 - phaseT / 52;
+      ctx.strokeStyle = 'rgba(255,210,74,' + (0.75 - k * 0.5) + ')'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(RUF.x - 30, RUF.y - 8, 40 + k * 46, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 26px system-ui';
+      ctx.fillText('?', RUF.x - 30, RUF.y - 52);
+    } else {
+      ctx.fillStyle = '#ff5470'; ctx.font = 'bold 24px system-ui';
+      ctx.fillText('!', RUF.x - 30, RUF.y - 54);
+    }
+  }
+
+  function draw() {
+    anim++;
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - .5) * shake * 0.6, (Math.random() - .5) * shake * 0.6);
+    ctx.fillStyle = '#0b0e18'; ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    // floorboards
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const x = c * TS, y = OFFY + r * TS, cr = tiles && tiles[r * COLS + c] === 1;
+      ctx.fillStyle = (r + c) % 2 ? '#141a28' : '#111726';
+      ctx.fillRect(x, y, TS, TS);
+      if (cr) {
+        ctx.fillStyle = 'rgba(255,120,80,.07)'; ctx.fillRect(x, y, TS, TS);
+        ctx.strokeStyle = 'rgba(255,140,90,.4)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+        ctx.strokeRect(x + 2.5, y + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(255,160,110,.5)'; ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) { ctx.moveTo(x + 16, y + 18 + i * 7); ctx.quadraticCurveTo(x + 25, y + 13 + i * 7, x + 34, y + 18 + i * 7); }
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, TS - 1, TS - 1);
+    }
+
+    // moonlight shaft
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createLinearGradient(40, 0, 230, H);
+    g.addColorStop(0, 'rgba(130,180,255,.13)'); g.addColorStop(1, 'rgba(130,180,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(150, 0); ctx.lineTo(260, H); ctx.lineTo(110, H); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    drawRufus();
+
+    // snacks
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const s of snacks) {
+      const p = Math.sin((s.t + anim) * 0.06) * 2;
+      ctx.save(); ctx.globalAlpha = .35; ctx.fillStyle = '#ffd24a';
+      ctx.beginPath(); ctx.arc(s.x, s.y + p, 15, 0, 7); ctx.fill(); ctx.restore();
+      ctx.font = '22px serif'; ctx.fillText(s.e, s.x, s.y + p);
+    }
+
+    // particles
+    for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life / 44); ctx.fillStyle = p.col; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    ctx.globalAlpha = 1;
+
+    drawRaccoon(px, py, moving);
+
+    // awake red wash
+    if (phase === 2) {
+      ctx.fillStyle = 'rgba(255,84,112,' + (0.07 + 0.05 * Math.sin(anim * 0.25)) + ')';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,84,112,.85)'; ctx.lineWidth = 5; ctx.strokeRect(2.5, 2.5, W - 5, H - 5);
+    }
+    if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (flash / 30) + ')'; ctx.fillRect(0, 0, W, H); }
+
+    // top bar: noise meter + state
+    ctx.fillStyle = 'rgba(6,8,14,.85)'; ctx.fillRect(0, 0, W, 26);
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('NOISE', 10, 13.5);
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; roundRect(48, 8, 184, 10, 5); ctx.fill();
+    const nc = noise > 75 ? '#ff5470' : noise > 45 ? '#ffd24a' : '#7fe3ff';
+    if (noise > 0.5) { ctx.fillStyle = nc; roundRect(48, 8, Math.max(6, 184 * (noise / 100)), 10, 5); ctx.fill(); }
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = 'bold 12px system-ui';
+    ctx.fillStyle = phase === 2 ? '#ff5470' : phase === 1 ? '#ffd24a' : '#7fe3ff';
+    ctx.fillText(phase === 2 ? 'EYES OPEN — FREEZE' : phase === 1 ? 'STIRRING...' : 'ASLEEP', W - 10, 14);
+
+    if (lastGrab > 0) {
+      ctx.globalAlpha = lastGrab / 50; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 13px system-ui';
+      ctx.fillText('x' + mult.toFixed(1), px, py - 22); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  // =========================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
