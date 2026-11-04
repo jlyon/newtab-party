@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Troll Toll</title>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #ff7a2f; --secondary: #7ddc5a; --bg: #0e2233; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (360 / 600))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #touch-controls { display: none; gap: 8px; justify-content: center; width: 100%; max-width: 420px; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 48px; flex: 1; max-width: 90px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  #btn-fire { background: rgba(255,122,47,.35); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); font-family: 'Luckiest Guy', system-ui, sans-serif; letter-spacing: 1px; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-family: 'Luckiest Guy', system-ui, sans-serif; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay h2 { font-size: clamp(40px, 11vw, 76px); text-shadow: 0 4px 0 #7a2c06, 0 0 30px rgba(255,122,47,.5); }
+  #start-overlay .cast { font-size: clamp(28px, 8vw, 40px); letter-spacing: 6px; margin: 4px 0; }
+  #start-overlay .hint { color: var(--secondary); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="360" height="600"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-up">▲</button>
+    <button class="btn" id="btn-down">▼</button>
+    <button class="btn" id="btn-right">▶</button>
+    <button class="btn" id="btn-fire">🔥</button>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <h2>Troll Toll</h2>
+  <div class="cast">🐶🐱🐘🐉</div>
+  <p>The bridge is gone. Hop your crew across the river on logs and nutria (the divers sink, careful) and get each one into a den. Touch the troll and it collects its toll. The dragon can torch it: toll-free crossings score double.</p>
+  <p class="hint">Arrows / WASD or swipe to hop · Space / 🔥 to breathe fire (dragon only)</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 360, H = 600;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== TROLL TOLL =====
+  const CELL = 40, START_ROW = 13, HOME_ROW = 1, SAND_ROW = 7;
+  const ANIMALS = [
+    { e: '🐶', name: 'Dog',      splash: 'The dog went for a swim. Honestly? Thrilled about it.' },
+    { e: '🐱', name: 'Cat',      splash: 'The cat touched water. It will never forgive you.' },
+    { e: '🐘', name: 'Elephant', splash: 'Six tons of elephant, zero tons of buoyancy.' },
+    { e: '🐉', name: 'Dragon',   splash: 'Dragon meets river. Water: super effective.' },
+  ];
+  const DENS = [1, 3, 5, 7].map(c => c * CELL + CELL / 2);
+  // row, type, length (cells), gap (cells), count, speed, dir, diving lane
+  const LANE_DEFS = [
+    [12, 'nutria', 2, 2, 4, 0.6, -1, false],
+    [11, 'log',    3, 3, 3, 0.8,  1, false],
+    [10, 'nutria', 3, 2, 3, 0.7, -1, true ],
+    [9,  'log',    2, 2, 4, 1.1,  1, false],
+    [8,  'log',    4, 3, 2, 0.6, -1, false],
+    [6,  'nutria', 2, 2, 4, 0.9,  1, true ],
+    [5,  'log',    3, 3, 3, 1.0, -1, false],
+    [4,  'nutria', 3, 3, 3, 0.8,  1, false],
+    [3,  'log',    2, 3, 3, 1.3, -1, false],
+    [2,  'nutria', 2, 2, 4, 0.7,  1, true ],
+  ];
+  const RIVER_ROWS = LANE_DEFS.map(d => d[0]);
+
+  let score = 0, lanes, player, troll, flames, parts, dens, level, lives, animalIdx, timeLeft, maxRow, dying, toast, frame, lastMsg, burns, fireCd;
+  const rowY = r => r * CELL + CELL / 2;
+  const crossTime = () => Math.max(1500, 2400 - (level - 1) * 180);   // steps (60/s)
+  const speedMul = () => 1 + 0.15 * (level - 1);
+  function setScore() { document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+  function say(text, t = 120) { toast = { text, t }; }
+
+  function makeLanes() {
+    lanes = {};
+    for (const [row, type, len, gap, count, speed, dir, dive] of LANE_DEFS) {
+      const span = count * (len + gap) * CELL, items = [];
+      for (let i = 0; i < count; i++) items.push({ x: i * (len + gap) * CELL - (row * 37) % 80, len, dive: dive && i % 2 === 0, ph: (i * 97 + row * 53) % 360 });
+      lanes[row] = { row, type, speed, dir, span, items };
+    }
+  }
+  const laneV = l => l.speed * l.dir * speedMul();
+  function sinkOf(it) {                 // 0 = floating, 1 = fully under
+    if (!it.dive) return 0;
+    const p = (frame + it.ph) % 360;
+    if (p < 240) return 0; if (p < 280) return (p - 240) / 80; if (p < 340) return 1; return 1 - (p - 340) / 20;
+  }
+  const solid = it => !it.dive || ((frame + it.ph) % 360) < 280;
+
+  function spawnTroll() {
+    const opts = RIVER_ROWS.filter(r => Math.abs(r - player.row) > 1);
+    troll = { alive: true, row: opts[Math.floor(Math.random() * opts.length)], x: 40 + Math.random() * (W - 80),
+              vx: (Math.random() < .5 ? -1 : 1) * (0.8 + 0.15 * level), switchT: 200 + Math.random() * 160, t: 0, deadT: 0, burnX: 0, burnY: 0, burnAnim: 0 };
+  }
+  function respawn() {
+    player = { x: W / 2, row: START_ROW, face: 'up', hop: 0 };
+    timeLeft = crossTime(); maxRow = START_ROW;
+  }
+  function reset() {
+    score = 0; level = 1; lives = 3; animalIdx = 0; dying = 0; frame = 0; burns = 0; fireCd = 0;
+    flames = []; parts = []; dens = [null, null, null, null]; toast = null; lastMsg = '';
+    makeLanes(); respawn(); spawnTroll(); setScore();
+    say(ANIMALS[0].name + ' goes first. Good luck.', 100);
+  }
+
+  function burst(x, y, colors, n, spd) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = Math.random() * spd;
+      parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, life: 30 + Math.random() * 25, c: colors[i % colors.length], r: 2 + Math.random() * 3 }); }
+  }
+  function die(kind) {
+    if (dying) return;
+    const a = ANIMALS[animalIdx];
+    lastMsg = {
+      splash: a.splash, swept: 'The ' + a.name.toLowerCase() + ' got swept downstream to Sacramento.',
+      troll: 'The troll collected its toll. The toll was the ' + a.name.toLowerCase() + '.',
+      bank: 'Bonked the riverbank. Aim for an open den.', time: 'Too slow. The troll charges late fees.',
+    }[kind];
+    lives--; dying = 70;
+    burst(player.x, rowY(player.row), kind === 'troll' ? ['#6fae4a', '#fff', '#ff5050'] : ['#bfe9ff', '#ffffff', '#5fb7e0'], 26, 3.5);
+    say(lastMsg, 110);
+  }
+
+  function hop(dx, dr) {
+    if (!running || dying || player.hop > 0) return;
+    const nr = player.row + dr;
+    if (nr < HOME_ROW || nr > START_ROW) return;
+    player.face = dr < 0 ? 'up' : dr > 0 ? 'down' : dx < 0 ? 'left' : 'right';
+    player.x = Math.max(16, Math.min(W - 16, player.x + dx * CELL));
+    player.row = nr; player.hop = 8;
+    if (nr < maxRow) { maxRow = nr; score += 10; setScore(); }
+    if (nr === HOME_ROW) arriveHome();
+  }
+  function arriveHome() {
+    const i = DENS.findIndex((dx, k) => !dens[k] && Math.abs(player.x - dx) < 22);
+    if (i < 0) { die('bank'); return; }
+    dens[i] = ANIMALS[animalIdx].e;
+    let pts = 50 + Math.floor(timeLeft / 60) * 2;
+    if (!troll.alive) { pts *= 2; say('TOLL-FREE CROSSING! +' + pts); } else say('Home! +' + pts + ' (troll is still charging tolls)');
+    score += pts;
+    burst(DENS[i], rowY(HOME_ROW), ['#7ddc5a', '#ffe066', '#fff'], 22, 3);
+    if (dens.every(Boolean)) {
+      const bonus = 200 * level; score += bonus; level++;
+      dens = [null, null, null, null];
+      say('LEVEL ' + level + '! +' + bonus + ' · the river is angrier', 150);
+    }
+    setScore();
+    animalIdx = (animalIdx + 1) % ANIMALS.length;
+    respawn();
+    if (ANIMALS[animalIdx].name === 'Dragon' && troll.alive) setTimeout(() => { if (running && !dying) say('Dragon up! Space / 🔥 to torch the troll', 140); }, 1300);
+  }
+  function breathe() {
+    if (!running || dying) return;
+    if (ANIMALS[animalIdx].name !== 'Dragon') { if (!toast || toast.t < 40) say('Only the dragon breathes fire. The ' + ANIMALS[animalIdx].name.toLowerCase() + ' just coughs.', 70); return; }
+    if (fireCd > 0) return;
+    fireCd = 22;
+    const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[player.face];
+    flames.push({ x: player.x + d[0] * 14, y: rowY(player.row) + d[1] * 14, vx: d[0] * 5.5, vy: d[1] * 5.5, life: 60 });
+  }
+
+  function step() {
+    frame++;
+    for (const k in lanes) { const l = lanes[k], v = laneV(l);
+      for (const it of l.items) { it.x += v; const w = it.len * CELL;
+        if (it.x >= l.span - w) it.x -= l.span; if (it.x < -w) it.x += l.span; } }
+
+    // troll
+    if (troll.alive) {
+      troll.t++; troll.x += troll.vx;
+      if (troll.x < 22 || troll.x > W - 22) { troll.vx *= -1; troll.x = Math.max(22, Math.min(W - 22, troll.x)); }
+      if (--troll.switchT <= 0) {
+        let nr = troll.row + (Math.random() < .5 ? -1 : 1);
+        if (nr === SAND_ROW) nr += nr > troll.row ? 1 : -1;
+        if (RIVER_ROWS.includes(nr)) troll.row = nr;
+        troll.switchT = 220 + Math.random() * 180;
+      }
+    } else {
+      troll.burnAnim++;
+      if (--troll.deadT <= 0) { spawnTroll(); say('The troll is back. And it is mad.', 90); }
+    }
+    if (fireCd > 0) fireCd--;
+    for (const f of flames) {
+      f.x += f.vx; f.y += f.vy; f.life--;
+      if (frame % 2 === 0) parts.push({ x: f.x, y: f.y, vx: (Math.random() - .5) * .8, vy: (Math.random() - .5) * .8, life: 16, c: Math.random() < .5 ? '#ffd23f' : '#ff7a2f', r: 3 + Math.random() * 3 });
+      if (troll.alive && Math.abs(f.x - troll.x) < 26 && Math.abs(f.y - rowY(troll.row)) < 22) {
+        f.life = 0; troll.alive = false; troll.deadT = 600; troll.burnAnim = 0; troll.burnX = troll.x; troll.burnY = rowY(troll.row);
+        burns++; score += 100; setScore();
+        burst(troll.x, rowY(troll.row), ['#ff7a2f', '#ffd23f', '#333', '#6fae4a'], 40, 4.5);
+        say('TROLL TOASTED! +100 · toll-free for 10s', 130);
+      }
+    }
+    flames = flames.filter(f => f.life > 0 && f.x > -10 && f.x < W + 10 && f.y > 0 && f.y < H);
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
+    parts = parts.filter(p => p.life > 0);
+    if (toast && --toast.t <= 0) toast = null;
+
+    if (dying) {
+      if (--dying === 0) {
+        if (lives <= 0) { gameOver('Toll collected', lastMsg + ' Reached level ' + level + ', toasted ' + burns + ' troll' + (burns === 1 ? '' : 's') + '.'); return; }
+        respawn();
+      }
+      return;
+    }
+    if (player.hop > 0) player.hop--;
+    if (--timeLeft <= 0) { die('time'); return; }
+
+    const lane = lanes[player.row];
+    if (lane) {
+      const on = lane.items.find(it => solid(it) && player.x > it.x + 5 && player.x < it.x + it.len * CELL - 5);
+      if (on) player.x += laneV(lane);
+      else if (player.hop === 0) { die('splash'); return; }
+      if (player.x < 6 || player.x > W - 6) { die('swept'); return; }
+    }
+    if (troll.alive && troll.row === player.row && Math.abs(troll.x - player.x) < 28) die('troll');
+  }
+
+  // ---- input ----
+  addEventListener('keydown', e => {
+    if (!running || e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k === 'arrowup' || k === 'w') hop(0, -1);
+    else if (k === 'arrowdown' || k === 's') hop(0, 1);
+    else if (k === 'arrowleft' || k === 'a') hop(-1, 0);
+    else if (k === 'arrowright' || k === 'd') hop(1, 0);
+    else if (k === ' ' || k === 'f') breathe();
+  });
+  function tapBtn(id, fn) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); el.classList.add('held'); fn(); };
+    const up = e => { e.preventDefault(); el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  tapBtn('btn-left', () => hop(-1, 0)); tapBtn('btn-right', () => hop(1, 0));
+  tapBtn('btn-up', () => hop(0, -1));   tapBtn('btn-down', () => hop(0, 1));
+  tapBtn('btn-fire', breathe);
+  let sw = null;
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.changedTouches[0]; sw = { x: t.clientX, y: t.clientY }; }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault(); if (!sw) return;
+    const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y; sw = null;
+    if (Math.hypot(dx, dy) < 18) { hop(0, -1); return; }          // tap = hop forward
+    if (Math.abs(dx) > Math.abs(dy)) hop(dx < 0 ? -1 : 1, 0); else hop(0, dy < 0 ? -1 : 1);
+  }, { passive: false });
+
+  // ---- drawing ----
+  function drawNutria(x, y, dir, sink) {
+    ctx.save(); ctx.translate(x, y + sink * 8); ctx.globalAlpha = 1 - sink * 0.85; if (dir < 0) ctx.scale(-1, 1);
+    ctx.strokeStyle = '#4a2f1c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, 4); ctx.quadraticCurveTo(-22, 10, -19, 0); ctx.stroke();
+    ctx.fillStyle = '#7a5233'; ctx.beginPath(); ctx.ellipse(-2, 2, 15, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8c6240'; ctx.beginPath(); ctx.ellipse(11, -2, 8, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff8c1a'; ctx.fillRect(15, 2, 2.5, 4); ctx.fillRect(17.7, 2, 2.5, 4);         // famous orange teeth
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(13, -5, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6b4329'; ctx.beginPath(); ctx.arc(7, -8, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(17, -1); ctx.lineTo(24, -3); ctx.moveTo(17, 0); ctx.lineTo(24, 2); ctx.stroke();
+    ctx.restore();
+    if (sink > 0.3) { ctx.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x - 8 + i * 8, y - 6 + Math.sin(frame * .2 + i) * 3, 2, 0, Math.PI * 2); ctx.fill(); } }
+  }
+  function drawLog(x, y, len) {
+    const w = len * CELL - 6;
+    ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.roundRect(x + 3, y - 13, w, 26, 12); ctx.fill();
+    ctx.strokeStyle = '#4e2f16'; ctx.lineWidth = 2;
+    for (let i = 1; i < len * 2; i++) { ctx.beginPath(); ctx.moveTo(x + 3 + i * 20, y - 11); ctx.lineTo(x + 3 + i * 20 - 4, y + 11); ctx.stroke(); }
+    ctx.fillStyle = '#b9864d'; ctx.beginPath(); ctx.ellipse(x + 3 + w - 6, y, 6, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a5a2b'; ctx.beginPath(); ctx.ellipse(x + 3 + w - 6, y, 3, 6, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  function drawTroll(x, y, angry) {
+    ctx.save(); ctx.translate(x, y + Math.sin(frame * .1) * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 12, 22 + Math.sin(frame * .15) * 3, 6, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#5c8f3c'; ctx.beginPath(); ctx.ellipse(0, 2, 18, 17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8e0c0'; ctx.beginPath(); ctx.moveTo(-12, -11); ctx.lineTo(-17, -22); ctx.lineTo(-7, -14); ctx.fill(); ctx.beginPath(); ctx.moveTo(12, -11); ctx.lineTo(17, -22); ctx.lineTo(7, -14); ctx.fill();
+    ctx.fillStyle = '#3e6b25'; ctx.beginPath(); ctx.ellipse(0, -12, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -3, 4, 0, Math.PI * 2); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = angry ? '#d22' : '#111'; ctx.beginPath(); ctx.arc(-6, -2, 2, 0, Math.PI * 2); ctx.arc(6, -2, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, -9); ctx.lineTo(-3, -6); ctx.moveTo(10, -9); ctx.lineTo(3, -6); ctx.stroke();
+    ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.ellipse(0, 8, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-5, 5, 3, 3); ctx.fillRect(2, 5, 3, 3);
+    ctx.fillStyle = '#ffe066'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.fillText('$', 20, -10 + Math.sin(frame * .2) * 2);
+    ctx.restore();
+  }
+  function emoji(ch, x, y, size, flip) {
+    ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+    ctx.font = size + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ch, 0, 2); ctx.restore();
+  }
+  function draw() {
+    if (!lanes) { makeLanes(); }
+    ctx.clearRect(0, 0, W, H);
+    const fr = frame || 0;
+    // water
+    const g = ctx.createLinearGradient(0, CELL * 2, 0, CELL * 13); g.addColorStop(0, '#1c6e8f'); g.addColorStop(1, '#155571');
+    ctx.fillStyle = g; ctx.fillRect(0, CELL * 2, W, CELL * 11);
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 2;
+    for (const r of RIVER_ROWS) { const l = lanes[r], off = ((fr * l.speed * l.dir * 0.6) % 60 + 60) % 60;
+      for (let x = -60 + off; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, rowY(r) + 12); ctx.quadraticCurveTo(x + 10, rowY(r) + 8, x + 20, rowY(r) + 12); ctx.stroke(); } }
+    // header + banks
+    ctx.fillStyle = '#0b1b28'; ctx.fillRect(0, 0, W, CELL);
+    ctx.fillStyle = '#3d7a3a'; ctx.fillRect(0, CELL, W, CELL); ctx.fillRect(0, CELL * 13, W, CELL);
+    ctx.fillStyle = '#2f6230'; for (let x = 0; x < W; x += 12) { ctx.fillRect(x, CELL * 2 - 4, 8, 4); ctx.fillRect(x + 6, CELL * 13, 8, 4); }
+    ctx.fillStyle = '#d9c38a'; ctx.fillRect(0, CELL * 7, W, CELL);
+    ctx.fillStyle = '#c4ad73'; for (let x = 8; x < W; x += 26) ctx.fillRect(x, CELL * 7 + 14 + (x % 3) * 5, 4, 3);
+    ctx.fillStyle = '#081420'; ctx.fillRect(0, CELL * 14, W, CELL);
+    // dens
+    DENS.forEach((dx, i) => {
+      ctx.fillStyle = '#1d3a1b'; ctx.beginPath(); ctx.ellipse(dx, rowY(1) + 4, 17, 15, 0, Math.PI, 0); ctx.lineTo(dx + 17, rowY(1) + 18); ctx.lineTo(dx - 17, rowY(1) + 18); ctx.fill();
+      if (dens && dens[i]) emoji(dens[i], dx, rowY(1) + 2, 26);
+    });
+    // platforms
+    for (const r of RIVER_ROWS) { const l = lanes[r];
+      for (const it of l.items) {
+        if (l.type === 'log') drawLog(it.x, rowY(r), it.len);
+        else { const s = frame === undefined ? 0 : sinkOf(it); for (let c = 0; c < it.len; c++) drawNutria(it.x + c * CELL + CELL / 2, rowY(r), l.dir, s); }
+      } }
+    // troll
+    if (troll) {
+      if (troll.alive) drawTroll(troll.x, rowY(troll.row), true);
+      else if (troll.burnAnim < 60) { ctx.globalAlpha = 1 - troll.burnAnim / 60; ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(troll.burnX, troll.burnY + troll.burnAnim * .3, 16, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    }
+    for (const f of flames || []) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(f.x, f.y, 6, 0, Math.PI * 2); ctx.fill(); }
+    for (const p of parts || []) { ctx.globalAlpha = Math.min(1, p.life / 20); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    // HUD row
+    if (player) {
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('LV ' + level, 8, 14);
+      const tf = Math.max(0, timeLeft / crossTime());
+      ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(50, 9, 150, 10);
+      ctx.fillStyle = tf < .25 ? '#ff5050' : '#7ddc5a'; ctx.fillRect(50, 9, 150 * tf, 10);
+      ctx.textAlign = 'right';
+      if (troll && troll.alive) { ctx.fillStyle = '#ff9a5a'; ctx.fillText('TROLL: TOLLING', W - 8, 14); }
+      else if (troll) { ctx.fillStyle = '#7ddc5a'; ctx.fillText('TOLL-FREE ' + Math.ceil(troll.deadT / 60) + 's', W - 8, 14); }
+      ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '11px system-ui';
+      ctx.fillText('Now: ' + ANIMALS[animalIdx].name, 8, 31);
+      // bottom row: lives + queue
+      ctx.fillStyle = '#ff5a6a'; ctx.font = '16px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText('♥'.repeat(Math.max(0, lives)), 8, rowY(14));
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '11px system-ui'; ctx.textAlign = 'right'; ctx.fillText('up next', W - 104, rowY(14));
+      for (let i = 1; i <= 3; i++) emoji(ANIMALS[(animalIdx + i) % 4].e, W - 100 + i * 26, rowY(14), 20);
+    }
+    if (toast && running) {
+      ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const words = toast.text.split(' '), lines = []; let cur = '';
+      for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > W - 50) { lines.push(cur); cur = w; } else cur = t; }
+      lines.push(cur);
+      const bh = lines.length * 17 + 12, by = CELL * 7 + 20 - bh / 2;
+      ctx.globalAlpha = Math.min(1, toast.t / 20);
+      ctx.fillStyle = 'rgba(8,20,32,.85)'; ctx.beginPath(); ctx.roundRect(16, by, W - 32, bh, 10); ctx.fill();
+      ctx.fillStyle = '#fff'; lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 14 + i * 17));
+      ctx.globalAlpha = 1;
+    }
+    // player
+    if (player && running) {
+      const a = ANIMALS[animalIdx], y = rowY(player.row) - Math.sin((player.hop / 8) * Math.PI) * 8;
+      if (!dying) emoji(a.e, player.x, y, 30, player.face === 'right');
+    }
+  }
+
+  frame = 0; level = 1;
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

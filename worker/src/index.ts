@@ -251,7 +251,7 @@ export default {
     // ── Web UI ───────────────────────────────────────────────
 
     if (pathname === '/' && method === 'GET') {
-      return html(renderArcade());
+      return html(renderArcade({ game: getDailyGame(getGames(), todayUTC()), origin: url.origin }));
     }
 
     if (pathname === '/leaderboard' && method === 'GET') {

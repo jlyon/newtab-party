@@ -34,13 +34,44 @@ const FAVICON = `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://
 
 // ── renderArcade ─────────────────────────────────────
 
-export function renderArcade(): string {
+// Link-preview (Slack, Facebook, iMessage, X…) tags for the arcade page:
+// "Today's game is <name>" plus today's 1200x630 share card (the logo centered on the
+// dark background, built by scripts/gen_share.mjs so unfurlers don't crop it).
+function shareMeta(game: Game | null, origin: string): string {
+  const title = game ? `Today's game is ${game.name}` : 'newtab.party';
+  const tags = [
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="newtab.party">`,
+    `<meta property="og:url" content="${esc(origin)}/">`,
+    `<meta property="og:title" content="${esc(title)}">`,
+    `<meta name="twitter:title" content="${esc(title)}">`,
+  ];
+  if (game) {
+    const img = `${origin}/games/share/${encodeURIComponent(game.id)}.jpg`;
+    tags.push(
+      `<meta property="og:image" content="${esc(img)}">`,
+      `<meta property="og:image:type" content="image/jpeg">`,
+      `<meta property="og:image:width" content="1200">`,
+      `<meta property="og:image:height" content="630">`,
+      `<meta property="og:image:alt" content="${esc(game.name)}">`,
+      `<meta name="twitter:card" content="summary_large_image">`,
+      `<meta name="twitter:image" content="${esc(img)}">`,
+      `<meta name="twitter:image:alt" content="${esc(game.name)}">`,
+    );
+  } else {
+    tags.push(`<meta name="twitter:card" content="summary">`);
+  }
+  return tags.join('\n');
+}
+
+export function renderArcade({ game = null, origin = 'https://newtab.party' }: { game?: Game | null; origin?: string } = {}): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Arcade</title>
+${shareMeta(game, origin)}
 ${FAVICON}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }

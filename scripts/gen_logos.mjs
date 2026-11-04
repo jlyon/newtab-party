@@ -27,6 +27,7 @@ import crypto from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { createRequire } from 'node:module';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { makeShareCard, shareDir, sharePath } from './lib/share_card.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const GAMES_JSON = path.join(ROOT, 'worker', 'games.json');
@@ -343,6 +344,8 @@ async function main() {
         if (issues.length && !fromFile && attempt < retries) { console.log(`      ${slug}: ${issues.join('; ')}; trying again`); continue; }
         fs.writeFileSync(dest, best.png);
         console.log(`saved ${path.relative(ROOT, dest)}  ${best.width}x${best.height}  subject ${Math.round(best.coverage * 100)}%`);
+        fs.mkdirSync(shareDir(ROOT), { recursive: true });
+        fs.writeFileSync(sharePath(ROOT, slug), await makeShareCard(loadSharp(), best.png));   // link-preview card
         if (best.issues.length) console.log(`      warning: ${best.issues.join('; ')}`);
         ok = true;
         break;

@@ -27,6 +27,8 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `scripts/deploy.mjs` | `npm run deploy`: diffs local `games.json` against the live one and refuses if today's or any past day's game would change, then runs `wrangler deploy`. |
 | `scripts/lib/rotation.mjs` | Shared rotation math for the scripts (mirrors `eraFor`/`getDailyGame` in `index.ts`). |
 | `scripts/set_today.mjs` | Makes a given game today's game by swapping it into today's slot (`npm run today -- <id>`). |
+| `ios/` | iOS app: SwiftUI + WKWebView wrapper around `https://newtab.party` (Xcode project `ios/NewTabParty.xcodeproj`). |
+| `tv/` | Google TV / Android TV app: WebView wrapper plus a remote-control layer (remote mode and pointer mode, picked from each game's `controls` text). See `tv/README.md`. |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
 
@@ -65,7 +67,7 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 2. Copy `.html` to `worker/public/games/` and run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>` (desktop, iPhone, iPad)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
 4. **`npm run schedule -- <id>`** — this is what schedules it. **New games air tomorrow by default** (house rule); pass `--date YYYY-MM-DD` only when a specific debut day is wanted (`--end` = end of the cycle). It starts a new era from tomorrow with the game slotted in, so later days shift back one and today and every aired day keep their game. It prints the air date. Deploy before 00:00 UTC so it airs on time.
-5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`)
+5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`) It also writes the 1200x630 link-preview card (`worker/public/games/share/<id>.jpg`, the og:image for `/`); `npm run share` builds any missing cards from existing logos.
 6. `npm run deploy` — any time of day; live immediately, no extension update needed
 
 Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).

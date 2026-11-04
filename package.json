@@ -1,0 +1,24 @@
+{
+  "name": "newtab-party",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --cwd worker",
+    "deploy": "node scripts/deploy.mjs",
+    "db:init:local": "wrangler d1 execute newtab-party --cwd worker --local --file=schema.sql",
+    "db:init:remote": "wrangler d1 execute newtab-party --cwd worker --remote --file=schema.sql",
+    "typecheck": "tsc -p worker --noEmit",
+    "logos": "node scripts/gen_logos.mjs",
+    "share": "node scripts/gen_share.mjs",
+    "schedule": "node scripts/schedule_game.mjs",
+    "retire": "node scripts/retire_game.mjs",
+    "today": "node scripts/set_today.mjs",
+    "qa:lint": "node scripts/qa/lint.mjs",
+    "qa:smoke": "node scripts/qa/smoke.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.4.0",
+    "wrangler": "^4.90.1"
+  }
+}
