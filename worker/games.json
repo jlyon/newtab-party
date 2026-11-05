@@ -28,7 +28,8 @@
     "maze-muncher-sugar-rush",
     "fogwatch",
     "vertigo",
-    "wild-cats"
+    "wild-cats",
+    "the-jen-10"
   ],
   "scheduleHistory": [
     {
@@ -485,6 +486,15 @@
       "controls": "Aim with the mouse or arrow keys, click or Space to throw, A / D to walk the sideline. On touch, tap to throw and use the ◀ ▶ buttons to walk.",
       "type": "throwing",
       "logo": "a cartoon soccer coach in a red ball cap and whistle winding up to throw a crispy golden chicken tender, soccer pitch crest"
+    },
+    {
+      "id": "the-jen-10",
+      "name": "The Jen 10",
+      "file": "games/the-jen-10.html",
+      "description": "First-person pass-only basketball. You are Jen, point guard who refuses to shoot, dropping dimes to cutting office coworkers while a villain named Sidekick reads your eyes. Look one way, pass the other.",
+      "controls": "Move the mouse or your finger to look, click or tap a coworker to pass. Keyboard: arrows look, up picks a coworker, Space passes. Three turnovers and you are benched.",
+      "type": "sports",
+      "logo": "a smirking cartoon point guard in a pink #10 jersey and dark sunglasses throwing a no-look basketball pass, mint green court crest"
     }
   ]
 }
