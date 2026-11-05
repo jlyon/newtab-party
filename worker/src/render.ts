@@ -30,7 +30,11 @@ function formatCountdown(ms: number): string {
   return `${h}h ${m}m`;
 }
 
-const FAVICON = `<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥳</text></svg>">`;
+// Real image files (worker/public), not a data: URI, so link unfurlers (Slack, iMessage…)
+// can show the site icon next to "newtab.party". Generated from extension/icons/icon128.png.
+const FAVICON = `<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" href="/favicon.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">`;
 
 // ── renderArcade ─────────────────────────────────────
 

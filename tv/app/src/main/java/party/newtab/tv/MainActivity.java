@@ -265,7 +265,7 @@ public class MainActivity extends Activity {
 
     /** Arrow-key games play in remote mode; click/tap-only games get the pointer. */
     static boolean wantsArrowKeys(String controls) {
-        String c = controls.toLowerCase();
+        String c = controls.toLowerCase(java.util.Locale.ROOT);
         return c.contains("←") || c.contains("→") || c.contains("↑") || c.contains("↓")
             || c.contains("arrow") || c.contains("wasd") || c.contains("d-pad")
             || c.contains("a/d") || c.contains("a / d") || c.contains("a·d");

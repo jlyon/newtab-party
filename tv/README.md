@@ -22,13 +22,13 @@ Pair a remote on the TV under Settings, then Remotes & Accessories, then Pair re
 
 ## Build
 
-Needs JDK 17 or newer, the Android SDK (platform 36, build-tools, platform-tools) and Gradle 8.13 or newer for the first wrapper run.
+Needs JDK 17 or newer and the Android SDK with platform 36, build-tools and platform-tools. The Gradle wrapper is checked in, so Gradle itself downloads on the first run.
 
 ```bash
 cd tv
-echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
-gradle wrapper --gradle-version 8.14.3   # first time only
-./gradlew assembleDebug                  # app/build/outputs/apk/debug/app-debug.apk
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # first time only
+./gradlew assembleDebug    # writes app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## Install on a Google TV
