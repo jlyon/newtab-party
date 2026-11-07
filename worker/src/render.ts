@@ -163,6 +163,7 @@ ${FAVICON}
     <span id="high-score"></span>
     <div class="topbar-actions">
       <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
+      <a class="btn-link" href="/games">All games</a>
       <a class="btn-link" id="lb-link" href="/leaderboard">Leaderboard</a>
       <button class="btn-link" onclick="openAbout()">About</button>
     </div>
@@ -433,8 +434,9 @@ init();
 }
 
 // ── renderGamesCalendar ──────────────────────────────
-// The (unlinked) /games "practice room" — every game laid out on a calendar,
-// each cell thumbnailed with its own gameplay screenshot. Past days replay for
+// The /games "practice room" (the topbar's "All games" link) — every game laid out
+// on a calendar, each cell showing the game's logo. On phones the week grid becomes a
+// newest-first tile grid (today first, no weekday columns). Past days replay for
 // practice; today is the only one that counts toward the leaderboard.
 
 export interface CalCell {
@@ -482,10 +484,34 @@ const PRACTICE_CSS = `  * { box-sizing: border-box; margin: 0; padding: 0; }
   a.cal-cell.is-retired:hover { filter: none; opacity: 1; }
   .foot { margin-top: 30px; font-size: 12px; color: rgba(255,255,255,0.28); }
   .foot a { color: rgba(255,255,255,0.5); }
-  @media (max-width: 560px) {
-    .cal-name { font-size: 10px; }
-    .cal-cell { padding: 5px; border-radius: 8px; }
-    .cal-badge { font-size: 8px; }
+  .cal-wd { display: none; }
+  /* Big screens (desktop, TV): a wider calendar with bigger tiles and labels. */
+  @media (min-width: 1400px) { .wrap { max-width: 1240px; } .cal-day { font-size: 14px; } .cal-badge { font-size: 11px; } }
+  /* Short landscape (phone sideways, TV): tighter intro so the calendar starts above the fold. */
+  @media (max-height: 560px) and (orientation: landscape) {
+    body { padding-top: 22px; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .blurb { font-size: 13px; line-height: 1.5; }
+    .legend { margin: 12px 0 12px; }
+  }
+  /* Phones: drop the weekday columns. Every aired game becomes a tile in one grid,
+     newest first (today on top), labelled with its weekday and date. */
+  @media (max-width: 600px) {
+    body { padding: 28px 16px 60px; }
+    .blurb { font-size: 14px; }
+    .cal-head { display: none; }
+    .cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+    .cal-week { display: contents; }
+    .cal .cal-cell { order: var(--rev); }
+    .cal .cal-cell.is-empty, .cal .cal-cell.is-future { display: none; }
+    .cal-wd { display: inline; }
+    .cal-day { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .cal-logo { top: 26px; bottom: 6px; max-height: 70%; }
+    .cal-cell.is-today .cal-logo { bottom: 20px; max-height: 60%; }
+    .cal-cell { border-radius: 8px; }
+    .cal-badge { font-size: 9px; }
+    .retired-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+    .legend .future-key { display: none; }
   }
   .retired-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; padding: 12px 18px; border-radius: 10px; background: #14141f; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.75); font-size: 14px; font-weight: 600; text-decoration: none; transition: border-color 0.12s ease, color 0.12s ease; }
   .retired-link:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
@@ -502,29 +528,33 @@ const PRACTICE_CSS = `  * { box-sizing: border-box; margin: 0; padding: 0; }
 export function renderGamesCalendar({ today, cells, retiredCount = 0 }: { today: string; cells: CalCell[]; retiredCount?: number }): string {
   const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const cellHtml = (c: CalCell): string => {
-    const dayNum = Number(c.date.slice(8, 10));
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const cellHtml = (c: CalCell, i: number): string => {
+    const d = new Date(c.date + 'T00:00:00Z');
+    // "5" in the week grid; "Thu, Nov 5" in the phone tile grid (the .cal-wd part is phone-only).
+    const dayNum = `<span class="cal-wd">${WEEKDAYS[d.getUTCDay()]}, ${MONTHS[d.getUTCMonth()]} </span>${d.getUTCDate()}`;
+    const rev = ` style="--rev:${-i}"`;
     // Empty grid padding — no game scheduled on this day.
     if (!c.game) {
-      return `<div class="cal-cell is-empty"><span class="cal-day">${dayNum}</span></div>`;
+      return `<div class="cal-cell is-empty"${rev}><span class="cal-day">${dayNum}</span></div>`;
     }
     const name = esc(c.game.name);
     // Upcoming games stay hidden — locked placeholder, no logo or title revealed.
     if (c.isFuture) {
-      return `<div class="cal-cell is-future"><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
+      return `<div class="cal-cell is-future"${rev}><span class="cal-day">${dayNum}</span><span class="cal-lock">🔒</span></div>`;
     }
     const logo = `<img class="cal-logo" src="/games/logos/${c.game.id}.png" alt="${name}" loading="lazy">`;
     const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
     const href = c.isToday ? '/' : `/play/${c.date}`;
     const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
     const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
-    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
+    return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"${rev}><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
   };
 
   // Group into weeks of 7 (cells already start on a Sunday and end on a Saturday).
   let weeks = '';
   for (let i = 0; i < cells.length; i += 7) {
-    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map(cellHtml).join('')}</div>`;
+    weeks += `<div class="cal-week">${cells.slice(i, i + 7).map((c, j) => cellHtml(c, i + j)).join('')}</div>`;
   }
 
   // Retired games live on their own page (/games/retired).
@@ -551,10 +581,10 @@ ${PRACTICE_CSS}</style>
   <div class="legend">
     <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
     <span><i class="dot past"></i> Past game (practice, scores not saved)</span>
-    <span><i class="dot future"></i> Not aired yet</span>
+    <span class="future-key"><i class="dot future"></i> Not aired yet</span>
   </div>
   <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
-  ${weeks}
+  <div class="cal">${weeks}</div>
   ${retiredHtml}
   <div class="foot"><a href="/">← Back to today's game</a></div>
 </div>
@@ -845,6 +875,7 @@ ${FAVICON}
     <div class="topbar-actions">
       <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
       <button class="btn-link" onclick="document.getElementById('scores-overlay').classList.add('open')">Scores</button>
+      <a class="btn-link" href="/games">All games</a>
       <a class="btn-link" href="/leaderboard">← Leaderboard</a>
     </div>
   </div>

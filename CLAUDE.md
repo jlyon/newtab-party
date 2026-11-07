@@ -40,7 +40,7 @@ The arcade shell (topbar, About modal, recent-games cards, name prompt) exists i
 Any change to the arcade/About UI (About copy, recent-games card design, links, topbar, name prompt, etc.) MUST be made in **both**. Things to watch when porting:
 
 - The extension page is not on the worker origin, so every URL in the extension must be absolute via the `SERVER_URL` const (e.g. `` `${SERVER_URL}/games/logos/<id>.png` ``, `` `${SERVER_URL}/leaderboard` ``), whereas the worker uses root-relative paths (`/games`, `/leaderboard`).
-- The `/games` calendar (`renderGamesCalendar()`) is worker-only; the extension **links** to it (`https://newtab.party/games`, "Practice room") rather than rendering it.
+- The `/games` calendar (`renderGamesCalendar()`) is worker-only; both topbars have an "All games" link to it (root-relative `/games` in the worker, `https://newtab.party/games` in the extension, which also links it from About as "Practice room") rather than rendering it. On phones (≤600px) it drops the weekday columns for a newest-first tile grid.
 - Recent-games cards (About modal) and the `/games` calendar cells share one look: the transparent game logo (`/games/logos/<id>.png`) centered on a dark square tile, gold border for today, date/day label top-left, no screenshot thumbnails. Keep that consistent across `renderArcade()`, `renderGamesCalendar()`, and the extension.
 
 ## Daily game algorithm
