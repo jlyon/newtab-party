@@ -86,6 +86,13 @@
     #over-overlay p { margin: 6px 0; }
     #over-overlay button { margin-top: 10px; }
   }
+  /* Short portrait phones (iPhone SE): smaller logo and tighter panel so the button stays on screen. */
+  @media (orientation: portrait) and (max-height: 620px) {
+    #start-overlay img { max-height: 28dvh !important; margin-bottom: 6px !important; }
+    #start-overlay .panel { padding: 16px 18px; }
+    #start-overlay p { margin: 6px 0; font-size: 13px; line-height: 1.4; }
+    #start-overlay button { margin-top: 12px; padding: 12px 40px; }
+  }
   @media (min-width: 1200px) and (min-height: 700px) { #start-overlay .panel { max-width: 660px; } .overlay p { font-size: 18px; max-width: 52ch; } }
 </style>
 </head>

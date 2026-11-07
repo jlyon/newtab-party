@@ -111,7 +111,8 @@ async function layoutReport(page) {
     const out = { innerW: innerWidth, innerH: innerHeight, scrollW: de.scrollWidth, scrollH: de.scrollHeight, bodyScrollH: document.body.scrollHeight, touchClass: document.body.classList.contains('touch'), issues: [] };
     if (de.scrollWidth > innerWidth + 1) out.issues.push(`horizontal overflow ${de.scrollWidth}>${innerWidth}`);
     // Content taller than the viewport must be reachable by touch: some ancestor with overflow auto/scroll whose touch-action allows pan-y.
-    const tallest = [...document.querySelectorAll('body *')].filter(vis).filter(el => el.getBoundingClientRect().bottom > innerHeight + 4 && getComputedStyle(el).position !== 'fixed');
+    // (SVG children are skipped: the <svg> viewport clips them, so an oversized decorative path is never visible.)
+    const tallest = [...document.querySelectorAll('body *')].filter(vis).filter(el => !el.ownerSVGElement && el.getBoundingClientRect().bottom > innerHeight + 4 && getComputedStyle(el).position !== 'fixed');
     for (const el of tallest.slice(0, 40)) {
       let p = el, ok = false;
       while (p && p !== document.documentElement) { const cs = getComputedStyle(p); if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && p.scrollHeight > p.clientHeight + 2 && cs.touchAction !== 'none') { ok = true; break; } p = p.parentElement; }
