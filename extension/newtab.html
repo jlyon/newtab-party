@@ -346,6 +346,31 @@
       .lb-anon {
         color: rgba(255, 255, 255, 0.2);
       }
+      /* Report flag on leaderboard names (mirrors REPORT_CSS in worker/src/render.ts) */
+      .lb-player .report-btn {
+        margin-left: 8px;
+        background: none;
+        border: 0;
+        color: rgba(255, 255, 255, 0.18);
+        font-size: 11px;
+        cursor: pointer;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: inherit;
+        vertical-align: 1px;
+      }
+      .lb-player .report-btn:hover,
+      .lb-player .report-btn:focus-visible {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .lb-player .report-btn.confirm {
+        color: #ff9a9a;
+        background: rgba(255, 90, 90, 0.14);
+      }
+      .lb-player .report-btn.done {
+        color: rgba(255, 255, 255, 0.3);
+        cursor: default;
+      }
       .lb-score {
         font-size: 17px;
         font-weight: 700;
@@ -580,6 +605,11 @@
       #name-input:focus {
         border-color: rgba(255, 255, 255, 0.3);
       }
+      .name-error {
+        color: #ff9a9a;
+        font-size: 12px;
+        margin: -6px 0 12px;
+      }
       .name-btns {
         display: flex;
         gap: 8px;
@@ -744,6 +774,9 @@
             >Practice room →</a
           >
           <button id="about-open-lb">Leaderboard →</button>
+          <a href="https://newtab.party/privacy" target="_blank" rel="noopener"
+            >Privacy</a
+          >
         </div>
       </div>
     </div>
@@ -762,6 +795,7 @@
           maxlength="30"
           autocomplete="off"
         />
+        <p id="name-error" class="name-error" hidden></p>
         <div class="name-btns">
           <button id="name-submit-btn">Save to leaderboard</button>
           <button id="name-skip-btn">Skip</button>

@@ -318,10 +318,11 @@ async function openLeaderboard() {
         const tr = document.createElement("tr");
         tr.innerHTML =
           `<td class="lb-rank">${i + 1}</td>` +
-          `<td class="lb-player">${s.player_name ? esc(s.player_name) : '<span class="lb-anon">—</span>'}</td>` +
+          `<td class="lb-player">${s.player_name ? `<span class="pn">${esc(s.player_name)}</span><button type="button" class="report-btn" data-play="${s.id}" title="Report this name" aria-label="Report this name">⚑</button>` : '<span class="lb-anon">—</span>'}</td>` +
           `<td class="lb-score">${s.score.toLocaleString()}</td>`;
         tbody.appendChild(tr);
       });
+      hideBlockedNames();
     } else {
       tbody.innerHTML =
         '<tr><td colspan="3" class="lb-empty">No scores yet today — be the first</td></tr>';
@@ -357,6 +358,7 @@ function closeAbout() {
 
 function showNamePrompt(rank) {
   const saved = localStorage.getItem("playerName");
+  document.getElementById("name-error").hidden = true;
   document.getElementById("name-rank-val").textContent = rank;
   document.getElementById("name-input").value = saved || "";
   document.getElementById("name-overlay").classList.add("open");
@@ -387,16 +389,89 @@ function submitName() {
     skipName();
     return;
   }
-  closeNamePrompt();
   const id = sessionPlayId;
-  sessionPlayId = null;
-  localStorage.setItem("playerName", name);
+  const err = document.getElementById("name-error");
+  err.hidden = true;
   fetch(`${SERVER_URL}/api/plays/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ playerName: name }),
-  }).catch(() => {});
+  })
+    .then((r) => {
+      // The name filter said no: keep the prompt open so they can pick another.
+      if (r.status === 422) {
+        return r
+          .json()
+          .catch(() => ({}))
+          .then((d) => {
+            err.textContent = d.message || "That name is not allowed. Please pick another.";
+            err.hidden = false;
+            document.getElementById("name-input").focus();
+          });
+      }
+      sessionPlayId = null;
+      localStorage.setItem("playerName", name);
+      closeNamePrompt();
+    })
+    .catch(() => {
+      sessionPlayId = null;
+      closeNamePrompt();
+    });
 }
+
+// ── Reporting leaderboard names ───────────────────
+// Mirrors REPORT_JS in worker/src/render.ts. First tap arms the flag, second tap
+// reports the name and hides it for this viewer.
+
+const BLOCKED_KEY = "blockedNames";
+
+function blockedNames() {
+  try {
+    return JSON.parse(localStorage.getItem(BLOCKED_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function hideBlockedNames() {
+  const b = blockedNames().map((n) => String(n).toLowerCase());
+  document.querySelectorAll(".lb-player .pn").forEach((el) => {
+    if (b.includes(el.textContent.toLowerCase()))
+      el.parentNode.innerHTML = '<span class="lb-anon">Hidden</span>';
+  });
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest && e.target.closest(".report-btn");
+  if (!btn || btn.classList.contains("done")) return;
+  if (!btn.classList.contains("confirm")) {
+    btn.classList.add("confirm");
+    btn.textContent = "Report?";
+    setTimeout(() => {
+      if (!btn.classList.contains("done")) {
+        btn.classList.remove("confirm");
+        btn.textContent = "⚑";
+      }
+    }, 4000);
+    return;
+  }
+  btn.classList.remove("confirm");
+  btn.classList.add("done");
+  btn.textContent = "Reported";
+  const pn = btn.parentNode.querySelector(".pn");
+  const name = pn ? pn.textContent : "";
+  fetch(`${SERVER_URL}/api/plays/${btn.dataset.play}/report`, { method: "POST" }).catch(() => {});
+  if (name) {
+    const b = blockedNames();
+    if (!b.includes(name)) {
+      b.push(name);
+      try {
+        localStorage.setItem(BLOCKED_KEY, JSON.stringify(b.slice(-200)));
+      } catch {}
+    }
+  }
+  setTimeout(hideBlockedNames, 900);
+});
 
 // ── Utilities ─────────────────────────────────────
 
