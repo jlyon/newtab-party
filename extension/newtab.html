@@ -272,6 +272,31 @@
       }
 
       /* ── Leaderboard modal specifics ─────────────────── */
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 28px;
+      }
+      .title-row > div {
+        min-width: 0;
+      }
+      .title-row .modal-subtitle {
+        margin-bottom: 0;
+      }
+      .title-logo {
+        width: 84px;
+        height: 84px;
+        object-fit: contain;
+        flex-shrink: 0;
+        filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+      }
+      @media (max-width: 480px) {
+        .title-logo {
+          width: 64px;
+          height: 64px;
+        }
+      }
       #lb-modal {
         max-width: 520px;
       }
@@ -615,9 +640,14 @@
     <div id="lb-overlay" class="modal-overlay">
       <div id="lb-modal" class="modal-box">
         <button id="lb-close" class="modal-close">×</button>
-        <div class="modal-label" id="lb-label">Today</div>
-        <div class="modal-title" id="lb-game-name">…</div>
-        <div class="modal-subtitle" id="lb-game-type"></div>
+        <div class="title-row">
+          <img class="title-logo" id="lb-logo" alt="" hidden />
+          <div>
+            <div class="modal-label" id="lb-label">Today</div>
+            <div class="modal-title" id="lb-game-name">…</div>
+            <div class="modal-subtitle" id="lb-game-type"></div>
+          </div>
+        </div>
         <div id="lb-loading">Loading…</div>
         <table class="lb-table" id="lb-table" style="display: none">
           <thead>

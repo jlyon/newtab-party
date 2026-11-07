@@ -427,9 +427,12 @@ Add an entry to `worker/games.json` under the `"games"` array:
      "file": "games/<slug>.html",
      "description": "One sentence about what the game is.",
      "controls": "Short controls hint shown on the start screen.",
-     "type": "<game-type>"
+     "type": "<game-type>",
+     "model": "<your model ID>"
    }
    ```
+`model` records which Claude model built the game: your own exact model ID as given in your system prompt (for example `claude-opus-5-5`, not a marketing name like "Opus 5.5"). If you can't tell which model you are, ask the user instead of guessing. When you later **rebuild or substantially rework** an existing game (new mechanics, an art overhaul, a rewrite), set `model` to your ID. Leave it alone for maintenance passes: layout/responsive fixes, QA fixes, logos, copy tweaks.
+
 Then schedule it with **`npm run schedule -- <slug>`** from the repo root. New games air **tomorrow** by default; if the user named a specific debut date, add `--date YYYY-MM-DD`. It never moves today or a day that has aired, and prints the air date. Never hand-edit or reorder `schedule` (see CLAUDE.md rotation rules).
 
 ### 5. Ship

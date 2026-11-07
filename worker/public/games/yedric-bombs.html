@@ -183,7 +183,7 @@
   }
   fitCanvas();
   addEventListener('resize', fitCanvas);
-  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas);
 
   // ===== GAME-SPECIFIC SECTION =====
   const PLAYER_NAME  = 'Yedric';

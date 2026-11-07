@@ -120,7 +120,7 @@
     ctx.imageSmoothingEnabled = false;
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
-  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
+  try { new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas); } catch (e) {}
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};

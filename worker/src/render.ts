@@ -659,6 +659,11 @@ ${FAVICON}
   .daily-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 6px; }
   .daily-game { font-size: 32px; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
   .daily-date { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 28px; }
+  .title-row { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+  .title-row > div { min-width: 0; }
+  .title-logo { width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); }
+  @media (max-width: 480px) { .title-logo { width: 64px; height: 64px; } }
+  .title-row .daily-date { margin-bottom: 0; }
   .daily-desc { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 28px; line-height: 1.5; max-width: 480px; }
   .score-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
   .score-table thead th { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; padding: 0 0 10px; text-align: left; }
@@ -693,9 +698,14 @@ ${FAVICON}
     <a class="btn-install" href="https://chromewebstore.google.com/detail/newtabparty/hhledeikahmmaakcgcapeklbajaganbm" target="_blank" rel="noopener">+ Add to Chrome</a>
   </div>
 
-  <div class="daily-label">Today · ${fmtDate(today)}</div>
-  <div class="daily-game">${esc(game?.name ?? 'No game configured')}</div>
-  <div class="daily-date">${esc(game?.type ?? '')}</div>
+  <div class="title-row">
+    ${game ? `<img class="title-logo" src="/games/logos/${esc(game.id)}.png" alt="" onerror="this.remove()">` : ''}
+    <div>
+      <div class="daily-label">Today · ${fmtDate(today)}</div>
+      <div class="daily-game">${esc(game?.name ?? 'No game configured')}</div>
+      <div class="daily-date">${esc(game?.type ?? '')}</div>
+    </div>
+  </div>
   ${game?.description ? `<div class="daily-desc">${esc(game.description)}</div>` : ''}
 
   <table class="score-table">
@@ -795,6 +805,11 @@ ${FAVICON}
   .modal-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 6px; }
   .modal-title { font-size: 30px; font-weight: 700; margin-bottom: 4px; }
   .modal-subtitle { color: rgba(255,255,255,0.3); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 28px; }
+  .title-row { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+  .title-row > div { min-width: 0; }
+  .title-logo { width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45)); }
+  @media (max-width: 480px) { .title-logo { width: 64px; height: 64px; } }
+  .title-row .modal-subtitle { margin-bottom: 0; }
   .score-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
   .score-table thead th { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; padding: 0 0 10px; text-align: left; }
   .score-table thead th.r { text-align: right; }
@@ -842,9 +857,14 @@ ${FAVICON}
 <div id="scores-overlay"${openScores ? ' class="open"' : ''}>
   <div id="scores-modal">
     <button class="modal-close" onclick="closeScores()">×</button>
-    <div class="modal-label">${esc(dateLabel)}</div>
-    <div class="modal-title">${esc(game.name)}</div>
-    <div class="modal-subtitle">${esc(game.type ?? '')}</div>
+    <div class="title-row">
+      <img class="title-logo" src="/games/logos/${esc(game.id)}.png" alt="" onerror="this.remove()">
+      <div>
+        <div class="modal-label">${esc(dateLabel)}</div>
+        <div class="modal-title">${esc(game.name)}</div>
+        <div class="modal-subtitle">${esc(game.type ?? '')}</div>
+      </div>
+    </div>
     <table class="score-table">
       <thead>
         <tr><th></th><th>Player</th><th class="r">Score</th></tr>

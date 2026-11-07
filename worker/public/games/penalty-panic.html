@@ -226,7 +226,7 @@ body.touch #controls { display:flex; }
   }
   fitCanvas();
   window.addEventListener('resize', fitCanvas);
-  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
+  try { new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas); } catch (e) {}
 
   // Goal + pitch geometry
   const GL = 130, GR = 470, GTOP = 56, GLINE = 200;   // posts, crossbar, keeper line

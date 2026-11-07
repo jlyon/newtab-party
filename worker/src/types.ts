@@ -5,6 +5,7 @@ export interface Game {
   description?: string;
   controls?: string;
   type?: string;
+  model?: string;   // Claude model ID that last built or substantively reworked the game, e.g. "claude-opus-5-5"
 }
 
 // One rotation era: `schedule` (game ids in air order) anchored at `scheduleEpoch`.

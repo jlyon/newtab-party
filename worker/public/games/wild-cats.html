@@ -137,7 +137,7 @@
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
   window.addEventListener('touchstart', () => setTimeout(fitCanvas, 0), { once: true, passive: true });   // body.touch reveals the hint
-  if (window.ResizeObserver) { const ro = new ResizeObserver(() => fitCanvas()); for (const el of canvas.parentElement.children) if (el !== canvas) ro.observe(el); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => requestAnimationFrame(fitCanvas)); for (const el of canvas.parentElement.children) if (el !== canvas) ro.observe(el); }
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {};

@@ -264,7 +264,7 @@
   }
   function fit() { const w = Math.max(1, stage.getBoundingClientRect().width); renderer.setSize(w, w * 400 / 640, false); }
   fit(); addEventListener('resize', fit);
-  if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);   // body.touch changes the layout
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fit)).observe(stage);   // body.touch changes the layout
 
   scene.add(new THREE.HemisphereLight('#cfe4ff', '#1f4a24', 0.55));
   const sun = new THREE.DirectionalLight('#fff1d6', 0.95);

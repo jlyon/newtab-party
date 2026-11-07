@@ -246,7 +246,7 @@
   }
   fitCanvas();
   addEventListener('resize', fitCanvas);
-  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas);
   const scoreEl = document.getElementById('score');
   const livesEl = document.getElementById('lives');
   const overlay = document.getElementById('overlay');

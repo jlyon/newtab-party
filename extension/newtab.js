@@ -306,6 +306,10 @@ async function openLeaderboard() {
     document.getElementById("lb-game-name").textContent =
       data.game?.name ?? "—";
     document.getElementById("lb-game-type").textContent = data.game?.type ?? "";
+    const lbLogo = document.getElementById("lb-logo");
+    lbLogo.hidden = !data.game?.id;
+    lbLogo.onerror = () => { lbLogo.hidden = true; };
+    if (data.game?.id) lbLogo.src = `${SERVER_URL}/games/logos/${data.game.id}.png`;
 
     const tbody = document.getElementById("lb-rows");
     tbody.innerHTML = "";

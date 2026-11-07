@@ -208,7 +208,7 @@
   }
   fitCanvas();
   addEventListener('resize', fitCanvas);
-  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas);
   window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitCanvas, 50); }, { once: true, passive: true });
   // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
   window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });

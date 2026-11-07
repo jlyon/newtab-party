@@ -115,7 +115,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
-  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);   // body.touch changes the layout
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas);   // body.touch changes the layout
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};

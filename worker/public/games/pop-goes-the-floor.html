@@ -119,7 +119,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
-  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
+  try { new ResizeObserver(() => requestAnimationFrame(fitCanvas)).observe(canvas); } catch (e) {}
 
   const keys = {}, held = {};
   addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();

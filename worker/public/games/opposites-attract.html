@@ -98,7 +98,7 @@
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
   window.addEventListener('touchstart', () => setTimeout(fitCanvas, 0), { once: true, passive: true });   // body.touch reveals hint/controls
-  if (window.ResizeObserver) { const ro = new ResizeObserver(() => fitCanvas()); for (const el of canvas.parentElement.children) if (el !== canvas) ro.observe(el); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => requestAnimationFrame(fitCanvas)); for (const el of canvas.parentElement.children) if (el !== canvas) ro.observe(el); }
 
   const keys = {};
   addEventListener('keydown', e => {

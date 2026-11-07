@@ -70,9 +70,12 @@ Want everyone to play it? Open a pull request.
      "file": "games/my-game.html",
      "description": "One sentence about the game.",
      "controls": "Arrow keys to move · Space to shoot · Swipe on mobile",
-     "type": "spaceship-shooter"
+     "type": "spaceship-shooter",
+     "model": "claude-opus-5-5"
    }
    ```
+
+   `model` is the ID of the Claude model that built the game (optional; leave it out if a person made it).
 
 3. Run `npm run schedule -- my-game` from the repo root. New games always go to the **front of the queue** and air tomorrow (house rule), pushing the rest of the cycle back a day without touching today or any day that has aired. Never edit the `schedule` array by hand.
 4. Run the QA checks from the repo root and fix anything they flag:

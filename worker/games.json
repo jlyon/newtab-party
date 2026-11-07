@@ -197,7 +197,8 @@
       "file": "games/blouncerroozal.html",
       "description": "Casino chip brick-breaker. Smash gold and silver chips with a shrinking paddle, catch falling chips to trigger multiball mayhem. Score scales with chip value.",
       "controls": "Mouse or ← → to move · Click or Space to launch · Catch falling chips for multiball",
-      "type": "brick-breaker"
+      "type": "brick-breaker",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "shootin-n-crackin",
@@ -205,7 +206,8 @@
       "file": "games/shootin-n-crackin.html",
       "description": "Pizza Slice vs the IRS. Your bouncing lasers shred briefcase auditors while you dodge the audit boss every 30 seconds. Waves get faster.",
       "controls": "Arrow keys or WASD to move · Space to shoot · Lasers bounce off walls",
-      "type": "spaceship-shooter"
+      "type": "spaceship-shooter",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "the-wildcard",
@@ -213,7 +215,8 @@
       "file": "games/the-wildcard.html",
       "description": "Bachelorette party choose-your-own-adventure. You are the wild card. There are multiple endings. You will probably earn most of them.",
       "controls": "Click choices to advance the story",
-      "type": "cyoa"
+      "type": "cyoa",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "stump-grandpa",
@@ -221,7 +224,8 @@
       "file": "games/stump-grandpa.html",
       "description": "18-pair memory match against a cantankerous grandpa who heckles your mistakes, drains patience over time, and occasionally shuffles the cards when you miss.",
       "controls": "Click cards to flip · Match all pairs before Grandpa loses patience",
-      "type": "card-game"
+      "type": "card-game",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "rock-em-sock-em-wrecking-ball",
@@ -229,7 +233,8 @@
       "file": "games/rock-em-sock-em-wrecking-ball.html",
       "description": "Uncle Earl takes on the HOA board in a fists-vs-clipboards brawl. Punch the suit-wearing enforcers before they reach you. Score 300 to flip the table.",
       "controls": "← → or A/D to move · Space/Z/X or button to punch",
-      "type": "brawler"
+      "type": "brawler",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "smithereens",
@@ -237,7 +242,8 @@
       "file": "games/smithereens.html",
       "description": "Backyard artillery: your lawnmower has a cannon and so does TANGO's. Aim, charge, and blast every TANGO into lawn confetti. Wind changes every round, the lawn craters under every hit, and each new TANGO aims sharper.",
       "controls": "← → / A D or drag the lawn to aim · Hold Space / FIRE to charge, release to shoot · 1–4 or WPN to switch weapons (Pinecone, Sprinkler, Garden Gnome, Bouncy Ball)",
-      "type": "artillery"
+      "type": "artillery",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "yedric-bombs",
@@ -245,7 +251,8 @@
       "file": "games/yedric-bombs.html",
       "description": "Yedric the yeti shreds the mountain — dodging pines, boulders, and robot impostors on the way to the finish. Hit ramps for big air, thread gates for bonus points.",
       "controls": "← → or A/D to steer · Tilt phone to steer · Hit jumps to clear trees and rocks",
-      "type": "ski"
+      "type": "ski",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "yeti-run",
@@ -253,7 +260,8 @@
       "file": "games/yeti-run.html",
       "description": "Help Yedric escape the mountain. Jump over snowmen, dodge wayward skiers, and outrun avalanche boulders. Double-jump allowed. The mountain always wins. Eventually.",
       "controls": "Space or ↑ to jump · Double-jump for extra height · Tap anywhere on mobile",
-      "type": "runner"
+      "type": "runner",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "hognose",
@@ -261,7 +269,8 @@
       "file": "games/hognose.html",
       "description": "Dr. Hognose PhD needs 25 graduation caps. Slither the dramatic hognose snake through the grid, collect caps, and don't eat your own tail. She will huff at you if you fail.",
       "controls": "Arrow keys or WASD to slither · Swipe or D-pad on mobile · Don't eat your tail",
-      "type": "snake"
+      "type": "snake",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "burnin-glory",
@@ -269,7 +278,8 @@
       "file": "games/burnin-glory.html",
       "description": "Jungle Rally Championship. Pilot the navy kart down a sweeping 3D dirt road deep into the jungle — overtake rivals, dodge hotshots charging from behind, and stay out of the mud.",
       "controls": "← → or A/D to steer through the sweepers · Space or button to boost · Swipe or tilt on mobile",
-      "type": "racing"
+      "type": "racing",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "tippity-toes",
@@ -277,7 +287,8 @@
       "file": "games/tippity-toes.html",
       "type": "Minesweeper",
       "description": "Bun-Bun the Easter Bunny is tip-toeing through the egg basket. Clear the field without cracking a single egg.",
-      "controls": "Click to reveal · Right-click or long-press to flag a rabbit"
+      "controls": "Click to reveal · Right-click or long-press to flag a rabbit",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "coeur-brise",
@@ -285,7 +296,8 @@
       "file": "games/coeur-brise.html",
       "type": "Hearts",
       "description": "A game of polite betrayal at a Parisian card table. Avoid hearts and the Queen of Spades — or shoot the moon.",
-      "controls": "Click cards to select · Click Pass to confirm · Click to play a card"
+      "controls": "Click cards to select · Click Pass to confirm · Click to play a card",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "oligarchs-dilemma",
@@ -293,7 +305,8 @@
       "file": "games/oligarchs-dilemma.html",
       "type": "Deal or No Deal",
       "description": "16 sealed cases. One holds your fortune. Elon the Banker phones in lowball offers. Greed is a strategy.",
-      "controls": "Click cases to open · Deal or No Deal to respond to offers"
+      "controls": "Click cases to open · Deal or No Deal to respond to offers",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "frosty-freefall",
@@ -301,7 +314,8 @@
       "file": "games/frosty-freefall.html",
       "type": "Catcher",
       "description": "Frosty fell apart in the sky. Catch his pieces in order (base, middle, head, hat) as they stack up on your mitten, grab carrots, coal and scarves for bonus points, and dodge fireballs and road salt.",
-      "controls": "← → / A D to move the mitten. On touch, drag, tilt or hold ◀ ▶. Build Frostys in a row to raise your multiplier. Three hits and he melts."
+      "controls": "← → / A D to move the mitten. On touch, drag, tilt or hold ◀ ▶. Build Frostys in a row to raise your multiplier. Three hits and he melts.",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "rack-attack",
@@ -309,7 +323,8 @@
       "file": "games/rack-attack.html",
       "type": "Beer Pong",
       "description": "Frat basement. Ten red cups a side. You vs. Chad. Sink all his cups before he sinks yours.",
-      "controls": "← → to aim · Hold Space to charge · Release to throw"
+      "controls": "← → to aim · Hold Space to charge · Release to throw",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "fly-by-the-seat-of-your-pants",
@@ -317,7 +332,8 @@
       "file": "games/fly-by-the-seat-of-your-pants.html",
       "type": "Shooter",
       "description": "You're Rogue One, threading a canyon in a TIE fighter. Dodge the walls, shoot the asteroids, survive.",
-      "controls": "Arrows or WASD to fly · Space to fire"
+      "controls": "Arrows or WASD to fly · Space to fire",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "chop-till-you-drop",
@@ -325,7 +341,8 @@
       "file": "games/chop-till-you-drop.html",
       "type": "Chopper",
       "description": "Benny the Beaver chops a tree before the stamina bar runs dry. Dodge branches labeled with rivals.",
-      "controls": "← → arrows to chop sides"
+      "controls": "← → arrows to chop sides",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "penalty-panic",
@@ -333,7 +350,8 @@
       "file": "games/penalty-panic.html",
       "type": "Soccer",
       "description": "Best of 5 from the spot. Pick your nation, aim your shot, and dive to save. Win it for your country.",
-      "controls": "Drag to aim · Hold Space to charge shot · Arrows to choose dive direction when defending"
+      "controls": "Drag to aim · Hold Space to charge shot · Arrows to choose dive direction when defending",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "build-the-boardwalk",
@@ -341,7 +359,8 @@
       "file": "games/build-the-boardwalk.html",
       "type": "Tycoon",
       "description": "Santa Cruz beach tycoon. Build churro stands, arcades, surf shacks and coasters on the sand, keep the tourist lines moving, and be worth the most when the sun sets at 9 PM.",
-      "controls": "Drag a ride from the tray onto the sand (or press 1-5 and click / tap a spot) · Tap a ride to upgrade it · Churros next to rides boost them; surf shacks go by the water"
+      "controls": "Drag a ride from the tray onto the sand (or press 1-5 and click / tap a spot) · Tap a ride to upgrade it · Churros next to rides boost them; surf shacks go by the water",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "sweep-the-strait",
@@ -349,7 +368,8 @@
       "file": "games/sweep-the-strait.html",
       "type": "Minesweeper",
       "description": "Naval minesweeper. Clear every contact mine from the Strait of Hormuz and reopen the shipping lane — one wrong tap and the tankers stay docked.",
-      "controls": "Tap to sweep a tile · Right-click or long-press to drop a ship marker on a suspected mine"
+      "controls": "Tap to sweep a tile · Right-click or long-press to drop a ship marker on a suspected mine",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "yarrmada",
@@ -357,7 +377,8 @@
       "file": "games/yarrmada.html",
       "type": "Battleship",
       "description": "Pirate-cove battleship. Sink the enemy fleet before they sink yours — fewer shots means a higher score, ye efficient sea-dog.",
-      "controls": "Tap squares in Enemy Waters to fire · Re-roll your fleet or set sail to start"
+      "controls": "Tap squares in Enemy Waters to fire · Re-roll your fleet or set sail to start",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "senor-frogs-cabo",
@@ -365,7 +386,8 @@
       "file": "games/senor-frogs-cabo.html",
       "type": "snake",
       "description": "Lead the Señor Frog's conga line around the club, recruiting thirsty tourists to grow the line. Dodge the walls, your own dancers, and the spills, cactus & tables that pile up as you grow.",
-      "controls": "Arrows / WASD / D-pad to steer · Swipe on mobile · Don't crash the conga line"
+      "controls": "Arrows / WASD / D-pad to steer · Swipe on mobile · Don't crash the conga line",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "weiners-and-tubs",
@@ -373,7 +395,8 @@
       "file": "games/weiners-and-tubs.html",
       "type": "doodle-jump",
       "description": "Frank the hot dog auto-bounces up a tower of hot tubs — you just steer. Grab a beer for a super-bounce, watch the icy tubs that crack after one hop, and don't fall in the cold.",
-      "controls": "← → / A·D / buttons to steer · Tilt or swipe on mobile · Hop tub to tub"
+      "controls": "← → / A·D / buttons to steer · Tilt or swipe on mobile · Hop tub to tub",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "moonslayer",
@@ -381,7 +404,8 @@
       "file": "games/moonslayer.html",
       "type": "Hearts",
       "description": "A lunar hunt of polite betrayal. Take the fewest souls — dodge every heart and the Black Queen (Q♠) — or slay the moon by taking them all. Lowest score wins.",
-      "controls": "Click 3 cards to pass · Click a card to play · Follow the led suit"
+      "controls": "Click 3 cards to pass · Click a card to play · Follow the led suit",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "bend-it-like-maxi",
@@ -389,7 +413,8 @@
       "file": "games/bend-it-like-maxi.html",
       "type": "Soccer",
       "description": "96th minute of the World Cup final, 1-1. Pick your nation and curl ten free kicks over, around, or under the wall and past a keeper who gets better with every kick.",
-      "controls": "← → to aim · A / D to curve · Hold Space or KICK to charge · Release to shoot"
+      "controls": "← → to aim · A / D to curve · Hold Space or KICK to charge · Release to shoot",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "abominable-speedway",
@@ -397,7 +422,8 @@
       "file": "games/abominable-speedway.html",
       "description": "Yedric the Yeti laps a snaking mountain circuit — Yeti Hairpin, Icicle Sweep, Grandpa's Elbow. Overtake rival yetis, ride pink booters for boost charges, survive ice patches and snowball goons, and stay on the packed snow. The mountain hides a secret or two.",
       "controls": "← → or A/D to steer through the corners · Space or button to boost · Swipe or tilt on mobile · Off track is slow",
-      "type": "racing"
+      "type": "racing",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "the-sunken-signal",
@@ -405,7 +431,8 @@
       "file": "games/the-sunken-signal.html",
       "description": "Island mystery choose-your-own-adventure. A sunken research station starts broadcasting after 31 years — explore, gather what you need, and dive for the source. 9 gems hidden in the scenery, multiple endings, the greedy one pays best.",
       "controls": "Click choices to explore · Click gems hidden in the scenery · Enter picks the first choice",
-      "type": "cyoa"
+      "type": "cyoa",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "cleanup-on-isle-11",
@@ -413,7 +440,8 @@
       "file": "games/cleanup-on-isle-11.html",
       "description": "First-person supermarket sweep, grandma edition. Prowl the 3D warehouse aisles hunting everything on your shopping list while dodging puddles, rival shoppers, runaway carts, and the siren song of the free sample stand.",
       "controls": "WASD to move (A/D strafe) · ←→ or click-drag to look · Left thumb moves, right thumb looks on mobile · Walk into items to grab them",
-      "type": "supermarket-sweep"
+      "type": "supermarket-sweep",
+      "model": "claude-opus-4-8"
     },
     {
       "id": "prompter-payday",
@@ -421,7 +449,8 @@
       "file": "games/prompter-payday.html",
       "description": "You run the teleprompter. You also, allegedly, bet on which words appear in tonight's speech. Unscramble each word and feed it to the prompter before airtime runs out — every word you land pays out your market position.",
       "controls": "Tap letters to build the word · Tap a placed letter to send it back · Type + Enter on keyboard",
-      "type": "word-unscramble"
+      "type": "word-unscramble",
+      "model": "claude-fable-5"
     },
     {
       "id": "deja-loop",
@@ -430,7 +459,8 @@
       "description": "Every 4 seconds a copy of you replays your last 4 seconds, forever. Grab gold orbs while dodging an ever-growing parade of your past selves.",
       "controls": "Mouse, drag, or WASD / arrows to steer · Gold orbs score 1 + 1 per echo · Teal rings erase your 2 oldest echoes · Don't stand still",
       "type": "arena-dodge",
-      "logo": "a small red dot looking over its shoulder at a trail of ghostly outlined copies of itself, blueprint-grid background, circular badge"
+      "logo": "a small red dot looking over its shoulder at a trail of ghostly outlined copies of itself, blueprint-grid background, circular badge",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "echo-location",
@@ -439,7 +469,8 @@
       "description": "You are a bat in a pitch-black cave. Every flap chirps and lights up the walls for a moment. Fly as far as you can without hitting anything.",
       "controls": "Space / ↑ / tap to flap · X / Shift / SCREECH for a big ping (3 charges, moths refill)",
       "type": "flappy",
-      "logo": "a cartoon bat mid-flap with concentric glowing sonar rings radiating from its mouth, pitch-black cave background, circular badge"
+      "logo": "a cartoon bat mid-flap with concentric glowing sonar rings radiating from its mouth, pitch-black cave background, circular badge",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "fogwatch",
@@ -448,7 +479,8 @@
       "description": "Keep the lighthouse: sweep your lamp over ships drifting through the fog to turn them away from the rocks, and whatever you do, don't keep the light on the kraken.",
       "controls": "← → / A D or drag to aim the lamp · Space / ✦ flares the beam wide (burns oil). Three wrecks and it's lights out.",
       "type": "lighthouse",
-      "logo": "a weathered lighthouse on black rocks with a golden beam cutting through fog, a kraken eye glowing in the dark water, vintage maritime crest"
+      "logo": "a weathered lighthouse on black rocks with a golden beam cutting through fog, a kraken eye glowing in the dark water, vintage maritime crest",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "vertigo",
@@ -457,7 +489,8 @@
       "description": "You don't control the ball, you control the world: spin the whole arena so gravity rolls the ball into gems before they rot into spikes.",
       "controls": "← → / A D, hold either half of the arena, or tilt your phone to spin the world. Grab gems fast for combos. Touch a spike and it's over.",
       "type": "tilt-maze",
-      "logo": "a glossy orange ball balanced on a tilted neon-cyan square arena spinning in space, dizzy spiral motion lines, retro arcade crest"
+      "logo": "a glossy orange ball balanced on a tilted neon-cyan square arena spinning in space, dizzy spiral motion lines, retro arcade crest",
+      "model": "claude-fable-5-1"
     },
     {
       "id": "wild-cats",
@@ -466,7 +499,8 @@
       "description": "Savanna tower defense: place tabbies, hairball-hacking kittens and roaring lions to stop mice, cucumbers, warthogs and one very good boy from reaching the food bowl. One leak and it's over.",
       "controls": "Pick a cat (click/tap or 1 2 3), click/tap the grass to place it, click/tap a cat to upgrade. Space / Go! sends the next wave early for bonus points.",
       "type": "tower-defense",
-      "logo": "a fierce cartoon lion and a tiny grey kitten coughing up a hairball, back to back on golden savanna grass under an acacia tree, navy and green sports crest"
+      "logo": "a fierce cartoon lion and a tiny grey kitten coughing up a hairball, back to back on golden savanna grass under an acacia tree, navy and green sports crest",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "maze-muncher-sugar-rush",
@@ -475,7 +509,8 @@
       "description": "A first-person corn maze where you hoard Halloween candy while dentists hunt you down.",
       "controls": "Arrows / WASD to walk and turn. Touch: hold the arrows or drag the maze.",
       "type": "maze-muncher",
-      "logo": "a masked dentist with a head mirror and drill lurking in a moonlit cornfield, candy corn border"
+      "logo": "a masked dentist with a head mirror and drill lurking in a moonlit cornfield, candy corn border",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "opposites-attract",
@@ -484,7 +519,8 @@
       "description": "You're a lovesick electron. Flip your charge to get pulled toward or shoved away from charged particles, and ride that attraction through the gaps.",
       "controls": "Tap / Space to flip your charge between + and −.",
       "type": "polarity",
-      "logo": "a cute blue electron with blushing cheeks and heart eyes, orbited by a red plus proton, little hearts"
+      "logo": "a cute blue electron with blushing cheeks and heart eyes, orbited by a red plus proton, little hearts",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "slingshot-sally",
@@ -493,7 +529,8 @@
       "description": "Astronaut Sally slingshots from planet to planet, rescuing stray astro-cats and trying hard not to drift into the void.",
       "controls": "Tap / Space to let go of your orbit and launch.",
       "type": "orbit-hop",
-      "logo": "a gold-suited astronaut girl with violet visor holding a cat in a space helmet, ringed planet behind"
+      "logo": "a gold-suited astronaut girl with violet visor holding a cat in a space helmet, ringed planet behind",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "swingin-safari",
@@ -502,7 +539,8 @@
       "description": "Swing a monkey up an endless jungle on vines while the lava rises below you.",
       "controls": "Hold mouse / Space / finger to grab a vine and reel in, then let go to fling.",
       "type": "grapple-swing",
-      "logo": "an orange monkey swinging on a lime green vine above bubbling lava, banana in hand"
+      "logo": "an orange monkey swinging on a lime green vine above bubbling lava, banana in hand",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "red-light-green-fight",
@@ -511,7 +549,8 @@
       "description": "Run the stoplights for a growing grid of intersections. One crash ends it, and so does letting road rage boil over.",
       "controls": "Click / tap an intersection (or press 1–4) to flip its light.",
       "type": "traffic",
-      "logo": "an angry boxing-glove traffic light with red and green lamps, tiny cars honking"
+      "logo": "an angry boxing-glove traffic light with red and green lamps, tiny cars honking",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "tendy-slapper",
@@ -520,7 +559,8 @@
       "description": "First-person youth soccer coach sim. Your U9 team is hangry: lob chicken tenders to the kids before their snack meters hit zero and they quit practice. Miss and the pigeons eat well.",
       "controls": "Aim with the mouse or arrow keys, click or Space to throw, A / D to walk the sideline. On touch, tap to throw and use the ◀ ▶ buttons to walk.",
       "type": "throwing",
-      "logo": "a cartoon soccer coach in a red ball cap and whistle winding up to throw a crispy golden chicken tender, soccer pitch crest"
+      "logo": "a cartoon soccer coach in a red ball cap and whistle winding up to throw a crispy golden chicken tender, soccer pitch crest",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "the-jen-10",
@@ -529,7 +569,8 @@
       "description": "First-person pass-only basketball. You are Jen, point guard who refuses to shoot, dropping dimes to cutting office coworkers while a villain named Sidekick reads your eyes. Look one way, pass the other.",
       "controls": "Move the mouse or your finger to look, click or tap a coworker to pass. Keyboard: arrows look, up picks a coworker, Space passes. Three turnovers and you are benched.",
       "type": "sports",
-      "logo": "a smirking cartoon point guard in a pink #10 jersey and dark sunglasses throwing a no-look basketball pass, mint green court crest"
+      "logo": "a smirking cartoon point guard in a pink #10 jersey and dark sunglasses throwing a no-look basketball pass, mint green court crest",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "troll-toll",
@@ -538,7 +579,8 @@
       "description": "Frogger on a troll-infested river. The bridge is gone, so hop a dragon, an elephant, a dog and a cat across on logs and nutria rafts into their dens. Touch the troll and it collects its toll; the dragon can torch it for double points.",
       "controls": "Arrows / WASD or swipe to hop. Space or the fire button breathes fire (dragon only). Diving nutria sink. Levels never end, lives do.",
       "type": "frogger",
-      "logo": "a smug green river troll with a gold dollar sign, half-submerged, with a tiny dragon blowing a flame at it, a nutria with orange teeth swimming by, round woodland crest"
+      "logo": "a smug green river troll with a gold dollar sign, half-submerged, with a tiny dragon blowing a flame at it, a nutria with orange teeth swimming by, round woodland crest",
+      "model": "claude-opus-5-5"
     },
     {
       "id": "toad-tower",
@@ -547,7 +589,8 @@
       "description": "Bubble Bobble in a haunted wizard tower. Wartholomew the frog wizard traps living candles in magic bubbles and pops them for loot, floor after floor. One life, and if you dawdle the Snuffer comes for you.",
       "controls": "Arrows move, Up or Z jumps, Space or X blows a bubble. Bump a trapped candle to pop it, pop touching bubbles for combos, hold jump to bounce on bubbles. Grab the potion for a Magic Surge.",
       "type": "platformer",
-      "logo": "a green frog wizard in a purple pointy hat with a gold star, holding a glowing wand, a big green magic bubble with an angry lit candle trapped inside, round midnight-purple tower crest with gold trim"
+      "logo": "a green frog wizard in a purple pointy hat with a gold star, holding a glowing wand, a big green magic bubble with an angry lit candle trapped inside, round midnight-purple tower crest with gold trim",
+      "model": "claude-opus-5-5"
     }
   ]
 }

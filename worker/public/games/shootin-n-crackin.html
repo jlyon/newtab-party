@@ -211,7 +211,7 @@
   fitCanvas();
   addEventListener('resize', fitCanvas);
   window.addEventListener('touchstart', () => setTimeout(fitCanvas, 0), { once: true, passive: true });   // body.touch changes the CSS size
-  if (window.ResizeObserver) { const ro = new ResizeObserver(() => fitCanvas()); ro.observe(canvas.parentElement.querySelector('h1')); ro.observe(document.getElementById('controls')); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => requestAnimationFrame(fitCanvas)); ro.observe(canvas.parentElement.querySelector('h1')); ro.observe(document.getElementById('controls')); }
   const scoreEl = document.getElementById('score');
   const livesEl = document.getElementById('lives');
   const waveEl = document.getElementById('wave');
