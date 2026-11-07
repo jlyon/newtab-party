@@ -13,8 +13,9 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/games.json` | Source of truth for the game library. Bundled into the worker at deploy time; also served at `GET /games.json`. |
 | `worker/public/games/*.html` | Self-contained game files. Served as Cloudflare edge assets at `/games/*`. |
 | `worker/src/index.ts` | Fetch handler + all routes. Intercepts `/games/*` to strip `X-Frame-Options`. |
-| `worker/src/db.ts` | All D1 query logic (async). |
-| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()`, `renderGamesCalendar()` (`/games`), `renderRetiredGames()` (`/games/retired`) — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
+| `worker/src/db.ts` | All D1 query logic (async). Score reads pass through `moderate()`, which blanks names that fail the filter or were reported. |
+| `worker/src/moderation.ts` | Leaderboard name filter (`isNameAllowed`, checked on save and on display) and report helpers. `POST /api/plays/:id/report` records a report; a name with `REPORT_HIDE_THRESHOLD` distinct reporters is hidden everywhere. Required for App Store guideline 1.2. |
+| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()`, `renderGamesCalendar()` (`/games`), `renderRetiredGames()` (`/games/retired`), `renderPrivacy()` (`/privacy`) — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
@@ -27,7 +28,7 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `scripts/deploy.mjs` | `npm run deploy`: diffs local `games.json` against the live one and refuses if today's or any past day's game would change, then runs `wrangler deploy`. |
 | `scripts/lib/rotation.mjs` | Shared rotation math for the scripts (mirrors `eraFor`/`getDailyGame` in `index.ts`). |
 | `scripts/set_today.mjs` | Makes a given game today's game by swapping it into today's slot (`npm run today -- <id>`). |
-| `ios/` | iOS app: SwiftUI + WKWebView wrapper around `https://newtab.party` (Xcode project `ios/NewTabParty.xcodeproj`). |
+| `ios/` | iOS app (`ios/NewTabParty.xcodeproj`): WKWebView on `https://newtab.party` plus native Game Center daily leaderboard, end-of-game score bar (haptics, share sheet), daily reminders, a home screen widget (`NewTabPartyWidget` target) and a settings sheet. Hides the Chrome Web Store buttons. See `ios/README.md`. |
 | `tv/` | Google TV / Android TV app: WebView wrapper plus a remote-control layer (remote mode and pointer mode, picked from each game's `controls` text). See `tv/README.md`. |
 
 ## Arcade shell + About modal — keep the extension and worker in sync
@@ -125,6 +126,8 @@ CREATE TABLE plays (
   played_at   DATETIME DEFAULT CURRENT_TIMESTAMP  -- UTC
 );
 ```
+
+A second table, `name_reports` (`play_id`, `player_name`, `reporter`, `created_at`), holds leaderboard name reports; `reporter` is a salted hash of the reporter's IP, used only to count distinct people. `schema.sql` is all `IF NOT EXISTS`, so re-running `npm run db:init:remote` adds it safely.
 
 All queries are in `worker/src/db.ts`. D1 uses `db.prepare(sql).bind(...).run/first/all()` — everything is async. Key functions:
 - `recordPlay(db, gameId, gameName, score)` → `{ id, rank }`

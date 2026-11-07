@@ -1,6 +1,7 @@
 import type { Env, Game, GamesData, ScheduleEra } from './types';
 import * as db from './db';
-import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, renderRetiredGames, esc } from './render';
+import { isNameAllowed, reporterId } from './moderation';
+import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, renderRetiredGames, renderPrivacy, esc } from './render';
 import gamesData from '../games.json';
 
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
@@ -195,6 +196,8 @@ export default {
       const { playerName } = body;
       if (typeof playerName !== 'string' || !playerName.trim())
         return json({ error: 'playerName is required' }, 400);
+      if (!isNameAllowed(playerName))
+        return json({ error: 'name_not_allowed', message: 'That name is not allowed. Please pick another.' }, 422);
 
       const updated = await db.setPlayerName(env.DB, id, playerName);
       if (!updated)
@@ -207,6 +210,15 @@ export default {
       const deleted = await db.deletePlay(env.DB, id);
       if (!deleted)
         return json({ error: 'Cannot delete — play not found or leaderboard is locked' }, 403);
+      return json({ ok: true });
+    }
+
+    // Report an offensive leaderboard name (App Store guideline 1.2).
+    const reportMatch = pathname.match(/^\/api\/plays\/(\d+)\/report$/);
+    if (reportMatch && method === 'POST') {
+      const result = await db.reportPlayName(env.DB, parseInt(reportMatch[1], 10), await reporterId(request));
+      if (result === 'not_found') return json({ error: 'Play not found' }, 404);
+      if (result === 'no_name') return json({ error: 'That score has no name to report' }, 400);
       return json({ ok: true });
     }
 
@@ -252,6 +264,10 @@ export default {
 
     if (pathname === '/' && method === 'GET') {
       return html(renderArcade({ game: getDailyGame(getGames(), todayUTC()), origin: url.origin }));
+    }
+
+    if (pathname === '/privacy' && method === 'GET') {
+      return html(renderPrivacy());
     }
 
     if (pathname === '/leaderboard' && method === 'GET') {

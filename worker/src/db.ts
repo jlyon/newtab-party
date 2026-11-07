@@ -1,4 +1,36 @@
 import type { Play, DailyEntry } from './types';
+import { isNameAllowed, normalizeName, REPORT_HIDE_THRESHOLD } from './moderation';
+
+// Names reported by REPORT_HIDE_THRESHOLD different people, lowercased. A missing
+// name_reports table (schema not migrated yet) just means nothing is hidden.
+async function hiddenNames(db: D1Database): Promise<Set<string>> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT lower(player_name) AS name FROM name_reports
+         WHERE player_name IS NOT NULL
+         GROUP BY lower(player_name)
+         HAVING COUNT(DISTINCT reporter) >= ?`,
+      )
+      .bind(REPORT_HIDE_THRESHOLD)
+      .all<{ name: string }>();
+    return new Set(results.map((r) => r.name));
+  } catch {
+    return new Set();
+  }
+}
+
+// Blank out names that fail the filter (including ones saved before it existed)
+// or that enough people reported. The score row itself stays.
+async function moderate(db: D1Database, plays: Play[]): Promise<Play[]> {
+  if (!plays.some((p) => p.player_name)) return plays;
+  const hidden = await hiddenNames(db);
+  return plays.map((p) =>
+    p.player_name && (!isNameAllowed(p.player_name) || hidden.has(p.player_name.toLowerCase()))
+      ? { ...p, player_name: undefined }
+      : p,
+  );
+}
 
 export async function recordPlay(
   db: D1Database,
@@ -32,7 +64,7 @@ export async function getDailyScores(
     )
     .bind(gameId, date)
     .all<Play>();
-  return results;
+  return moderate(db, results);
 }
 
 export async function getDailyCount(
@@ -81,7 +113,7 @@ export async function setPlayerName(
     .prepare(
       "UPDATE plays SET player_name = ? WHERE id = ? AND date(played_at) = date('now')",
     )
-    .bind(name.trim().slice(0, 30), id)
+    .bind(normalizeName(name), id)
     .run();
   return (result.meta.changes as number) > 0;
 }
@@ -123,5 +155,24 @@ export async function getRecentPlays(
     .prepare('SELECT * FROM plays ORDER BY played_at DESC LIMIT ?')
     .bind(limit)
     .all<Play>();
-  return results;
+  return moderate(db, results);
+}
+
+// One report per (play, reporter). Returns false if the play has no name to report.
+export async function reportPlayName(
+  db: D1Database,
+  id: number,
+  reporter: string,
+): Promise<'ok' | 'not_found' | 'no_name'> {
+  const play = await db
+    .prepare('SELECT player_name FROM plays WHERE id = ?')
+    .bind(id)
+    .first<{ player_name: string | null }>();
+  if (!play) return 'not_found';
+  if (!play.player_name) return 'no_name';
+  await db
+    .prepare('INSERT OR IGNORE INTO name_reports (play_id, player_name, reporter) VALUES (?, ?, ?)')
+    .bind(id, play.player_name, reporter)
+    .run();
+  return 'ok';
 }

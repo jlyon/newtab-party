@@ -36,6 +36,54 @@ const FAVICON = `<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" href="/favicon.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">`;
 
+// ── Leaderboard name reporting (App Store guideline 1.2) ──
+// Every named score gets a small flag. First tap arms it ("Report?"), second tap
+// sends POST /api/plays/:id/report and hides that name for this viewer right away
+// (localStorage 'blockedNames'). The server hides it for everyone once enough
+// different people report it (src/moderation.ts). The extension mirrors this in
+// newtab.js / newtab.html.
+
+function nameCell(s: Play): string {
+  if (!s.player_name) return '<span class="anon">—</span>';
+  return `<span class="pn">${esc(s.player_name)}</span><button type="button" class="report-btn" data-play="${s.id}" title="Report this name" aria-label="Report this name">⚑</button>`;
+}
+
+const REPORT_CSS = `
+  .player-name .report-btn { margin-left: 8px; background: none; border: 0; color: rgba(255,255,255,0.18); font-size: 11px; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-family: inherit; vertical-align: 1px; }
+  .player-name .report-btn:hover, .player-name .report-btn:focus-visible { color: rgba(255,255,255,0.6); }
+  .player-name .report-btn.confirm { color: #ff9a9a; background: rgba(255,90,90,0.14); }
+  .player-name .report-btn.done { color: rgba(255,255,255,0.3); cursor: default; }`;
+
+const REPORT_JS = `
+(function () {
+  var KEY = 'blockedNames';
+  function blocked() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+  function hideBlocked() {
+    var b = blocked().map(function (n) { return String(n).toLowerCase(); });
+    document.querySelectorAll('.player-name .pn').forEach(function (el) {
+      if (b.indexOf(el.textContent.toLowerCase()) >= 0) el.parentNode.innerHTML = '<span class="anon">Hidden</span>';
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.report-btn');
+    if (!btn || btn.classList.contains('done')) return;
+    if (!btn.classList.contains('confirm')) {
+      btn.classList.add('confirm'); btn.textContent = 'Report?';
+      setTimeout(function () { if (!btn.classList.contains('done')) { btn.classList.remove('confirm'); btn.textContent = '⚑'; } }, 4000);
+      return;
+    }
+    btn.classList.remove('confirm'); btn.classList.add('done'); btn.textContent = 'Reported';
+    var pn = btn.parentNode.querySelector('.pn'), name = pn ? pn.textContent : '';
+    fetch('/api/plays/' + btn.getAttribute('data-play') + '/report', { method: 'POST' }).catch(function () {});
+    if (name) {
+      var b = blocked();
+      if (b.indexOf(name) < 0) { b.push(name); try { localStorage.setItem(KEY, JSON.stringify(b.slice(-200))); } catch (e) {} }
+    }
+    setTimeout(hideBlocked, 900);
+  });
+  hideBlocked();
+})();`;
+
 // ── renderArcade ─────────────────────────────────────
 
 // Link-preview (Slack, Facebook, iMessage, X…) tags for the arcade page:
@@ -146,6 +194,7 @@ ${FAVICON}
   #name-submit-btn:hover { background: rgba(255,215,0,0.22); }
   #name-skip-btn { background: none; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); font-size: 12px; font-family: inherit; padding: 7px 14px; border-radius: 4px; cursor: pointer; }
   #name-skip-btn:hover { color: rgba(255,255,255,0.6); }
+  .name-error { color: #ff9a9a; font-size: 12px; margin: -6px 0 12px; }
 </style>
 </head>
 <body>
@@ -179,6 +228,7 @@ ${FAVICON}
     <div class="name-rank">You're #<span id="name-rank-val"></span> today!</div>
     <p>Add your name to the leaderboard</p>
     <input id="name-input" type="text" placeholder="Your name" maxlength="30" autocomplete="off">
+    <p id="name-error" class="name-error" hidden></p>
     <div class="name-btns">
       <button id="name-submit-btn" onclick="submitName()">Save to leaderboard</button>
       <button id="name-skip-btn" onclick="skipName()">Skip</button>
@@ -209,6 +259,7 @@ ${FAVICON}
       <a href="https://github.com/jlyon/newtab-party" target="_blank">GitHub repo →</a>
       <a href="/games">Practice room →</a>
       <button id="about-open-lb">Leaderboard →</button>
+      <a href="/privacy">Privacy</a>
     </div>
   </div>
 </div>
@@ -392,6 +443,7 @@ async function maybePromptForScore(gameId, gameName, score) {
 
 function showNamePrompt(rank) {
   const saved = localStorage.getItem('playerName');
+  document.getElementById('name-error').hidden = true;
   document.getElementById('name-rank-val').textContent = rank;
   document.getElementById('name-input').value = saved || '';
   document.getElementById('name-overlay').classList.add('open');
@@ -415,11 +467,24 @@ function discardPlay() {
 function submitName() {
   const name = document.getElementById('name-input').value.trim();
   if (!name || !sessionPlayId) { skipName(); return; }
-  closeNamePrompt();
   const id = sessionPlayId;
-  sessionPlayId = null;
-  localStorage.setItem('playerName', name);
-  fetch('/api/plays/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playerName: name }) }).catch(()=>{});
+  const err = document.getElementById('name-error');
+  err.hidden = true;
+  fetch('/api/plays/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playerName: name }) })
+    .then(r => {
+      // The name filter said no: keep the prompt open so they can pick another.
+      if (r.status === 422) {
+        return r.json().catch(() => ({})).then(d => {
+          err.textContent = d.message || 'That name is not allowed. Please pick another.';
+          err.hidden = false;
+          document.getElementById('name-input').focus();
+        });
+      }
+      sessionPlayId = null;
+      localStorage.setItem('playerName', name);
+      closeNamePrompt();
+    })
+    .catch(() => { sessionPlayId = null; closeNamePrompt(); });
 }
 
 function openAbout() { document.getElementById('about-overlay').classList.add('open'); }
@@ -649,7 +714,7 @@ export function renderLeaderboard({
     ? scores.slice(0, 20).map((s, i) => `
         <tr>
           <td class="rank">${i + 1}</td>
-          <td class="player-name">${s.player_name ? esc(s.player_name) : '<span class="anon">—</span>'}</td>
+          <td class="player-name">${nameCell(s)}</td>
           <td class="score-val">${s.score.toLocaleString()}</td>
         </tr>`).join('')
     : `<tr><td colspan="3" class="empty-row">No scores yet today — be the first</td></tr>`;
@@ -719,6 +784,10 @@ ${FAVICON}
   .prev-play-link:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
   .prev-top { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); text-align: right; padding: 9px 16px; }
   .prev-plays { font-size: 11px; color: rgba(255,255,255,0.2); text-align: right; white-space: nowrap; }
+  .page-foot { margin-top: 40px; font-size: 12px; color: rgba(255,255,255,0.25); }
+  .page-foot a { color: rgba(255,255,255,0.45); text-decoration: none; }
+  .page-foot a:hover { color: rgba(255,255,255,0.75); }
+${REPORT_CSS}
 </style>
 </head>
 <body>
@@ -756,8 +825,10 @@ ${FAVICON}
     <tbody>${prevRows}</tbody>
   </table>
 
+  <div class="page-foot"><a href="/privacy">Privacy</a> · <a href="https://github.com/jlyon/newtab-party/issues" target="_blank" rel="noopener">Report a problem</a></div>
 </div>
-<script>
+<script>${REPORT_JS}
+
 function updateCountdown() {
   const t = new Date(); t.setUTCHours(24,0,0,0);
   const ms = t - Date.now();
@@ -786,7 +857,7 @@ export function renderReplay(
     ? scores.slice(0, 20).map((s, i) => `
         <tr>
           <td class="rank">${i + 1}</td>
-          <td class="player-name">${s.player_name ? esc(s.player_name) : '<span class="anon">—</span>'}</td>
+          <td class="player-name">${nameCell(s)}</td>
           <td class="score-val">${s.score.toLocaleString()}</td>
         </tr>`).join('')
     : `<tr><td colspan="3" class="empty-row">No scores were recorded for this day</td></tr>`;
@@ -855,6 +926,7 @@ ${FAVICON}
   .empty-row { font-size: 13px; color: rgba(255,255,255,0.25); padding: 20px 0; text-align: center; }
   .footer-note { font-size: 12px; color: rgba(255,255,255,0.25); padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
   .locked-note { font-size: 11px; color: rgba(255,200,0,0.35); margin-top: 6px; }
+${REPORT_CSS}
   @media (max-width: 600px) { #game-title-wrap { flex: 1; min-width: 0; } #game-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } #game-date { display: none; } #high-score { display: none; } .btn-install { display: none; } }
 </style>
 </head>
@@ -907,7 +979,8 @@ ${FAVICON}
   </div>
 </div>
 
-<script>
+<script>${REPORT_JS}
+
 // Back-swipe guard: a stray edge swipe on a phone would leave the arcade mid-game.
 // Push one history entry on first touch and re-push whenever the gesture pops it,
 // so the swipe lands back on this page instead of navigating away.
@@ -955,6 +1028,79 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeScores(
 // load the game once the viewer dismisses it — don't navigate them into the game.
 ${openScores ? "loadingEl.classList.add('hidden');" : 'loadGameFrame();'}
 </script>
+</body>
+</html>`;
+}
+
+// ── renderPrivacy ────────────────────────────────────
+// /privacy: linked from the About modal (worker + extension), the leaderboard page
+// and the iOS app's settings. App Store review requires one for every app.
+
+export function renderPrivacy(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newtab.party · privacy policy</title>
+${FAVICON}
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080810; color: #d1d5db; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 48px 20px 80px; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .back { font-size: 12px; color: rgba(255,255,255,0.35); text-decoration: none; }
+  .back:hover { color: rgba(255,255,255,0.7); }
+  h1 { font-size: 30px; color: #fff; margin: 28px 0 4px; letter-spacing: -0.5px; }
+  .updated { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 28px; }
+  h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255,255,255,0.35); margin: 34px 0 10px; }
+  p, li { font-size: 15px; }
+  p + p { margin-top: 10px; }
+  ul { padding-left: 20px; }
+  li + li { margin-top: 8px; }
+  strong { color: #fff; font-weight: 600; }
+  a { color: #ffd700; text-underline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Back to today's game</a>
+  <h1>Privacy policy</h1>
+  <div class="updated">Last updated November 7, 2026</div>
+
+  <p>newtab.party is a daily arcade game you can play on the web, in the Chrome extension, and in the iOS and Google TV apps. There are no accounts, no ads and no tracking. This page lists everything we handle.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Scores.</strong> When a score for today's game is good enough for the top of the board, we store the score, the game and the time. Scores are not tied to an account, a device or an email address.</li>
+    <li><strong>The name you choose.</strong> Adding a name to the leaderboard is optional, and the name is shown publicly next to your score. If you skip the name, the score is removed.</li>
+    <li><strong>Name reports.</strong> If you report a leaderboard name, we store the report with a one-way hash of your network address. We use it only to count how many different people reported a name.</li>
+    <li><strong>Server logs.</strong> Our host, Cloudflare, processes your IP address and request details to serve the site and protect it from abuse.</li>
+  </ul>
+
+  <h2>What stays on your device</h2>
+  <ul>
+    <li>Your last leaderboard name and any names you have hidden, in your browser's local storage.</li>
+    <li>In the iOS app: your reminder settings and your best score today, which the home screen widget reads.</li>
+  </ul>
+
+  <h2>Game Center (iOS app)</h2>
+  <p>If you are signed in to Game Center, the iOS app sends your scores for today's game to Apple's Game Center leaderboard. Apple handles that data under its own privacy policy, and other players can see your Game Center nickname there.</p>
+
+  <h2>Notifications (iOS app)</h2>
+  <p>Daily reminders are scheduled on your device. We do not use push notifications and never receive a device token. You can turn reminders off in the app or in iOS Settings.</p>
+
+  <h2>What we do not do</h2>
+  <p>We do not sell or share your data, show ads, use analytics or tracking tools, or build profiles of players.</p>
+
+  <h2>Leaderboard rules</h2>
+  <p>Names are filtered for profanity, slurs and links. Anyone can report a name with the flag next to it. A reported name is hidden right away for the person who reported it, and for everyone once several people report it. We review reports and remove names that break these rules.</p>
+
+  <h2>Children</h2>
+  <p>newtab.party is a general audience game. We do not knowingly collect personal information from children.</p>
+
+  <h2>Removing your data and contacting us</h2>
+  <p>Past leaderboards stay viewable, so scores and names are kept. To remove a name you added, or for any other privacy question, <a href="https://github.com/jlyon/newtab-party/issues" target="_blank" rel="noopener">open an issue on GitHub</a> with the date, the game and the name.</p>
+</div>
 </body>
 </html>`;
 }
