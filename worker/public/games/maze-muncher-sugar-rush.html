@@ -10,9 +10,11 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: clamp(11px, 3vw, 14px); opacity: .9; }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: clamp(12px, 1.3vw + 0.6vh, 20px); opacity: .9; }
   #hud span:first-child { color: var(--primary); font-weight: 700; }
-  canvas { display: block; width: min(95vw, calc((100dvh - 180px) * (640 / 400))); height: auto; border-radius: 8px; box-shadow: 0 8px 40px rgba(155,92,255,.25), 0 8px 30px rgba(0,0,0,.6); cursor: grab; }
+  #wrap { --reserved: 60px; }
+  body.touch #wrap { --reserved: 150px; }
+  canvas { display: block; width: min(calc(100vw - 48px), calc((100dvh - var(--reserved)) * (640 / 400))); height: auto; border-radius: 8px; box-shadow: 0 8px 40px rgba(155,92,255,.25), 0 8px 30px rgba(0,0,0,.6); cursor: grab; }
   #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
   body.touch #touch-controls { display: flex; }
   #touch-hint { display: none; font-size: 12px; opacity: .7; text-align: center; }
@@ -23,7 +25,7 @@
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; overflow-y: auto; touch-action: pan-y; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); font-family: 'Creepster', cursive; letter-spacing: 1px; font-weight: 400; }
-  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 1vw + 0.9vh, 19px); }
   .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-weight: 700; }
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 
@@ -34,15 +36,38 @@
       radial-gradient(70% 60% at 50% 0%, rgba(155,92,255,.35), transparent 70%),
       rgba(8,5,16,.94);
   }
-  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: 28px clamp(18px, 5vw, 36px); max-width: 560px; border: 1px solid rgba(155,92,255,.35); }
-  #start-overlay .emoji { font-size: clamp(26px, 7vw, 40px); letter-spacing: 8px; }
+  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: 28px clamp(18px, 5vw, 36px); max-width: min(720px, 92vw); border: 1px solid rgba(155,92,255,.35); }
+  #start-overlay .emoji { font-size: clamp(26px, min(7vw, 7dvh), 52px); letter-spacing: 8px; }
   #start-overlay h2 {
-    font-size: clamp(38px, 9vw, 72px); line-height: 0.98; color: var(--primary);
+    font-size: clamp(38px, min(9vw, 11dvh), 92px); line-height: 0.98; color: var(--primary);
     text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(155,92,255,.8);
   }
   #start-overlay p { color: rgba(255,255,255,0.9); margin: 10px auto; }
-  #start-overlay p.how { font-size: clamp(12px, 2.8vw, 14px); opacity: .8; }
-  #start-overlay button { font-family: 'Creepster', cursive; font-size: clamp(18px, 4.5vw, 24px); padding: 12px 54px; box-shadow: 0 12px 44px rgba(255,138,31,.35); transition: transform .14s ease, filter .14s ease; }
+  #start-overlay p.how { font-size: clamp(12px, 0.8vw + 0.8vh, 17px); opacity: .8; }
+  #start-overlay button { font-family: 'Creepster', cursive; font-size: clamp(18px, min(4.5vw, 4dvh), 30px); padding: 12px 54px; box-shadow: 0 12px 44px rgba(255,138,31,.35); transition: transform .14s ease, filter .14s ease; }
+  /* Short landscape (phones on their side): controls beside the maze, two-column title. */
+  @media (orientation: landscape) and (max-height: 460px) {
+    body.touch #wrap { display: grid; grid-template-columns: 64px auto 64px 64px; grid-template-rows: auto 1fr 1fr; grid-template-areas: "hud hud hud hud" "u cv l r" "d cv l r"; justify-content: center; align-content: center; gap: 4px 12px; padding: 4px 16px env(safe-area-inset-bottom); }
+    body.touch #hud { grid-area: hud; font-size: 12px; gap: 2px 14px; }
+    body.touch canvas { grid-area: cv; width: min(calc(100vw - 300px), calc((100dvh - 34px) * (640 / 400))); }
+    body.touch #touch-controls { display: contents; }
+    body.touch #touch-controls .btn { width: 64px; max-width: none; flex: none; }
+    body.touch #btn-up { grid-area: u; align-self: end; }
+    body.touch #btn-down { grid-area: d; align-self: start; }
+    body.touch #btn-left { grid-area: l; align-self: center; }
+    body.touch #btn-right { grid-area: r; align-self: center; }
+    body.touch #touch-hint { display: none; }
+    #start-overlay .panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-areas: "e d" "t d" "t how" "t b"; align-items: center; column-gap: 22px; padding: 14px 22px; max-width: 800px; }
+    #start-overlay .emoji { grid-area: e; font-size: 28px; }
+    #start-overlay h2 { grid-area: t; font-size: 46px; align-self: start; }
+    #start-overlay p { grid-area: d; margin: 4px 0; font-size: 13px; line-height: 1.4; text-align: left; }
+    #start-overlay p.how { grid-area: how; font-size: 12px; }
+    #start-overlay button { grid-area: b; margin-top: 8px; justify-self: start; padding: 10px 44px; }
+    #over-overlay { padding: 10px; }
+    #over-overlay h2 { font-size: 40px; margin-bottom: 0; }
+    #over-overlay p { margin: 6px auto; }
+    #over-overlay button { margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -95,6 +120,7 @@
     ctx.imageSmoothingEnabled = false;
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};

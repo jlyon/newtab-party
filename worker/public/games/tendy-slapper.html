@@ -10,11 +10,14 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; flex-wrap: wrap; justify-content: center; }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, calc(0.85vw + 6.5px), 18px); opacity: .9; flex-wrap: wrap; justify-content: center; align-items: center; }
   #combo { color: var(--primary); font-weight: 700; }
   #kids { color: var(--secondary); font-weight: 700; }
   #mute { border: 0; background: rgba(255,255,255,.1); color: #fff; border-radius: 8px; min-width: 44px; min-height: 32px; padding: 4px 10px; cursor: pointer; font-size: 16px; }
-  #stage { position: relative; width: min(95vw, calc((100dvh - 150px) * (640 / 400))); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  /* --reserved: height stacked with the pitch (HUD, gaps, touch row); --side: width beside it. */
+  body { --reserved: 58px; --side: 5vw; }
+  body.touch { --reserved: 120px; }
+  #stage { position: relative; width: min(calc(100vw - var(--side)), calc((100dvh - var(--reserved)) * (640 / 400))); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
   canvas { display: block; width: 100%; height: auto; cursor: crosshair; }
   #toast { position: absolute; left: 0; right: 0; top: 4%; text-align: center; pointer-events: none; font-family: 'Bangers', Impact, sans-serif;
            font-size: clamp(16px, 4.2vw, 30px); letter-spacing: 1px; color: #fff; -webkit-text-stroke: 1px rgba(0,0,0,.6); text-shadow: 0 3px 0 rgba(0,0,0,.6); opacity: 0; transition: opacity .25s; }
@@ -24,6 +27,7 @@
   @keyframes rise { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -40px; } }
   #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
   body.touch #touch-controls { display: flex; }
+  .hint .sep { display: none; }
   .hint { font-size: clamp(12px, 3.4vw, 15px); opacity: .85; padding: 0 6px; align-self: center; text-align: center; }
   .btn { height: 56px; min-width: 64px; flex: 1; max-width: 110px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
          background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
@@ -51,13 +55,45 @@
     border: none; border-radius: 40px; cursor: pointer; color: #10100f; background: var(--primary, #fff); box-shadow: 0 12px 44px rgba(0,0,0,0.5);
     transition: transform 0.14s ease, filter 0.14s ease; }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* Phone landscape: walk buttons either side of the pitch, hint under it, so the pitch keeps the height. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    #hud { gap: 14px; }
+    #mute { min-height: 28px; padding: 2px 10px; }
+    body.touch { --reserved: 64px; --side: 250px; }
+    body.touch #wrap { display: grid; justify-content: center; align-content: center; column-gap: 16px; row-gap: 4px;
+      grid-template-columns: auto auto auto; grid-template-areas: ". hud ." "l st r" ". hint ."; }
+    body.touch #hud { grid-area: hud; }
+    body.touch #stage { grid-area: st; }
+    body.touch #touch-controls { display: contents; }
+    body.touch #btn-left { grid-area: l; }
+    body.touch #btn-right { grid-area: r; }
+    body.touch .btn { width: 92px; height: min(130px, 40dvh); align-self: center; flex: none; }
+    body.touch .hint { grid-area: hint; font-size: 11px; }
+    body.touch .hint br { display: none; }
+    body.touch .hint .sep { display: inline; }
+  }
+  /* Start screen on short landscape screens: logo beside the copy so the button stays on screen. */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .overlay { padding: 10px 20px; }
+    #start-overlay .panel { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 22px; align-items: center;
+      max-width: 780px; padding: 14px 22px; text-align: left; }
+    #start-overlay .tag { grid-column: 2; }
+    #start-overlay img { grid-column: 1; grid-row: 1 / span 4; width: min(28vw, 210px) !important; max-height: calc(100dvh - 50px) !important; margin: 0 !important; }
+    #start-overlay h2 { grid-column: 2; font-size: clamp(30px, 11dvh, 56px); margin: 4px 0; }
+    #start-overlay p { grid-column: 2; margin: 6px 0 0; font-size: clamp(12px, calc(2.4dvh + 4.5px), 15px); line-height: 1.45; }
+    #start-overlay button { grid-column: 2; justify-self: start; margin-top: 10px; padding: 12px 40px; }
+    #over-overlay h2 { font-size: clamp(30px, 13dvh, 72px); }
+    #over-overlay p { margin: 6px 0; }
+    #over-overlay button { margin-top: 10px; }
+  }
+  @media (min-width: 1200px) and (min-height: 700px) { #start-overlay .panel { max-width: 660px; } .overlay p { font-size: 18px; max-width: 52ch; } }
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="hud"><span id="score">Score: 0</span><span id="combo">Combo x1</span><span id="kids">Kids 6/6</span><span id="best">Best: 0</span><button id="mute" title="Sound">🔊</button></div>
   <div id="stage"><canvas id="game" width="640" height="400"></canvas><div id="toast"></div></div>
-  <div id="touch-controls"><button class="btn" id="btn-left">◀</button><div class="hint">Tap to throw<br>◀ ▶ walk the sideline</div><button class="btn" id="btn-right">▶</button></div>
+  <div id="touch-controls"><button class="btn" id="btn-left">◀</button><div class="hint">Tap to throw<span class="sep"> · </span><br>◀ ▶ walk the sideline</div><button class="btn" id="btn-right">▶</button></div>
 </div>
 <div id="start-overlay" class="overlay show">
   <div class="panel">
@@ -228,6 +264,7 @@
   }
   function fit() { const w = Math.max(1, stage.getBoundingClientRect().width); renderer.setSize(w, w * 400 / 640, false); }
   fit(); addEventListener('resize', fit);
+  if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);   // body.touch changes the layout
 
   scene.add(new THREE.HemisphereLight('#cfe4ff', '#1f4a24', 0.55));
   const sun = new THREE.DirectionalLight('#fff1d6', 0.95);

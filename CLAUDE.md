@@ -19,7 +19,7 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
 | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/game-builder/` | The Claude Code plugin. The repo root is both the marketplace and the plugin; skills live at the root `skills/`, never inside `.claude-plugin/`. |
-| `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone/iPad. |
+| `scripts/qa/lint.mjs`, `scripts/qa/smoke.mjs` | QA gate for games: static rules + Playwright smoke run on desktop/iPhone (portrait + landscape)/iPad/TV. |
 | `package.json` (repo root) | The one npm project. Scripts: `dev`, `deploy`, `db:init:*` (wrangler, run with `--cwd worker`), `typecheck`, `logos`, `schedule`, `retire`, `today`, `qa:lint`, `qa:smoke`. Run from the root; pass script args after `--`. |
 | `scripts/gen_logos.mjs` | Batch logo generator (Gemini API, key from `.env`, magenta chroma-key to transparent PNG via `sharp`). No args = generate every missing logo. |
 | `scripts/schedule_game.mjs` | Adds games to the rotation without moving today or any aired day (`npm run schedule -- <id>`): airs tomorrow by default, `--date YYYY-MM-DD` for a specific day, `--end` for the end of the cycle. |
@@ -64,9 +64,9 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 ## Adding a game
 
 1. Build with the `game-builder` Claude Code skill (`/newtab-party:game-builder` once the plugin is installed); it starts from `skills/game-builder/assets/scaffold.html` (boilerplate only, no genre templates)
-2. Copy `.html` to `worker/public/games/` and run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>` (desktop, iPhone, iPad)
+2. Copy `.html` to `worker/public/games/` and run the QA gate from `worker/`: `npm run qa:lint -- <id>` and `SHOTS=1 npm run qa:smoke -- <id>` (desktop, iPhone portrait + landscape, iPad, TV)
 3. Add entry to the `games` array in `worker/games.json` (order there is just the registry — it no longer drives rotation)
-4. **`npm run schedule -- <id>`** — this is what schedules it. **New games air tomorrow by default** (house rule); pass `--date YYYY-MM-DD` only when a specific debut day is wanted (`--end` = end of the cycle). It starts a new era from tomorrow with the game slotted in, so later days shift back one and today and every aired day keep their game. It prints the air date. Deploy before 00:00 UTC so it airs on time.
+4. **`npm run schedule -- <id>`** — this is what schedules it. **New games go to the front of the queue and air tomorrow** (house rule: a new game is always next up, never appended to the end of the cycle); pass `--date YYYY-MM-DD` only when a specific debut day is wanted (`--end` = end of the cycle). It starts a new era from tomorrow with the game slotted in, so later days shift back one and today and every aired day keep their game. It prints the air date. Deploy before 00:00 UTC so it airs on time.
 5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`) It also writes the 1200x630 link-preview card (`worker/public/games/share/<id>.jpg`, the og:image for `/`); `npm run share` builds any missing cards from existing logos.
 6. `npm run deploy` — any time of day; live immediately, no extension update needed
 

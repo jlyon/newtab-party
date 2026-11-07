@@ -13,15 +13,15 @@
   /* play-area width: fill the viewport height; --aspect is set from JS (W/H), touch layout reserves room for buttons */
   /* Vars live on body so body.touch can override them; 100vw - 48px keeps a 24px margin from the
      screen edges on phones so drags don't start in the browser's back-swipe zone. */
-  body { --reserved: 90px; --aspect: 1.765; --cw: min(calc(100vw - 48px), 1100px, calc((100dvh - var(--reserved)) * var(--aspect))); }
-  body.touch { --reserved: 200px; }
+  body { --reserved: 90px; --aspect: 1.765; --cw: min(calc(100vw - 48px), 1600px, calc((100dvh - var(--reserved)) * var(--aspect))); }
+  body.touch { --reserved: 165px; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--primary);
     font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
     height: 100%; gap: 6px; padding: 0 0 env(safe-area-inset-bottom); }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; text-align: center; }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 1.4vw, 18px); opacity: 0.85; }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 18px; font-size: clamp(12px, 1.3vw + 0.6vh, 20px); opacity: 0.85; }
   canvas { border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary);
     width: var(--cw); height: auto; display: block; background: #0a1733; }
   #controls { display: none; gap: 10px; align-items: center; justify-content: space-between;
@@ -29,10 +29,6 @@
   body.touch #controls { display: flex; }
   #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 13px); opacity: 0.6; text-align: center; }
   body.touch #touch-hint { display: block; }
-  @media (min-width: 700px) {
-    .btn { width: 88px; height: 66px; font-size: 28px; }
-    #btn-atk { width: 110px; font-size: 32px; }
-  }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
     padding: 0; width: 60px; height: 52px; font-size: 22px; border: 2px solid var(--primary);
@@ -44,13 +40,17 @@
   #btn-atk { width: 72px; border-color: #fff; color: #fff; font-size: 26px;
     background: rgba(0,0,0,0.6); }
   #btn-atk:active, #btn-atk.held { background: #fff; color: var(--bg); }
+  @media (min-width: 700px) and (min-height: 600px) {
+    .btn { width: 80px; height: 60px; font-size: 26px; }
+    #btn-atk { width: 104px; font-size: 30px; }
+  }
   #overlay, #start-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.85); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
   #overScore { font-size: clamp(20px, 6vw, 32px) !important; font-weight: 800; color: #fff !important; margin: 10px 0 !important; }
   #start-overlay { display: flex; }
   #overlay h2, #start-overlay h2 { color: #fff; font-size: clamp(22px, 6vw, 36px); margin: 0 0 8px;
     text-shadow: 0 0 12px var(--primary); }
-  #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(12px, 3vw, 15px); max-width: 520px; }
+  #overlay p, #start-overlay p { color: var(--primary); margin: 4px 0; font-size: clamp(13px, 1vw + 0.9vh, 19px); max-width: 560px; }
   #overlay button, #start-overlay button { margin-top: 18px; padding: 12px 28px; font-size: clamp(14px, 3.5vw, 16px);
     background: var(--primary); color: var(--bg); border: none; cursor: pointer;
     border-radius: 4px; letter-spacing: 1px; font-weight: bold; min-height: 48px;
@@ -84,6 +84,27 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-logo { display: block; width: min(82%, 460px); max-height: 40dvh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  /* Short landscape (phones on their side): move buttons beside the room, two-column title. */
+  @media (orientation: landscape) and (max-height: 460px) {
+    body.touch { --cw: min(calc(100vw - 300px), calc((100dvh - 36px) * var(--aspect))); }
+    body.touch #wrap { display: grid; grid-template-columns: 60px 60px auto 84px; grid-template-rows: auto 1fr; grid-template-areas: "hud hud hud hud" "l r cv a"; justify-content: center; align-content: center; gap: 4px 10px; padding: 4px 16px env(safe-area-inset-bottom); }
+    body.touch h1, body.touch #touch-hint { display: none; }
+    body.touch #hud { grid-area: hud; justify-self: center; font-size: 12px; }
+    body.touch canvas { grid-area: cv; }
+    body.touch #controls, body.touch .ctrl-group { display: contents; }
+    body.touch #btn-left { grid-area: l; align-self: center; width: 60px; height: 72px; }
+    body.touch #btn-right { grid-area: r; align-self: center; width: 60px; height: 72px; }
+    body.touch #btn-atk { grid-area: a; align-self: center; width: 84px; height: 84px; font-size: 32px; }
+    #start-overlay { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 420px); grid-template-rows: 1fr auto auto auto 1fr; column-gap: 22px; align-items: center; justify-content: center; padding: 12px 24px; text-align: left; }
+    #start-logo { grid-column: 1; grid-row: 1 / 6; width: 100%; max-height: calc(100dvh - 40px); margin: 0; justify-self: center; }
+    #start-overlay p { grid-column: 2; font-size: 13px; }
+    #start-overlay p:first-of-type { grid-row: 2; }
+    #start-overlay p:nth-of-type(2) { grid-row: 3; }
+    #start-overlay button { grid-column: 2; grid-row: 4; justify-self: start; margin-top: 10px; padding: 10px 36px; }
+    #overlay { padding: 10px; }
+    #overlay button { margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -105,7 +126,7 @@
   <div id="touch-hint">Buttons, or drag the room to move &middot; tap it to punch &middot; hold a side to walk</div>
 </div>
 <div id="start-overlay">
-  <img src="logos/rock-em-sock-em-wrecking-ball.png" alt="Rock Em Sock Em Wrecking Ball" style="display:block;width:min(82%,420px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <img id="start-logo" src="logos/rock-em-sock-em-wrecking-ball.png" alt="Rock Em Sock Em Wrecking Ball">
   <p>You're Uncle Earl, brawling the HOA board.</p>
   <p>← → (or A/D) to move &nbsp;·&nbsp; Space / Z / X to punch. On mobile: buttons, or drag on the room to move and tap it to punch. Survive the suits. 10 points per KO.</p>
   <button id="start-btn">Start the brawl</button>
@@ -135,7 +156,7 @@
   const H = (window.innerHeight > window.innerWidth) ? 460 : 340;
   const DECOR_Y = (H - 50) - 290;   // room decor was drawn for FLOOR_Y = 290; keep it glued to the floor
   canvas.height = H;
-  document.documentElement.style.setProperty('--aspect', (W / H).toFixed(4));
+  document.body.style.setProperty('--aspect', (W / H).toFixed(4));
   // Crisp at any devicePixelRatio: backing store = CSS size x DPR, context scaled to logical W/H.
   // The CSS aspect ratio is pinned so the displayed height never depends on the (rounded)
   // backing-store size; otherwise a ResizeObserver refit loop can occur at DPR 1.

@@ -15,23 +15,54 @@
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
     height: 100%; gap: 5px; }
   h1 { margin: 0; font-size: clamp(14px, 4vw, 22px); letter-spacing: 2px; color: var(--secondary); }
-  #hud { display: flex; gap: 16px; font-size: clamp(11px, 3vw, 14px); opacity: 0.9; }
+  #info { display: contents; }
+  #hud { display: flex; gap: 16px; font-size: clamp(11px, calc(0.9vw + 6px), 18px); opacity: 0.9; }
   #list { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 95vw;
-    font-size: clamp(11px, 3vw, 14px); background: rgba(255,255,255,0.08); padding: 4px 10px;
+    font-size: clamp(11px, calc(0.9vw + 6px), 18px); background: rgba(255,255,255,0.08); padding: 4px 10px;
     border-radius: 6px; min-height: 24px; align-items: center; }
   #list span { white-space: nowrap; }
   #list span.got { opacity: 0.35; text-decoration: line-through; }
+  /* --reserved: height of everything stacked with the view (title, HUD, list, hint, buttons);
+     --side: width taken beside it (edge margins, or the buttons in touch landscape). */
+  body { --reserved: 104px; --side: 5vw; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(95vw, calc((100dvh - 120px) * 1.5)); height: auto; display: block; }
+    width: min(calc(100vw - var(--side)), calc((100dvh - var(--reserved)) * 1.5)); aspect-ratio: 3 / 2; height: auto; display: block; }
   #controls { display: none; gap: 14px; align-items: center; justify-content: center;
     max-width: 95vw; padding: 4px 0 calc(4px + env(safe-area-inset-bottom)); }
   body.touch #controls { display: flex; }
   /* phones: keep >= 24px of non-game margin at the screen edges so look-drags don't start the browser back gesture */
-  body.touch canvas { width: min(100vw - 48px, calc((100dvh - 230px) * 1.5)); }
+  body.touch { --reserved: 230px; --side: 48px; }
   #touch-hint { display: none; font-size: clamp(10px, 2.8vw, 13px); opacity: 0.7; text-align: center; padding: 0 8px; }
   body.touch #touch-hint { display: block; }
-  @media (min-width: 700px) { body.touch .btn { width: 76px; height: 64px; font-size: 26px; } body.touch canvas { width: min(95vw, calc((100dvh - 250px) * 1.5)); } }
-  @media (orientation: landscape) and (max-height: 500px) { body.touch canvas { width: min(100vw - 48px, calc((100dvh - 150px) * 1.5)); } h1 { display: none; } }
+  @media (min-width: 700px) and (min-height: 600px) { body.touch .btn { width: 76px; height: 64px; font-size: 26px; } body.touch { --reserved: 250px; --side: 5vw; } }
+  /* Short screens (TV, phone landscape): the arcade topbar already names the game, and the HUD
+     and shopping list share one row. */
+  @media (max-height: 600px) { h1 { display: none; } }
+  @media (max-height: 600px) and (orientation: landscape) {
+    #info { display: flex; align-items: center; justify-content: center; gap: 14px; max-width: 96vw; }
+    #list { max-width: none; flex-wrap: nowrap; }
+    body { --reserved: 48px; }
+  }
+  /* Touch landscape: move buttons left of the view, turn buttons right of it. */
+  @media (orientation: landscape) {
+    body.touch { --reserved: 150px; --side: 300px; }
+    body.touch #wrap { display: grid; justify-content: center; align-content: center; column-gap: 18px; row-gap: 5px;
+      grid-template-columns: auto auto auto; grid-template-areas: ". title ." "info info info" "move cv turn" ". hint ."; }
+    body.touch h1 { grid-area: title; text-align: center; }
+    body.touch #info { grid-area: info; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    body.touch canvas { grid-area: cv; }
+    body.touch #touch-hint { grid-area: hint; }
+    body.touch #controls { display: contents; }
+    body.touch .ctrl-group { flex-direction: column; align-self: center; gap: 12px; }
+    body.touch #grp-move { grid-area: move; }
+    body.touch #grp-turn { grid-area: turn; }
+  }
+  @media (orientation: landscape) and (max-height: 600px) {
+    body.touch { --reserved: 72px; --side: 220px; }
+    body.touch #wrap { column-gap: 16px; }
+    body.touch #info { flex-direction: row; gap: 14px; }
+    body.touch #touch-hint { font-size: 11px; }
+  }
   .ctrl-group { display: flex; gap: 8px; }
   .btn {
     padding: 0; width: 56px; height: 52px; font-size: 22px; border: 2px solid var(--secondary);
@@ -76,6 +107,15 @@
     #start-card img { max-height: 26vh !important; margin-bottom: 6px !important; }
     #start-card p { margin-bottom: 14px; line-height: 1.4; }
   }
+  @media (max-height: 500px) and (orientation: landscape) {
+    #start-card { display: grid; grid-template-columns: auto 1fr; column-gap: 20px; align-items: center;
+      max-width: 780px; padding: 14px 22px !important; text-align: left; }
+    #start-card img { grid-row: 1 / span 2; width: min(28vw, 210px) !important; max-height: calc(100dvh - 50px) !important; margin: 0 !important; }
+    #start-card p { margin: 0 0 12px !important; font-size: clamp(12px, calc(2.4dvh + 4.5px), 15px) !important; line-height: 1.45 !important; }
+    #start-btn { justify-self: start; padding: 12px 40px; }
+    #overlay { padding: 10px 20px; }
+  }
+  @media (min-width: 1200px) and (min-height: 700px) { #start-card { max-width: 640px; } #start-card p { font-size: 17px !important; } }
   #start-card h2 {
     font-family: 'Lilita One', system-ui, sans-serif;
     font-size: clamp(34px, 9vw, 68px); font-weight: 400;
@@ -106,20 +146,22 @@
 <body>
 <div id="wrap">
   <h1>CLEANUP ON ISLE 11</h1>
+  <div id="info">
   <div id="hud">
     <span id="score">Score: 0</span>
     <span id="time">Time: 60</span>
     <span id="round">List #1</span>
   </div>
   <div id="list"></div>
+  </div>
   <canvas id="game" width="600" height="400"></canvas>
   <div id="touch-hint">Left thumb on the view: move · right thumb: drag to look · or use the buttons</div>
   <div id="controls">
-    <div class="ctrl-group">
+    <div class="ctrl-group" id="grp-turn">
       <button class="btn" id="btn-tl">↰</button>
       <button class="btn" id="btn-tr">↱</button>
     </div>
-    <div class="ctrl-group">
+    <div class="ctrl-group" id="grp-move">
       <button class="btn" id="btn-fw">▲</button>
       <button class="btn" id="btn-bk">▼</button>
     </div>
@@ -166,6 +208,7 @@
   }
   fitCanvas();
   addEventListener('resize', fitCanvas);
+  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);
   window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitCanvas, 50); }, { once: true, passive: true });
   // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
   window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });

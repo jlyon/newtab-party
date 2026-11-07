@@ -118,7 +118,6 @@
   }
   .overlay .controls{margin:8px 0 4px;}
   @media (min-width: 700px) and (pointer: coarse){ .btn{min-height:60px;padding:14px 26px;} }
-  @media (orientation: landscape) and (max-height: 500px){ h1{font-size:22px;margin:0;} .tag{display:none;} #status{margin:2px 0;} .grid{width:min(40vw, calc(100dvh - 170px));} .fleet{margin-top:4px;} .controls{margin:6px 0 0;} }
   .overlay h1{margin-bottom:4px;}
   .overlay p{max-width:440px;font-size:clamp(14px,4vw,17px);line-height:1.55;color:var(--ink);}
   .overlay .big{font-size:clamp(24px,7vw,36px);color:var(--primary);font-weight:800;margin:6px 0;}
@@ -126,7 +125,7 @@
   .wrap{position:relative;z-index:1;width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;}
   #enemyFleet h3{display:none;}
   /* ── Phone layout: enemy board big, own fleet as a mini-map beside the enemy-ship chips; everything fits 100dvh ── */
-  @media (max-width: 700px){
+  @media (max-width: 700px) and (max-aspect-ratio: 4/3){
     body{padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
     .tag{display:none;}
     h1{font-size:26px;margin:0;letter-spacing:2px;}
@@ -154,7 +153,7 @@
     #startOverlay h1{font-size:clamp(34px,10vw,60px);}
   }
   #bgart{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;z-index:0;pointer-events:none;opacity:.18;}
-  #bgart svg{width:min(720px,96vw);height:auto;display:block;}
+  #bgart svg{width:min(720px,96vw);height:auto;max-height:75dvh;display:block;}
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #startOverlay {
@@ -182,6 +181,61 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #playBtn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.1); }
+
+  /* ── Responsive sizing ─────────────────────────────────────────── */
+  .overlay p{font-size:clamp(14px, min(2.1vw, 3.6dvh), 22px);max-width:min(92vw, 40ch);}
+  .overlay p.hintline{font-size:clamp(12px, min(1.4vw, 2.8dvh), 16px);color:rgba(234,246,248,.6);}
+  .overlay .big{font-size:clamp(24px, min(5vw, 8dvh), 56px);}
+  .overlay #overScore{font-size:clamp(18px, min(3.4vw, 5.5dvh), 36px);}
+  .best{font-size:clamp(13px, min(1.5vw, 3dvh), 18px);}
+  #startOverlay #playBtn{font-size:clamp(18px, min(2.4vw, 4.6dvh), 30px);}
+  #overOverlay .btn{font-size:clamp(15px, min(1.8vw, 3.4dvh), 22px);padding:.6em 1.6em;}
+  /* Portrait tablets: let the boards grow. */
+  @media (min-width: 701px) and (max-aspect-ratio: 4/3){
+    .grid{width:min(46vw, calc(100dvh - 320px), 600px);}
+    #status{font-size:clamp(16px, 2.4vw, 22px);}
+    .ship-chip{font-size:clamp(11px, 1.6vw, 15px);}
+    .panel h2{font-size:clamp(13px, 1.9vw, 18px);}
+    .panel small{font-size:clamp(11px, 1.5vw, 14px);height:auto;}
+  }
+  /* Wide screens (phone landscape, iPad landscape, desktop, TV): title, status, fleet and buttons in a
+     side column; both boards sized by the height. */
+  @media (min-aspect-ratio: 4/3){
+    body{padding:clamp(6px, 1.5dvh, 16px) clamp(8px, 1.5vw, 24px) calc(clamp(6px, 1.5dvh, 16px) + env(safe-area-inset-bottom));}
+    .wrap{max-width:none;height:100%;display:grid;justify-content:center;align-items:center;
+      --side:clamp(170px, 24vw, 360px); --gap:clamp(10px, 2vw, 32px);
+      grid-template-columns:var(--side) auto auto;grid-template-rows:1fr auto auto auto auto auto 1fr;
+      column-gap:var(--gap);row-gap:clamp(4px, 1.4dvh, 14px);}
+    .boards{display:contents;}
+    .tag{grid-column:1;grid-row:2;margin:0;text-align:center;font-size:clamp(11px, min(1.2vw, 2.6dvh), 16px);}
+    .wrap > h1{grid-column:1;grid-row:3;margin:0;text-align:center;font-size:clamp(22px, min(3.6vw, 8dvh), 60px);letter-spacing:2px;}
+    #status{grid-column:1;grid-row:4;margin:0;max-width:none;font-size:clamp(13px, min(1.6vw, 3.6dvh), 22px);}
+    #enemyFleet{grid-column:1;grid-row:5;margin:0;gap:clamp(4px, 0.8dvh, 8px);max-width:none;}
+    .ship-chip{font-size:clamp(10px, min(1.1vw, 2.6dvh), 16px);padding:.3em .7em;}
+    #setupControls,#battleControls{grid-column:1;grid-row:6;margin:0;}
+    .panel.enemy-panel{grid-column:2;grid-row:1 / -1;}
+    .panel.own-panel{grid-column:3;grid-row:1 / -1;}
+    .panel h2{font-size:clamp(11px, min(1.3vw, 2.8dvh), 18px);margin-bottom:clamp(2px, .8dvh, 8px);}
+    .panel small{font-size:clamp(10px, min(1.1vw, 2.4dvh), 15px);height:auto;min-height:1.2em;}
+    /* Width left for the two boards, split 55 / 45 in favour of the one you fire at; both capped by the height. */
+    .grid.enemy{width:min(calc(100dvh - 4.4em - 4dvh), calc((100vw - var(--side) - 2 * var(--gap) - 3vw) * .55));}
+    .grid.own{width:min(calc(100dvh - 4.4em - 4dvh), calc((100vw - var(--side) - 2 * var(--gap) - 3vw) * .45));}
+    .cell{font-size:clamp(10px, 1.4vw, 18px);}
+  }
+  @media (min-aspect-ratio: 4/3) and (max-height: 520px){
+    .tag{display:none;}
+    .wrap .controls .btn{min-height:44px;padding:8px 12px;font-size:14px;white-space:nowrap;}
+    .controls{gap:8px;}
+  }
+  /* Short landscape title screen: logo left, copy + button right. */
+  @media (max-height: 520px) and (orientation: landscape){
+    #startOverlay{display:grid;grid-template-columns:minmax(0, min(36vw, 72dvh)) minmax(0, 32em);grid-auto-rows:min-content;
+      align-content:center;justify-content:center;column-gap:clamp(16px, 4vw, 48px);text-align:left;}
+    #startOverlay #startLogo{grid-column:1;grid-row:1 / span 5;align-self:center;width:100% !important;max-height:84dvh !important;margin:0 !important;}
+    #startOverlay > :not(img){grid-column:2;}
+    #startOverlay p{max-width:none;margin:4px 0;}
+    #startOverlay .controls{justify-content:flex-start;margin:8px 0 4px;}
+  }
 </style>
 </head>
 <body>
@@ -269,20 +323,20 @@
 
   <div class="overlay" id="startOverlay">
     <div class="tag">a salty little game of</div>
-    <img src="logos/yarrmada.png" alt="Yarrmada" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <img id="startLogo" src="logos/yarrmada.png" alt="Yarrmada" style="display:block;width:min(82%,460px);max-height:40dvh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
     <p>Sink the enemy pirate fleet before they sink yours. Tap squares in <b>Enemy Waters</b> to fire yer cannons. Sink all 5 ships to win the plunder. Fewer shots = higher score, ye efficient sea-dog.</p>
     <div class="best" id="startBest"></div>
     <div class="controls"><button class="btn primary" id="playBtn">Weigh anchor</button></div>
-    <p style="font-size:12px;color:rgba(234,246,248,.5)">Tap / click to fire &middot; Enter to restart</p>
+    <p class="hintline">Tap / click to fire &middot; Enter to restart</p>
   </div>
 
   <div class="overlay" id="overOverlay" style="display:none;">
     <div class="big" id="overTitle"></div>
     <p id="overMsg"></p>
-    <div class="big" id="overScore" style="font-size:clamp(18px,5vw,24px)"></div>
+    <div class="big" id="overScore"></div>
     <div class="best" id="overBest"></div>
     <div class="controls"><button class="btn primary" id="againBtn">Sail again</button></div>
-    <p style="font-size:12px;color:rgba(234,246,248,.5)">Press Enter</p>
+    <p class="hintline">Press Enter</p>
   </div>
 </div>
 

@@ -79,6 +79,46 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* ── Responsive pass: readable HUD on big screens, steer buttons beside the canvas in landscape ── */
+  h1 { font-size: clamp(14px, min(4vw, 3.2dvh), 28px); }
+  #hud { font-size: clamp(12px, min(3vw, 2.6dvh), 20px); }
+  #start-overlay img { width: min(82%, 52dvh) !important; max-height: 42dvh !important; }
+  #start-overlay p { font-size: clamp(12px, min(3vw, 2.2dvh), 21px); max-width: min(100%, 36ch); }
+  #start-overlay button { font-size: clamp(15px, min(4vw, 2.8dvh), 28px); }
+  #overlay h2 { font-size: clamp(22px, min(6vw, 6dvh), 60px); }
+  #overlay p { font-size: clamp(12px, min(3vw, 2.4dvh), 22px); }
+  #overScore { font-size: clamp(20px, min(6vw, 4.4dvh), 40px) !important; }
+  #overlay button { font-size: clamp(14px, min(3.5vw, 2.4dvh), 22px); }
+  #start-overlay, #overlay { overflow-y: auto; }
+  /* Touch landscape (tablet / phone sideways): ◀ ▶ in the bottom corners, canvas takes the height. */
+  @media (orientation: landscape) {
+    body.touch { --reserved: 80px; --cw: min(calc(100vw - 300px), calc((100dvh - var(--reserved)) * 0.667)); }
+    body.touch #touch-hint { display: none; }
+    body.touch #controls { position: fixed; inset: 0; width: auto; pointer-events: none; z-index: 5; display: block; }
+    body.touch #controls .btn { position: absolute; pointer-events: auto; bottom: calc(20px + env(safe-area-inset-bottom));
+      width: clamp(76px, 10vw, 110px); height: clamp(76px, 10vw, 110px); }
+    body.touch #btn-left { left: 24px; }
+    body.touch #btn-right { right: 24px; }
+  }
+  /* Short landscape (phone sideways, TV): title + HUD in a side column, canvas uses the full height. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    body, body.touch { --cw: min(calc(100vw - 300px), calc((100dvh - 14px) * 0.667)); }
+    #wrap { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: auto 1fr; column-gap: 18px; row-gap: 8px;
+      align-items: start; padding: 6px 12px; }
+    h1 { grid-area: 1 / 1; justify-self: end; text-align: right; font-size: clamp(16px, 5.4dvh, 28px); }
+    #hud { grid-area: 2 / 1; justify-self: end; flex-direction: column; align-items: flex-end; gap: 4px; font-size: clamp(12px, 4.4dvh, 20px); }
+    canvas { grid-area: 1 / 2 / 3 / 3; align-self: center; }
+    #start-overlay { display: grid; grid-template-columns: auto minmax(0, 520px); grid-template-rows: 1fr auto auto 1fr; column-gap: 24px;
+      justify-content: center; align-items: center; text-align: left; padding: 12px 20px; }
+    #start-overlay[style*="none"] { display: none; }
+    #start-overlay img { grid-area: 1 / 1 / 5 / 2; width: auto !important; max-width: 34vw !important; height: calc(100dvh - 40px) !important;
+      max-height: 320px !important; margin: 0 !important; }
+    #start-overlay p { grid-area: 2 / 2; margin: 0 0 10px; font-size: clamp(12px, 4dvh, 17px); max-width: none; }
+    #start-overlay button { grid-area: 3 / 2; justify-self: start; margin-top: 4px; padding: 12px 40px; }
+    #overlay { padding: 12px; }
+    #overScore { margin: 4px 0 !important; }
+    #overlay button { margin-top: 10px; }
+  }
 </style>
 </head>
 <body>

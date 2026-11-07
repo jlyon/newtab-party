@@ -109,6 +109,40 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-btn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #start-overlay p { font-size: clamp(12px, min(3vw, 3.2dvh), 19px); }
+  #start-btn { font-size: clamp(15px, min(4vw, 3.4dvh), 24px); }
+  #overlay h2 { font-size: clamp(22px, min(6vw, 7dvh), 44px); }
+  #overlay p { font-size: clamp(12px, min(3vw, 3.2dvh), 19px); }
+  #overlay .final-score { font-size: clamp(22px, min(6vw, 6dvh), 40px); }
+  #overlay .sub, #overlay .formula { font-size: clamp(11px, min(2.8vw, 2.6dvh), 16px); }
+  #overlay button { font-size: clamp(14px, min(3.5vw, 3dvh), 20px); }
+
+  /* Landscape (phones on their side, tablets, desktop, TV): title, mission, HUD and hint on the
+     left, the board on the right at full height (cellSize() in the script uses the same query). */
+  @media (orientation: landscape) and (min-aspect-ratio: 13/10) {
+    #wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: clamp(16px, 3vw, 40px);
+      grid-template-rows: 1fr auto auto auto auto 1fr; row-gap: clamp(6px, 1.8dvh, 16px);
+      grid-template-areas: ". board" "h1 board" "tag board" "hud board" "hint board" ". board";
+      align-items: center; justify-items: center; padding: 8px 12px 8px 16px; }
+    #wrap > :first-child, #wrap > :last-child { margin: 0; }
+    h1 { grid-area: h1; font-size: clamp(16px, min(2.6vw, 5.5dvh), 40px); text-align: center; }
+    .tagline { grid-area: tag; max-width: 46ch; font-size: clamp(11px, min(1.5vw, 2.9dvh), 19px); }
+    #hud { grid-area: hud; font-size: clamp(12px, min(1.7vw, 3.2dvh), 21px); gap: 6px 16px; max-width: 40ch; }
+    #hud svg { width: 1.1em; height: 1.1em; }
+    #hint { grid-area: hint; max-width: 44ch; font-size: clamp(11px, min(1.3vw, 2.5dvh), 16px); }
+    #board { grid-area: board; max-height: calc(100dvh - 16px); max-width: calc(64vw - 12px); }
+    #zoom-btn { font-size: clamp(12px, 3.6dvh, 15px); min-height: 44px; }
+  }
+  /* phones on their side: cells get small, so offer the zoom toggle there too */
+  @media (orientation: landscape) and (max-height: 560px) {
+    body.touch #zoom-btn { display: inline-flex; align-items: center; }
+    #start-overlay { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); align-content: center;
+      justify-items: center; column-gap: 24px; padding: 12px 24px; }
+    #start-overlay img { grid-column: 1; grid-row: 1 / span 2; max-height: calc(100dvh - 24px) !important; width: 100% !important; margin: 0 !important; }
+    #start-overlay p, #start-overlay button { grid-column: 2; }
+    #start-overlay p { margin: 0; }
+    #start-btn { margin-top: clamp(12px, 4dvh, 24px); }
+  }
 </style>
 </head>
 <body>
@@ -390,15 +424,24 @@
 
   // Cell size from BOTH axes so the 16x16 board fits the viewport (desktop height-limited, phones width-limited).
   // Zoomed (touch toggle): 32px cells inside the pannable #board.
+  // Landscape screens (phones on their side, tablets, desktop, TV) put the board in a right-hand
+  // column sized from the full height; must match the side-layout media query in the CSS.
+  const SIDE_MQ = matchMedia('(orientation: landscape) and (min-aspect-ratio: 13/10)');
   function cellSize() {
-    const edge = (zoomed && window.innerWidth <= 600) ? 48 : 16;
-    const availW = Math.min(window.innerWidth - edge, 820) - GRID_PAD*2 - (COLS - 1) * GAP;
-    // measure the real height of everything around the board (title, tagline, HUD, hint, gaps, padding)
-    const others = ['h1', '.tagline', '#hud', '#hint'].reduce((a, q) => a + (document.querySelector(q)?.getBoundingClientRect().height || 0), 0);
-    const availH = window.innerHeight - others - 60 - GRID_PAD*2 - (ROWS - 1) * GAP;
+    let availW, availH;
+    if (SIDE_MQ.matches) {
+      availW = window.innerWidth * 0.64 - 40 - GRID_PAD*2 - (COLS - 1) * GAP;
+      availH = window.innerHeight - 22 - GRID_PAD*2 - (ROWS - 1) * GAP;
+    } else {
+      const edge = (zoomed && window.innerWidth <= 600) ? 48 : 16;
+      availW = Math.min(window.innerWidth - edge, 900) - GRID_PAD*2 - (COLS - 1) * GAP;
+      // measure the real height of everything around the board (title, tagline, HUD, hint, gaps, padding)
+      const others = ['h1', '.tagline', '#hud', '#hint'].reduce((a, q) => a + (document.querySelector(q)?.getBoundingClientRect().height || 0), 0);
+      availH = window.innerHeight - others - 60 - GRID_PAD*2 - (ROWS - 1) * GAP;
+    }
     const fit = Math.floor(Math.min(availW, availH) / COLS);
     if (zoomed) return Math.max(32, fit);
-    return Math.max(14, Math.min(42, fit));
+    return Math.max(14, Math.min(56, fit));
   }
 
   function render(hitR, hitC) {

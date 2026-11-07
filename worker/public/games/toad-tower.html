@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Toad Tower</title>
+<link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #3ddc84; --secondary: #ffcc4d; --bg: #1e1033; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; }
+  #hud #floor { color: var(--secondary); }
+  #hud #surge { color: var(--primary); }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (416 / 384))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 56px; flex: 1; max-width: 110px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.gap { margin-left: 18px; }
+  .btn.held, .btn:active { background: var(--primary); }
+
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 60px); color: var(--primary); font-family: 'Uncial Antiqua', Georgia, serif; font-weight: 400; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-family: 'Uncial Antiqua', Georgia, serif; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  kbd { background: rgba(255,255,255,.14); border-radius: 4px; padding: 1px 6px; font-family: inherit; }
+
+  /* ── Landing screen: gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(18,8,32,0.55), rgba(18,8,32,0.45) 72%, rgba(18,8,32,0.78)),
+      url('backgrounds/toad-tower.jpg') center/cover no-repeat, var(--bg);
+  }
+  #start-panel { background: rgba(20,10,36,0.62); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 4vw, 32px); max-width: 560px; }
+  #start-overlay h2 {
+    font-family: 'Uncial Antiqua', Georgia, serif; font-size: clamp(34px, 8vw, 62px); line-height: 1; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(61,220,132,0.65);
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay button {
+    font-family: 'Uncial Antiqua', Georgia, serif; margin-top: 22px; padding: 15px 50px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer; color: #10100f; background: var(--primary);
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* ── Responsive layout ──
+     Portrait: HUD, canvas, touch controls stacked; --reserved is the height the non-canvas rows need.
+     Landscape: canvas at full height in the middle, HUD to its left, touch pads in the bottom corners. */
+  #wrap { --reserved: 48px; padding: 8px 12px env(safe-area-inset-bottom); }
+  body.touch #wrap { --reserved: 112px; }
+  canvas { flex: none; aspect-ratio: 416 / 384; width: min(100vw - 24px, (100dvh - var(--reserved)) * 416 / 384); }
+  .pad { display: flex; gap: 10px; flex: 1; justify-content: center; max-width: 240px; }
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "hud cv hint" "padl cv padr"; gap: 8px clamp(12px, 3vw, 40px); padding: 8px 24px; align-items: center; }
+    canvas { grid-area: cv; width: min((100dvh - 16px) * 416 / 384, 100vw - 340px); }
+    #hud { grid-area: hud; justify-self: end; flex-direction: column; align-items: flex-end; gap: clamp(2px, 1dvh, 10px); text-align: right; font-size: clamp(13px, 3.4dvh, 24px); }
+    #hud span:empty { display: none; }
+    #hint { grid-area: hint; justify-self: start; max-width: 20ch; font-size: clamp(12px, 3dvh, 16px); line-height: 1.35; }
+    body.touch #touch-controls { display: contents; }
+    .pad { flex: none; max-width: none; }
+    .pad-l { grid-area: padl; justify-self: end; }
+    .pad-r { grid-area: padr; justify-self: start; }
+    .btn { flex: none; width: clamp(60px, 6vw, 76px); max-width: none; height: clamp(60px, 17dvh, 76px); margin: 0; }
+    /* two buttons per pad: keep both pads beside the canvas */
+    body.touch canvas { width: min((100dvh - 16px) * 416 / 384, 100vw - 48px - 2 * (2 * clamp(60px, 6vw, 76px) + 10px) - 2 * clamp(12px, 3vw, 40px)); }
+  }
+  /* Short landscape (phone on its side): logo on the left, copy + button on the right; compact game-over. */
+  .start-copy { display: contents; }
+  @media (max-height: 460px) and (orientation: landscape) {
+    .overlay { padding: 10px 24px; }
+    .overlay h2, #start-overlay h2 { font-size: 34px; }
+    .overlay p, #start-overlay p { font-size: 13px; line-height: 1.4; margin: 4px 0; }
+    .overlay button, #start-overlay button { margin-top: 10px; padding: 11px 36px; }
+    #start-panel { display: flex; flex-direction: row; align-items: center; gap: 24px; max-width: 820px; max-height: 100%; padding: 14px 20px; }
+    #start-panel > img, #start-panel > h2 { flex: 0 1 34%; width: 34% !important; max-height: 72dvh !important; margin: 0 !important; }
+    .start-copy { display: flex; flex-direction: column; align-items: center; flex: 0 1 52ch; min-width: 0; }
+    .start-copy p { padding: 10px 14px !important; }
+  }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    .overlay p, #start-overlay p { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="floor">Floor 1</span><span id="surge"></span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="416" height="384"></canvas>
+  <div id="touch-controls">
+    <div class="pad pad-l"><button class="btn" id="btn-left">◀</button><button class="btn" id="btn-right">▶</button></div>
+    <div class="pad pad-r"><button class="btn" id="btn-jump">▲</button><button class="btn" id="btn-fire">✦</button></div>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show">
+ <div id="start-panel">
+  <img src="logos/toad-tower.png" alt="Toad Tower" onerror="this.remove();document.getElementById('start-title').style.display='';" style="display:block;width:min(82%,400px);max-height:34vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <h2 id="start-title" style="display:none">Toad Tower</h2>
+  <div class="start-copy">
+  <p>Wartholomew the frog wizard is climbing a tower full of living candles. Blow a magic bubble to trap a Wicky, then bump the bubble to pop it. Pop touching bubbles for combos. Grab 🧪 for a Magic Surge. One life, and don't dawdle: the Snuffer is coming.</p>
+  <p><kbd>←</kbd> <kbd>→</kbd> move · <kbd>↑</kbd>/<kbd>Z</kbd> jump · <kbd>Space</kbd>/<kbd>X</kbd> bubble · hold jump to bounce on bubbles.<br>On touch: ◀ ▶ move, ▲ jump, ✦ bubble.</p>
+  <button id="start-btn">Play</button>
+  </div>
+ </div>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 416, H = 384;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-fire', 'fire'); holdBtn('btn-jump', 'jump');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || keys['A'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || keys['D'] || held.right;
+  const fire  = () => keys[' '] || keys['x'] || keys['X'] || held.fire;
+  const jump  = () => keys['ArrowUp'] || keys['w'] || keys['W'] || keys['z'] || keys['Z'] || held.jump;
+  // Press latches: a tap shorter than one sim step still counts.
+  let fireQ = false, jumpQ = false;
+  addEventListener('keydown', e => { if (e.repeat) return; if ([' ', 'x', 'X'].includes(e.key)) fireQ = true; if (['ArrowUp', 'w', 'W', 'z', 'Z'].includes(e.key)) jumpQ = true; });
+  ['touchstart', 'mousedown'].forEach(ev => {
+    document.getElementById('btn-fire').addEventListener(ev, () => { fireQ = true; });
+    document.getElementById('btn-jump').addEventListener(ev, () => { jumpQ = true; });
+  });
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const TS = 16, COLS = 26, ROWS = 24, G = 0.32, MAXF = 4.6, JUMP_V = -7.5;
+  const PLAT_ROWS = [18, 13, 8];              // one-way stone ledges, 5 rows apart (one jump each)
+  const GAP0 = 11, GAP1 = 14;                 // hole in floor + ceiling: fall through, come back from the top
+  const TOP_Y = 50;                           // where floating bubbles gather
+  const BG = '#1e1033', PRI = '#3ddc84', SEC = '#ffcc4d';
+  const PALETTES = [['#6b5a8e', '#9583bd', '#45395f'], ['#3e8a6a', '#6fc49d', '#265c45'], ['#8a5a6b', '#bd8396', '#5c3846'],
+                    ['#5a6f8e', '#8399bd', '#39465f'], ['#8e7a4a', '#c2ab72', '#5f5030']];
+  const WAX = ['#f3e6c4', '#f7c8d8', '#cfe8ff', '#e2d4ff', '#d9f5c9'];
+  const LOOT = [['🪰', 1], ['🐛', 1], ['🍄', 1], ['🦗', 2], ['🫐', 2], ['💎', 3], ['🔮', 3], ['👑', 5]];
+  const DEATH_WICK = ['Singed by a candle. Embarrassing for a wizard.', 'Frog legs, flambé.', 'Hot wax, cold reality.', 'The tower claims another apprentice.', 'You had one job. It was bubbles.'];
+  const DEATH_SNUFF = ['The Snuffer always gets its frog.', 'Lights out, Wartholomew.', 'Should have climbed faster.'];
+  const STARS = Array.from({ length: 30 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 0.6 + Math.random() * 1.4, p: Math.random() * 6 }));
+
+  let score = 0, floor = 1, grid = [], pal = PALETTES[0];
+  let player, enemies = [], bubbles = [], loot = [], texts = [], parts = [], snuffer = null;
+  let tick = 0, floorT = 0, intro = 0, clearT = 0, dying = 0, fireCd = 0, prevJump = true, hurry = false, surge = 0;
+  let deathTitle = '', deathMsg = '';
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const ri = (a, b) => Math.floor(rnd(a, b + 1));
+  const pick = a => a[ri(0, a.length - 1)];
+  const overlap = (a, b, i = 0) => a.x + i < b.x + b.w - i && a.x + a.w - i > b.x + i && a.y + i < b.y + b.h - i && a.y + a.h - i > b.y + i;
+  function addText(x, y, s, t, c, size) { texts.push({ x, y, s, t, c, size }); }
+  function updHud() {
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    document.getElementById('floor').textContent = 'Floor ' + floor;
+    document.getElementById('surge').textContent = surge > 0 ? '✦ Surge' : '';
+  }
+
+  // ── Floors: symmetric one-way ledges, each row reachable from the one below ──
+  function makeHalf() {
+    const h = new Array(11).fill(0);
+    const set = (a, b) => { for (let i = Math.max(0, a); i <= Math.min(10, b); i++) h[i] = 1; };
+    switch (ri(0, 6)) {
+      case 0: set(0, 8); break;
+      case 1: set(0, ri(3, 5)); break;
+      case 2: { const a = ri(2, 4); set(a, a + ri(3, 5)); break; }
+      case 3: set(ri(5, 7), 10); break;
+      case 4: set(0, 2); set(ri(5, 6), ri(8, 9)); break;
+      case 5: { const a = ri(0, 3); set(a, a + 2); set(a + 5, a + 7); break; }
+      default: set(ri(2, 3), 10); break;
+    }
+    return h;
+  }
+  function rowOverlaps(r, rb) {
+    for (let c = 2; c < COLS - 2; c++) if (grid[r][c])
+      for (let d = -2; d <= 2; d++) { const cc = c + d; if (cc >= 2 && cc <= COLS - 3 && grid[rb][cc]) return true; }
+    return false;
+  }
+  function genFloor() {
+    grid = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+    for (let r = 0; r < ROWS; r++) grid[r][0] = grid[r][1] = grid[r][COLS - 2] = grid[r][COLS - 1] = 1;
+    for (let c = 2; c < COLS - 2; c++) if (c < GAP0 || c > GAP1) grid[0][c] = grid[ROWS - 1][c] = 1;
+    let below = ROWS - 1;
+    for (const r of PLAT_ROWS) {
+      let ok = false;
+      for (let tries = 0; tries < 30 && !ok; tries++) {
+        const h = makeHalf();
+        for (let i = 0; i < 11; i++) { grid[r][2 + i] = h[i]; grid[r][COLS - 3 - i] = h[i]; }
+        ok = rowOverlaps(r, below);
+      }
+      if (!ok) for (let c = 2; c < COLS - 2; c++) grid[r][c] = (c < GAP0 || c > GAP1) ? 1 : 0;
+      below = r;
+    }
+    pal = PALETTES[(floor - 1) % PALETTES.length];
+  }
+  function mkEnemy(x, y) {
+    return { x, y, w: 14, h: 18, vx: 0, vy: 0, dir: Math.random() < 0.5 ? -1 : 1, onGround: false, angry: false, trapped: null,
+             jumpCd: 60, edgeCd: 0, color: pick(WAX), anim: Math.random() * 100 };
+  }
+  function spawnEnemies() {
+    const n = Math.min(3 + Math.floor((floor - 1) / 2), 7);
+    let spots = [];
+    for (const r of PLAT_ROWS) for (let c = 3; c < COLS - 3; c++) if (grid[r][c] && grid[r][c - 1] && grid[r][c + 1]) spots.push([r, c]);
+    enemies = [];
+    for (let i = 0; i < n && spots.length; i++) {
+      const [r, c] = spots[ri(0, spots.length - 1)];
+      enemies.push(mkEnemy(c * TS + 1, r * TS - 18));
+      spots = spots.filter(([rr, cc]) => rr !== r || Math.abs(cc - c) > 3);
+    }
+  }
+  function startFloor() {
+    genFloor(); spawnEnemies();
+    player = { x: 36, y: (ROWS - 1) * TS - 20, w: 16, h: 20, vx: 0, vy: 0, dir: 1, onGround: true, puff: 0, walk: 0 };
+    bubbles = []; loot = []; texts = []; parts = []; snuffer = null;
+    floorT = 0; intro = 100; clearT = 0; dying = 0; fireCd = 0; prevJump = true; hurry = false; fireQ = jumpQ = false;
+  }
+  function reset() { score = 0; floor = 1; tick = 0; surge = 0; startFloor(); updHud(); }
+
+  // ── Physics ──
+  function solidUnder(e, r) {
+    if (r < 1 || r >= ROWS) return false;
+    const c0 = Math.floor((e.x + 2) / TS), c1 = Math.floor((e.x + e.w - 2) / TS);
+    for (let c = c0; c <= c1; c++) if (grid[r][c]) return true;
+    return false;
+  }
+  function moveX(e) {
+    e.x += e.vx;
+    const lo = 2 * TS, hi = W - 2 * TS - e.w;
+    if (e.x < lo) { e.x = lo; return true; }
+    if (e.x > hi) { e.x = hi; return true; }
+    return false;
+  }
+  function moveY(e) {
+    e.vy = Math.min(e.vy + G, MAXF);
+    const oldB = e.y + e.h; e.y += e.vy; const newB = e.y + e.h;
+    e.onGround = false;
+    if (e.vy >= 0) {
+      for (let r = Math.max(1, Math.ceil(oldB / TS)); r * TS <= newB && r < ROWS; r++) {
+        if (solidUnder(e, r)) { e.y = r * TS - e.h; e.vy = 0; e.onGround = true; break; }
+      }
+    } else if (e.y < TS) { e.y = TS; e.vy = 0; }
+    if (e.y > H) e.y = -e.h;                    // fell through the floor hole: drop in from the top
+  }
+
+  // ── Step ──
+  function step() {
+    tick++;
+    for (const t of texts) { t.y -= 0.5; t.t--; }
+    texts = texts.filter(t => t.t > 0);
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.t--; }
+    parts = parts.filter(p => p.t > 0);
+    if (intro > 0) { intro--; return; }
+    if (dying > 0) {
+      dying--; player.vy = Math.min(player.vy + 0.25, 5); player.y += player.vy;
+      if (dying === 0) gameOver(deathTitle, deathMsg);
+      return;
+    }
+    floorT++;
+    if (surge > 0 && --surge === 0) updHud();
+    stepPlayer(); stepBubbles(); stepEnemies(); stepLoot(); stepSnuffer();
+    checkHits();
+    if (!clearT) {
+      if (floorT === 1800) { hurry = true; enemies.forEach(e => { e.angry = true; }); addText(W / 2, H / 2, 'HURRY UP!', 100, '#ff6b6b', 30); }
+      if (floorT === 2400) { snuffer = { x: W / 2, y: -24, vx: 0, vy: 0 }; addText(W / 2, H / 2, 'THE SNUFFER WAKES', 100, '#ff6b6b', 24); }
+      if (enemies.length === 0 && !dying) {
+        const bonus = 500 + floor * 100 + Math.max(0, Math.floor((1800 - floorT) / 3));
+        score += bonus; updHud(); snuffer = null; clearT = 210;
+        addText(W / 2, H / 2 - 10, 'FLOOR CLEAR! +' + bonus, 130, SEC, 22);
+      }
+    } else if (--clearT === 0) { floor++; startFloor(); updHud(); }
+  }
+
+  function stepPlayer() {
+    const p = player;
+    p.vx = (right() ? 1.7 : 0) - (left() ? 1.7 : 0);
+    if (p.vx) { p.dir = Math.sign(p.vx); p.walk++; }
+    moveX(p);
+    const j = jump();
+    if (((j && !prevJump) || jumpQ) && p.onGround) { p.vy = JUMP_V; p.onGround = false; }
+    prevJump = j; jumpQ = false;
+    moveY(p);
+    if (fireCd > 0) fireCd--;
+    if ((fire() || fireQ) && fireCd === 0) { shoot(); fireCd = surge > 0 ? 10 : 18; fireQ = false; }
+    if (p.puff > 0) p.puff--;
+  }
+  function shoot() {
+    if (bubbles.length >= 16) return;
+    const p = player;
+    bubbles.push({ x: p.x + p.w / 2 + p.dir * 12, y: p.y + 9, vx: p.dir * (surge > 0 ? 8.2 : 6.2), r: 13, shot: true, t: 0, life: 540, enemy: null, seed: Math.random() * 6.28 });
+    p.puff = 10;
+  }
+  function trap(b, e) {
+    b.shot = false; b.enemy = e; e.trapped = b;
+    b.life = Math.max(300, 620 - floor * 20);
+  }
+  function stepBubbles() {
+    for (const b of bubbles) {
+      b.t++;
+      if (b.shot) {
+        b.x += b.vx; b.vx *= 0.94;
+        const lo = 2 * TS + b.r, hi = W - 2 * TS - b.r;
+        if (b.x < lo || b.x > hi) { b.x = Math.max(lo, Math.min(hi, b.x)); b.shot = false; }
+        if (Math.abs(b.vx) < 1.3) b.shot = false;
+        for (const e of enemies) {
+          if (!e.trapped && Math.hypot(b.x - (e.x + e.w / 2), b.y - (e.y + e.h / 2)) < b.r + 8) { trap(b, e); break; }
+        }
+      } else {
+        b.life--;
+        if (b.y > TOP_Y) b.y -= 0.55; else b.y += (TOP_Y - b.y) * 0.05;
+        const tx = W / 2 + Math.sin(b.seed) * 120;
+        b.x += Math.sin(b.t * 0.05 + b.seed) * 0.25 + (b.y < TOP_Y + 50 ? (tx - b.x) * 0.004 : 0);
+        b.x = Math.max(2 * TS + b.r, Math.min(W - 2 * TS - b.r, b.x));
+      }
+    }
+    for (let i = 0; i < bubbles.length; i++) for (let k = i + 1; k < bubbles.length; k++) {
+      const a = bubbles[i], b = bubbles[k];
+      if (a.shot || b.shot) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d > 0 && d < a.r + b.r) { const f = (a.r + b.r - d) * 0.1 / d; a.x -= dx * f; a.y -= dy * f; b.x += dx * f; b.y += dy * f; }
+    }
+    for (const b of bubbles) {
+      if (b.enemy) { const e = b.enemy; e.x = b.x - e.w / 2; e.y = b.y - e.h / 2; }
+      if (!b.shot && b.life <= 0) {
+        b.dead = true;
+        if (b.enemy) { const e = b.enemy; e.trapped = null; e.angry = true; e.vy = 0; e.jumpCd = 30; addText(b.x, b.y - 16, 'ESCAPED!', 50, '#ff6b6b', 13); }
+      }
+    }
+    bubbles = bubbles.filter(b => !b.dead);
+  }
+  function stepEnemies() {
+    const spd = Math.min(0.85 + floor * 0.05, 1.7);
+    for (const e of enemies) {
+      e.anim++;
+      if (e.trapped) continue;
+      if (e.jumpCd > 0) e.jumpCd--;
+      if (e.edgeCd > 0) e.edgeCd--;
+      if (e.onGround) {
+        const feetRow = Math.round((e.y + e.h) / TS);
+        const ac = Math.floor((e.dir > 0 ? e.x + e.w + 1 : e.x - 1) / TS);
+        if (feetRow < ROWS && !grid[feetRow][ac] && e.edgeCd === 0) {
+          const playerBelow = player.y > e.y + 24;
+          if (!playerBelow && Math.random() < 0.65) e.dir *= -1;
+          e.edgeCd = 30;
+        }
+        if (e.jumpCd === 0 && player.y + player.h < e.y - 10 && Math.random() < (e.angry ? 0.05 : 0.025)) {
+          let can = false;
+          for (let k = 2; k <= 5; k++) if (solidUnder(e, feetRow - k)) can = true;
+          if (can) { e.vy = JUMP_V; e.onGround = false; }
+          e.jumpCd = 50;
+        }
+        if (Math.abs((player.y + player.h) - (e.y + e.h)) < 6 && Math.random() < 0.012) e.dir = player.x > e.x ? 1 : -1;
+      }
+      e.vx = e.dir * spd * (e.angry ? 1.6 : 1) * (e.onGround ? 1 : 0.6);
+      if (moveX(e)) e.dir *= -1;
+      moveY(e);
+    }
+  }
+  function stepLoot() {
+    for (const f of loot) {
+      f.life--; f.x += f.vx; f.vx *= 0.97;
+      const lo = 2 * TS, hi = W - 2 * TS - f.w;
+      if (f.x < lo) { f.x = lo; f.vx = -f.vx; }
+      if (f.x > hi) { f.x = hi; f.vx = -f.vx; }
+      moveY(f);
+      if (overlap(player, f)) {
+        f.life = 0; score += f.value;
+        if (f.potion) { surge = 600; addText(f.x + 8, f.y - 10, 'MAGIC SURGE!', 70, PRI, 16); }
+        addText(f.x + 8, f.y, '+' + f.value, 50, SEC, 14);
+        updHud();
+      }
+    }
+    loot = loot.filter(f => f.life > 0);
+  }
+  function stepSnuffer() {
+    if (!snuffer) return;
+    const dx = player.x + player.w / 2 - snuffer.x, dy = player.y + player.h / 2 - snuffer.y, d = Math.hypot(dx, dy) || 1;
+    const sp = Math.min(0.9 + floor * 0.04 + (floorT - 2400) * 0.0004, 2.2);
+    snuffer.vx += (dx / d * sp - snuffer.vx) * 0.04; snuffer.vy += (dy / d * sp - snuffer.vy) * 0.04;
+    snuffer.x += snuffer.vx; snuffer.y += snuffer.vy;
+  }
+  function burst(x, y, c) {
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; parts.push({ x, y, vx: Math.cos(a) * 1.8, vy: Math.sin(a) * 1.8 - 0.5, t: 22, c }); }
+  }
+  function killEnemy(e, i) {
+    const pts = 100 * Math.pow(2, i - 1);
+    score += pts; addText(e.x + 7, e.y - 4, '+' + pts, 60, '#fff', 13);
+    enemies = enemies.filter(x => x !== e);
+    if (Math.random() < 0.1) { loot.push({ x: e.x, y: e.y, w: 16, h: 16, vx: rnd(-2, 2), vy: -4.5, onGround: false, emoji: '🧪', value: 100, potion: true, life: 560 }); return; }
+    const [emoji, mult] = LOOT[Math.min(LOOT.length - 1, ri(0, 2) + (i - 1) * 2 + Math.floor(floor / 5))];
+    loot.push({ x: e.x, y: e.y, w: 16, h: 16, vx: rnd(-2, 2), vy: -4.5, onGround: false, emoji, value: mult * 100, life: 560 });
+  }
+  function popChain(b0) {
+    const q = [b0]; b0.dead = true;
+    let kills = 0, empties = 0;
+    while (q.length) {
+      const b = q.shift();
+      if (b.enemy) { kills++; killEnemy(b.enemy, kills); burst(b.x, b.y, SEC); } else { empties++; burst(b.x, b.y, PRI); }
+      for (const o of bubbles) if (!o.dead && !o.shot && Math.hypot(o.x - b.x, o.y - b.y) < b.r * 2 + 8) { o.dead = true; q.push(o); }
+    }
+    score += empties * 10;
+    if (kills > 1) addText(b0.x, b0.y - 24, kills + 'x COMBO!', 80, PRI, 20);
+    updHud();
+  }
+  function die(bySnuffer) {
+    if (dying) return;
+    dying = 80; player.vy = -5;
+    deathTitle = bySnuffer ? 'Snuffed.' : 'Croaked.';
+    deathMsg = pick(bySnuffer ? DEATH_SNUFF : DEATH_WICK) + ' You reached floor ' + floor + '.';
+  }
+  function checkHits() {
+    const p = player;
+    for (const b of bubbles) {
+      if (b.shot || b.dead) continue;
+      const cx = Math.max(p.x, Math.min(b.x, p.x + p.w)), cy = Math.max(p.y, Math.min(b.y, p.y + p.h));
+      if (Math.hypot(b.x - cx, b.y - cy) > b.r - 1) continue;
+      if (p.vy > 0 && p.y + p.h < b.y - 2 && jump()) { p.vy = -6.6; b.y += 2; continue; }   // bounce on top
+      popChain(b);
+    }
+    bubbles = bubbles.filter(b => !b.dead);
+    for (const e of enemies) if (!e.trapped && overlap(p, e, 3)) { die(false); return; }
+    if (snuffer && Math.hypot(snuffer.x - (p.x + p.w / 2), snuffer.y + 4 - (p.y + p.h / 2)) < 16) die(true);
+  }
+
+  // ── Drawing ──
+  function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+  function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.fill();
+  }
+  function tri(a, b, c, d, e, f) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.lineTo(e, f); ctx.closePath(); ctx.fill(); }
+  function drawTiles() {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!grid[r][c]) continue;
+      const x = c * TS, y = r * TS, wall = c < 2 || c > COLS - 3;
+      ctx.fillStyle = wall ? '#2d1a4d' : pal[0]; ctx.fillRect(x, y, TS, TS);
+      ctx.fillStyle = wall ? '#3c2566' : pal[1]; ctx.fillRect(x, y, TS, 3);
+      ctx.fillStyle = wall ? '#1a0e2e' : pal[2]; ctx.fillRect(x, y + TS - 3, TS, 3);
+      ctx.fillStyle = wall ? '#1a0e2e' : pal[2];                      // brick mortar
+      ctx.fillRect(x + ((r % 2) ? 4 : 11), y + 3, 1.5, TS - 6);
+      if (wall && r % 4 === 1) {                                       // tower window glow
+        ctx.fillStyle = 'rgba(255,204,77,' + (0.35 + Math.sin(tick * 0.05 + r) * 0.1) + ')';
+        rrect(x + 5, y + 3, 6, 10, 3);
+      }
+    }
+  }
+  function drawFrog(p) {
+    const moving = p.onGround && p.vx;
+    const hop = moving ? Math.abs(Math.sin(p.walk * 0.3)) * 2 : 0;
+    ctx.save(); ctx.translate(p.x + p.w / 2, p.y + p.h - hop);
+    if (dying) { ctx.translate(0, -10); ctx.rotate(tick * 0.3); ctx.translate(0, 10); }
+    ctx.scale(p.dir, 1);
+    const st = moving ? Math.sin(p.walk * 0.3) * 2 : 0;
+    ctx.fillStyle = '#1f8a4c'; ell(-4 + st, -1.5, 4, 1.8); ell(4 - st, -1.5, 4, 1.8);              // feet
+    ctx.fillStyle = '#5b2e91'; tri(-8, -2, 6, -2, -1, -14);                                          // robe
+    ctx.fillStyle = SEC; circ(-1, -6, 1.1);
+    ctx.fillStyle = PRI; ell(1, -12, 7, 5.5);                                                        // head
+    ctx.fillStyle = '#c8f7d6'; ell(3, -10, 4.5, 2.4);
+    ctx.fillStyle = PRI; circ(1, -17, 3.4); circ(7, -16.5, 3.4);                                     // eye bumps
+    ctx.fillStyle = '#fff'; circ(1, -17, 2.5); circ(7, -16.5, 2.5);
+    ctx.fillStyle = '#000'; circ(1.8, -17, 1.2); circ(7.8, -16.5, 1.2);
+    ctx.strokeStyle = '#155c33'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(4, -11, 3.5, 0.2, 1.2); ctx.stroke();
+    ctx.fillStyle = '#5b2e91'; ell(-3, -19.5, 6.5, 1.6); tri(-8, -20, 1, -20, -8, -32);              // hat
+    ctx.fillStyle = SEC; circ(-4.5, -24, 1.4);
+    ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(6, -6); ctx.lineTo(12, -12); ctx.stroke();  // wand
+    ctx.fillStyle = SEC; circ(12.5, -12.5, p.puff > 0 ? 2.6 : 1.6);
+    if (p.puff > 0 || surge > 0) { ctx.fillStyle = 'rgba(255,204,77,.5)'; circ(12.5, -12.5, 4 + Math.sin(tick * 0.4) * 1.2); }
+    ctx.restore();
+  }
+  function drawWicky(e, cx, fy, s) {
+    ctx.save(); ctx.translate(cx, fy); ctx.scale(e.dir * s, s);
+    if (e.onGround && !e.trapped) ctx.translate(0, Math.sin(e.anim * 0.25));
+    if (e.trapped) ctx.rotate(Math.sin(e.anim * 0.2) * 0.25);
+    const fl = Math.sin(e.anim * 0.4) * 1.2;
+    ctx.globalCompositeOperation = 'lighter';                                                            // additive glow
+    ctx.fillStyle = e.angry ? 'rgba(60,120,255,.28)' : 'rgba(255,140,30,.26)'; circ(0, -21, 6.5 + fl * 0.5);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = e.angry ? '#5ab0ff' : '#ff9f1c';                                                     // flame
+    ctx.beginPath(); ctx.moveTo(0, -27 - fl); ctx.quadraticCurveTo(4.5, -20, 0, -16.5); ctx.quadraticCurveTo(-4.5, -20, 0, -27 - fl); ctx.fill();
+    ctx.fillStyle = e.angry ? '#d6ecff' : '#ffe66d'; ell(0, -19, 1.6, 2.6);
+    ctx.fillStyle = '#333'; ctx.fillRect(-0.5, -17, 1, 2);                                               // wick
+    ctx.fillStyle = e.color; rrect(-6, -15, 12, 15, 3);                                                  // wax
+    ctx.beginPath(); ctx.ellipse(-3, -12, 1.6, 3.5, 0, 0, Math.PI * 2); ctx.ellipse(4, -11, 1.4, 2.8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-4.5, -13, 1.6, 9);
+    ctx.fillStyle = '#fff'; circ(-1, -8, 1.9); circ(3, -8, 1.9);
+    ctx.fillStyle = '#000'; circ(-0.5, -7.8, 1); circ(3.5, -7.8, 1);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.1; ctx.beginPath();
+    ctx.moveTo(-3, -11); ctx.lineTo(0, -9.8); ctx.moveTo(5, -11); ctx.lineTo(2, -9.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(1, -3, 1.8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.restore();
+  }
+  function drawBubble(b) {
+    if (b.enemy) drawWicky(b.enemy, b.x, b.y + 9, 0.72);
+    const warn = b.enemy && b.life < 120 && (tick >> 3) % 2;
+    const g = ctx.createRadialGradient(b.x - 4, b.y - 4, 2, b.x, b.y, b.r);
+    g.addColorStop(0, 'rgba(255,255,255,0.04)');
+    g.addColorStop(0.75, b.enemy ? 'rgba(255,204,77,0.14)' : 'rgba(61,220,132,0.1)');
+    g.addColorStop(1, b.enemy ? 'rgba(255,204,77,0.42)' : 'rgba(61,220,132,0.38)');
+    ctx.fillStyle = g; circ(b.x, b.y, b.r);
+    ctx.strokeStyle = warn ? '#ff6b6b' : (b.enemy ? SEC : PRI); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ell(b.x - 5, b.y - 6, 3, 1.8);
+    const a = b.t * 0.08 + b.seed;                                                    // orbiting sparkle
+    ctx.fillStyle = b.enemy ? SEC : '#d8ffe9'; circ(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, 1.3);
+  }
+  function drawSnuffer() {
+    ctx.save(); ctx.translate(snuffer.x, snuffer.y);
+    ctx.strokeStyle = '#8a6a1f'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(4, -10); ctx.lineTo(22, -26); ctx.stroke();  // handle
+    ctx.fillStyle = '#8a6a1f'; circ(23, -27, 3);
+    ctx.shadowColor = '#ff6b6b'; ctx.shadowBlur = 14; ctx.fillStyle = '#d4a73a';
+    ctx.beginPath(); ctx.moveTo(-3, -14); ctx.lineTo(3, -14); ctx.lineTo(13, 10); ctx.quadraticCurveTo(0, 14, -13, 10); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#f0cf6b'; ctx.fillRect(-2, -12, 2, 20);
+    ctx.fillStyle = '#ff3b3b'; circ(-4, 0, 1.9); circ(4, 0, 1.9);
+    ctx.fillStyle = 'rgba(200,200,220,.25)'; for (let i = 0; i < 3; i++) circ(-6 + i * 6, 14 + ((tick * 0.4 + i * 6) % 14), 2.5);
+    ctx.restore();
+  }
+  function text(s, x, y, size, c) {
+    ctx.font = size + 'px "Uncial Antiqua", Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(3, size / 6); ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(s, x, y);
+    ctx.fillStyle = c; ctx.fillText(s, x, y);
+  }
+  function draw() {
+    ctx.fillStyle = hurry && !clearT ? '#2c0f2a' : BG; ctx.fillRect(0, 0, W, H);
+    for (const s of STARS) { ctx.fillStyle = 'rgba(255,240,200,' + (0.25 + Math.sin(tick * 0.03 + s.p) * 0.2) + ')'; circ(s.x, s.y, s.r); }
+    drawTiles();
+    ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of loot) if (f.life > 120 || (tick >> 3) % 2) ctx.fillText(f.emoji, f.x + 8, f.y + 9);
+    for (const e of enemies) if (!e.trapped) {
+      if (intro > 0) ctx.globalAlpha = Math.max(0, 1 - intro / 100) * 0.7 + 0.3;
+      drawWicky(e, e.x + e.w / 2, e.y + e.h, 1);
+      ctx.globalAlpha = 1;
+    }
+    if (player) drawFrog(player);
+    for (const b of bubbles) drawBubble(b);
+    if (snuffer) drawSnuffer();
+    for (const p of parts) { ctx.globalAlpha = p.t / 22; ctx.fillStyle = p.c; circ(p.x, p.y, 2); }
+    ctx.globalAlpha = 1;
+    for (const t of texts) { ctx.globalAlpha = Math.min(1, t.t / 20); text(t.s, t.x, t.y, t.size, t.c); }
+    ctx.globalAlpha = 1;
+    if (running && intro > 0) {
+      ctx.fillStyle = 'rgba(30,16,51,.65)'; ctx.fillRect(0, H / 2 - 44, W, 88);
+      text('FLOOR ' + floor, W / 2, H / 2 - 12, 34, PRI);
+      text(floor === 1 ? 'Up the tower we go!' : 'The candles grow restless...', W / 2, H / 2 + 22, 16, SEC);
+    }
+  }
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

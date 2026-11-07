@@ -25,25 +25,37 @@
   .cloud.slow { animation-duration: 40s; }
   .halo { animation: haloPulse 7s ease-in-out infinite; transform-origin: 50% 22%; }
 
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-height: 100dvh; padding: 10px 8px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
-  /* if the table ever overflows a short viewport, it scrolls by touch rather than clipping */
-  #wrap { height: 100dvh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 12px); opacity: 0.6; text-align: center; }
+  /* Grid that fits 100dvh: title, scores, table (fills the leftover space via a size container),
+     message, hand, action, hint. Short landscape (phones, TV) puts title/scores/table on the left
+     and the hand on the right. If it ever can't fit, #wrap scrolls by touch (pan-y). */
+  #wrap { display: grid; width: 100%; height: 100dvh; overflow-y: auto; overflow-x: hidden;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(150px, 1fr) auto auto auto auto;
+    grid-template-areas: "title" "scores" "table" "msg" "hand" "act" "hint";
+    justify-items: center; align-items: center; row-gap: 7px;
+    --gap: 5px; --per-row: 13; --rows: 1;
+    --hand-w: min(100vw - 16px, 1150px);
+    --cwmax: min(92px, 9dvh);
+    --cw: max(34px, min(var(--cwmax), (var(--hand-w) - (var(--per-row) - 1) * var(--gap)) / var(--per-row)));
+    --ch: calc(var(--cw) * 1.42); }
+  @media (max-width: 639px), (orientation: portrait) { #wrap { --per-row: 7; --rows: 2; } }
+  #touch-hint { grid-area: hint; display: none; font-size: clamp(11px, 2.8vw, 13px); opacity: 0.6; text-align: center; }
   body.touch #touch-hint { display: block; }
-  h1 { margin: 0; font-size: clamp(18px, 4.4vw, 26px); letter-spacing: 5px; font-weight: 800;
+  h1 { margin: 0; font-size: clamp(18px, min(4.4vw, 4.4dvh), 36px); letter-spacing: 5px; font-weight: 800;
     background: linear-gradient(180deg, #ffffff 0%, #cdd6f4 55%, #8b97c4 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     text-shadow: 0 0 22px rgba(205,214,244,0.45); filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4)); }
-  /* translucent pill behind the title so it stays readable over the moon (a wrapper, because the
-     background-clip:text lettering is the h1's own background layer) */
-  .title-pill { padding: 4px 18px; border-radius: 30px; background: rgba(10,14,36,0.86); box-shadow: 0 0 24px rgba(10,14,36,0.7); }
-  #scores-bar { display: flex; gap: 10px; font-size: clamp(10px, 2.5vw, 13px); flex-wrap: wrap; justify-content: center; opacity: 0.9; }
-  .score-chip { padding: 3px 8px; border: 1px solid var(--primary); border-radius: 12px; background: rgba(10,14,36,0.82); }
+  .title-pill { grid-area: title; padding: 4px 18px; border-radius: 30px; background: rgba(10,14,36,0.86); box-shadow: 0 0 24px rgba(10,14,36,0.7); }
+  #scores-bar { grid-area: scores; display: flex; gap: 10px; font-size: clamp(11px, min(2.6vw, 2.6dvh), 18px); flex-wrap: wrap; justify-content: center; opacity: 0.9; }
+  .score-chip { padding: 0.2em 0.65em; border: 1px solid var(--primary); border-radius: 12px; background: rgba(10,14,36,0.82); }
   .score-chip.you { border-color: var(--secondary); color: var(--secondary); }
   /* Table scales with the viewport (desktop fills the available height, phones get ~95vw) */
-  #table { position: relative; width: min(95vw, 540px, calc((100dvh - 340px) * 13 / 7));
-    min-width: 280px; aspect-ratio: 13 / 7; height: auto;
+  #table-box { grid-area: table; width: 100%; height: 100%; min-height: 0; container-type: size;
+    display: flex; align-items: center; justify-content: center; }
+  #table { position: relative; width: min(100cqw - 14px, (100cqh - 14px) * 13 / 7);
+    aspect-ratio: 13 / 7; height: auto; container-type: inline-size;
     border-radius: 50% / 30%;
     background:
       radial-gradient(ellipse at 50% 45%, rgba(224,49,75,0.10), rgba(224,49,75,0) 60%),
@@ -52,11 +64,11 @@
       0 0 0 7px rgba(10,14,36,0.6), 0 0 28px rgba(205,214,244,0.12);
     display: flex; align-items: center; justify-content: center; }
   /* opponents' hands: tightly overlapped card backs; side players are stacked vertically */
-  :root { --aiw: clamp(20px, 5vw, 28px); --aih: clamp(26px, 7vw, 40px); --aistep: 9px; }
+  #table { --aiw: max(14px, 5cqw); --aih: max(19px, 7cqw); --aistep: max(5px, 1.7cqw); }
   .ai-area { position: absolute; display: flex; align-items: center; pointer-events: none; }
-  #ai-top    { top: 4px;  left: 50%; transform: translateX(-50%); }
-  #ai-left   { left: 8px;  top: 50%; transform: translateY(-50%); flex-direction: column; }
-  #ai-right  { right: 8px; top: 50%; transform: translateY(-50%); flex-direction: column; }
+  #ai-top    { top: 1.2cqw;  left: 50%; transform: translateX(-50%); }
+  #ai-left   { left: 2cqw;  top: 50%; transform: translateY(-50%); flex-direction: column; }
+  #ai-right  { right: 2cqw; top: 50%; transform: translateY(-50%); flex-direction: column; }
   .ai-card { width: var(--aiw); height: var(--aih);
     border-radius: 4px; border: 1px solid rgba(205,214,244,0.5);
     background:
@@ -69,14 +81,14 @@
   #ai-left .ai-card + .ai-card, #ai-right .ai-card + .ai-card { margin-top: calc(var(--aistep) - var(--aiw)); }
   #trick-area { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
     display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
-    gap: 4px; }
-  .trick-slot { width: clamp(36px, 10vw, 44px); height: clamp(50px, 14vw, 62px); border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); }
+    gap: 1cqw; }
+  .trick-slot { --cw: 10cqw; width: var(--cw); height: calc(var(--cw) * 1.4); border-radius: 5px; border: 1px dashed rgba(255,255,255,0.2); }
   .card {
-    width: clamp(40px, 11vw, 52px); height: clamp(56px, 16vw, 74px);
+    width: var(--cw); height: var(--ch);
     background: linear-gradient(160deg, #ffffff 0%, #eef1fb 100%);
-    border-radius: 7px; border: 1px solid #c4cbe0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: clamp(14px, 4vw, 18px); font-weight: 800; color: #1a2350;
+    border-radius: calc(var(--cw) * 0.14); border: 1px solid #c4cbe0;
+    display: flex; align-items: center; justify-content: center; white-space: nowrap;
+    font-size: max(12px, calc(var(--cw) * 0.36)); font-weight: 800; color: #1a2350;
     cursor: pointer; user-select: none;
     box-shadow: 1px 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
     transition: transform 0.12s, box-shadow 0.12s;
@@ -97,23 +109,39 @@
     outline: 2px solid var(--secondary); outline-offset: 2px; }
   .card.unplayable { opacity: 0.4; cursor: not-allowed; }
   .card.pass-sel { transform: translateY(-10px); outline: 2px solid #44cc44; outline-offset: 2px; }
-  #player-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center;
-    width: min(500px, 98vw); }
-  #msg { font-size: clamp(12px, 3.5vw, 15px); font-weight: 600; color: var(--secondary);
-    min-height: 22px; text-align: center; }
-  #action-area { display: flex; gap: 8px; }
-  .act-btn { padding: 10px 20px; min-height: 48px; min-width: 120px; font-size: clamp(13px, 3.5vw, 15px); font-weight: 600;
+  /* reserves room for a full 13-card hand (plus a selected card's lift) so the table doesn't
+     resize as cards are played */
+  #player-hand { grid-area: hand; display: flex; flex-wrap: wrap; gap: var(--gap); justify-content: center;
+    align-content: flex-start; width: var(--hand-w); padding-top: 12px;
+    min-height: calc(12px + var(--rows) * var(--ch) + (var(--rows) - 1) * var(--gap)); }
+  #msg { grid-area: msg; font-size: clamp(12px, min(3.5vw, 3dvh), 22px); font-weight: 600; color: var(--secondary);
+    min-height: 1.3em; line-height: 1.3; text-align: center; }
+  #action-area { grid-area: act; display: flex; gap: 8px; min-height: 48px; align-items: center; }
+  .act-btn { padding: 0.55em 1.3em; min-height: 48px; min-width: 120px; font-size: clamp(13px, min(3.5vw, 2.6dvh), 20px); font-weight: 600;
     border: 2px solid var(--primary); background: rgba(10,14,36,0.55); color: var(--primary);
     cursor: pointer; border-radius: 6px; user-select: none; transition: background 0.12s, color 0.12s, transform 0.12s; }
   .act-btn:disabled { opacity: 0.3; cursor: default; }
   .act-btn:hover:not(:disabled) { background: rgba(205,214,244,0.18); }
   .act-btn:active:not(:disabled) { background: var(--primary); color: var(--bg); transform: translateY(1px); }
   /* help button */
-  #help-btn { position: fixed; top: 10px; right: 12px; z-index: 30;
-    width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  #help-btn { position: fixed; top: 8px; right: 10px; z-index: 30;
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
     border: 1px solid rgba(205,214,244,0.6); background: rgba(10,14,36,0.55); color: var(--primary);
     font-size: 16px; font-weight: 800; line-height: 1; }
   #help-btn:active { background: var(--primary); color: var(--bg); }
+
+  /* Short landscape (phones on their side, TV): title, scores and table on the left; hand on the right. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    #wrap { --tcol: min(52vw, (100dvh - 90px) * 13 / 7 + 14px);
+      --hand-w: calc(100vw - var(--tcol) - 32px);
+      --per-row: 7; --rows: 2;
+      --cwmax: calc((100dvh - 150px) / 2.84);
+      padding: 8px; column-gap: 16px; row-gap: 4px;
+      grid-template-columns: var(--tcol) minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr auto auto auto auto 1fr;
+      grid-template-areas: "title ." "scores ." "table ." "table msg" "table hand" "table act" "table hint" "table ."; }
+    #help-btn { top: 6px; right: 8px; }
+  }
 
   /* intro / lore page — translucent so the moon scene shows behind it */
   #intro { position: fixed; inset: 0; z-index: 25; display: flex;
@@ -170,6 +198,12 @@
     transition: transform 0.12s, filter 0.12s; }
   #overlay button:hover { filter: brightness(1.08); transform: translateY(-1px); }
   #overlay button:active { transform: translateY(1px); }
+  #overlay { overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
+  #overlay h2 { font-size: clamp(20px, min(5vw, 7dvh), 48px); }
+  #overlay p { font-size: clamp(12px, min(3vw, 3.2dvh), 19px); }
+  #overlay .final-score { font-size: clamp(20px, min(5.5vw, 6dvh), 40px); }
+  #overlay .final-score small { font-size: clamp(11px, min(2.8vw, 2.6dvh), 16px); }
+  #overlay button { font-size: clamp(14px, min(3.5vw, 3dvh), 20px); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #intro {
@@ -197,6 +231,36 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #begin-btn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.05); }
+
+  /* Lore page sizing: fits without scrolling on phones, scales up on desktop/TV. */
+  .lore-panel { width: min(95vw, 640px); padding: clamp(14px, 2.4dvh, 24px) clamp(14px, 3vw, 26px) clamp(16px, 2.6dvh, 26px); }
+  .lore-logo { max-height: min(22dvh, 200px); }
+  .lore-panel .tagline { margin-bottom: clamp(8px, 1.8dvh, 16px); font-size: clamp(12px, min(3vw, 2dvh), 17px); }
+  .lore-panel p, .lore-panel li { font-size: clamp(12px, min(3.1vw, 2.1dvh), 17px); line-height: 1.5; }
+  .lore-panel h3 { margin: clamp(10px, 1.8dvh, 18px) 0 6px; font-size: clamp(13px, min(3.4vw, 2.3dvh), 18px); }
+  .lore-panel li { margin: 3px 0; }
+  .begin-row { margin: clamp(8px, 1.6dvh, 14px) calc(-1 * clamp(14px, 3vw, 26px)) calc(-1 * clamp(16px, 2.6dvh, 26px));
+    padding: clamp(8px, 1.6dvh, 14px) 16px calc(clamp(10px, 2dvh, 18px) + env(safe-area-inset-bottom)); }
+  #begin-btn { font-size: clamp(14px, min(3.8vw, 2.8dvh), 20px); padding: clamp(11px, 1.8dvh, 15px) clamp(22px, 7vw, 44px); }
+  .dismiss-hint { font-size: clamp(11px, 1.6dvh, 14px); margin-top: 8px; }
+  /* Short landscape (phones on their side, TV): logo + button on the left, story + rules on the right. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    #intro { padding: 8px; }
+    .lore-panel { width: min(96vw, 1000px); max-height: calc(100dvh - 16px); display: grid;
+      grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); grid-template-rows: 1fr auto;
+      grid-template-areas: "side main" "begin main"; column-gap: clamp(14px, 3vw, 32px); align-items: center;
+      padding: 12px clamp(14px, 2.4vw, 26px); }
+    .lore-side { grid-area: side; align-self: end; }
+    .lore-main { grid-area: main; }
+    .lore-logo { max-height: calc(100dvh - 190px); max-width: 100%; }
+    .begin-row { grid-area: begin; align-self: start; position: static; margin: 0; padding: 4px 0 0; background: none; }
+    .lore-panel .story p { margin: 0 0 6px; }
+    .lore-panel h3 { margin: 6px 0 4px; }
+    .lore-panel ul { margin: 4px 0 0; }
+    .lore-panel p, .lore-panel li { font-size: clamp(12px, 2.9dvh, 17px); line-height: 1.42; }
+    .lore-panel .tagline { font-size: clamp(12px, 2.8dvh, 16px); margin: 0; }
+    #begin-btn { font-size: clamp(13px, 3.2dvh, 19px); padding: clamp(10px, 2.4dvh, 15px) clamp(18px, 3vw, 36px); }
+  }
 </style>
 </head>
 <body>
@@ -278,7 +342,7 @@
     <span class="score-chip" id="s2">Theo: 0</span>
     <span class="score-chip" id="s3">Vera: 0</span>
   </div>
-  <div id="table">
+  <div id="table-box"><div id="table">
     <div class="ai-area" id="ai-top"></div>
     <div class="ai-area" id="ai-left"></div>
     <div class="ai-area" id="ai-right"></div>
@@ -288,7 +352,7 @@
       <div class="trick-slot" id="trick-3"></div>
       <div class="trick-slot" id="trick-0"></div>
     </div>
-  </div>
+  </div></div>
   <div id="msg">Loading...</div>
   <div id="player-hand"></div>
   <div id="action-area">
@@ -300,9 +364,12 @@
 
 <div id="intro">
   <div class="lore-panel">
-    <img src="logos/moonslayer.png" alt="Moonslayer" style="display:block;width:min(82%,400px);max-height:min(40dvh,180px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <div class="lore-side">
+    <img class="lore-logo" src="logos/moonslayer.png" alt="Moonslayer" style="display:block;width:min(82%,400px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
     <p class="tagline">Take the fewest souls. Or take them all.</p>
+    </div>
 
+    <div class="lore-main">
     <div class="story">
       <p>The Moon grew fat on stolen hearts. Each midnight she deals her cursed cards and feeds on every soul careless hands let slip — her assassin the <span class="moon-key">Black Queen</span> (Q♠), worth thirteen in one cold stroke. You and your rivals Diana, Theo, and Vera hunt to carry the fewest souls. Reach 100 and the hunt ends; the lightest soul is crowned <b>Moonslayer</b>.</p>
     </div>
@@ -314,6 +381,7 @@
       <li><span class="moon-key">Each ♥ = 1 point. Q♠ = 13.</span> Points are bad — <b>low score wins.</b></li>
       <li><b>Slay the Moon:</b> take all 13 hearts + Q♠ and everyone else eats 26 instead.</li>
     </ul>
+    </div>
 
     <div class="begin-row">
       <button id="begin-btn">BEGIN THE HUNT</button>

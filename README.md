@@ -51,7 +51,7 @@ Keep chatting until you love it. Things that work well:
 Every game the skill produces follows the same house rules, so it works everywhere without extra effort from you:
 
 - **One file.** All HTML, CSS and JavaScript in a single `.html`. It works offline.
-- **Phones, tablets and desktop.** Touch controls appear automatically on touch screens, keyboard controls on desktop, and the layout fits portrait phones and iPads.
+- **Phones, tablets and desktop.** Touch controls appear automatically on touch screens, keyboard controls on desktop, and the layout fits phones in portrait and landscape, iPads, desktop and TV.
 - **Same speed everywhere.** The game runs at the same pace on a 60 Hz laptop, a 120 Hz iPhone and a 144 Hz monitor.
 - **A title screen.** Every game opens with its name, how to play, and a Play button.
 - **Honest scores.** The score you see at game over is the exact number that would go on the leaderboard.
@@ -74,7 +74,7 @@ Want everyone to play it? Open a pull request.
    }
    ```
 
-3. Append your `id` to the **end** of the `schedule` array in the same file. That's what gives your game a day. Never insert it earlier, since that would move games that are already scheduled.
+3. Run `npm run schedule -- my-game` from the repo root. New games always go to the **front of the queue** and air tomorrow (house rule), pushing the rest of the cycle back a day without touching today or any day that has aired. Never edit the `schedule` array by hand.
 4. Run the QA checks from the repo root and fix anything they flag:
 
    ```bash
@@ -82,7 +82,7 @@ Want everyone to play it? Open a pull request.
    SHOTS=1 node scripts/qa/smoke.mjs my-game
    ```
 
-   The smoke test plays your game on a desktop, two iPhones and an iPad, and saves screenshots to `scripts/qa/shots/`. It needs Playwright (`npm i -D playwright` in `scripts/qa`).
+   The smoke test plays your game on a desktop, two iPhones (portrait and landscape), an iPad in both orientations and a TV-sized screen, and saves screenshots to `scripts/qa/shots/`. It needs Playwright (`npm i -D playwright` in `scripts/qa`).
 5. Open the PR. A logo gets generated for your game before it airs.
 
 ### The one rule games must follow

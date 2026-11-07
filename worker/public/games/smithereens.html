@@ -10,8 +10,10 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; opacity: .9; }
-  canvas { display: block; width: min(95vw - 24px, calc((100dvh - 170px) * (640 / 400))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); border: 2px solid rgba(123,211,74,.4); touch-action: none; }
+  #hud { display: flex; gap: 18px; font-size: clamp(12px, 1.3vw + 0.6vh, 20px); font-weight: 700; opacity: .9; }
+  #wrap { --reserved: 60px; }
+  body.touch #wrap { --reserved: 150px; }
+  canvas { display: block; width: min(calc(100vw - 48px), calc((100dvh - var(--reserved)) * (640 / 400))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); border: 2px solid rgba(123,211,74,.4); touch-action: none; }
   #touch-controls { display: none; gap: 8px; justify-content: center; width: min(95vw - 24px, 640px); }
   body.touch #touch-controls { display: flex; }
   .btn { height: 56px; min-width: 56px; flex: 1; max-width: 130px; border: 0; border-radius: 12px; font: 700 18px system-ui, sans-serif; color: #fff;
@@ -24,7 +26,7 @@
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,16,10,.9); z-index: 20; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-family: 'Black Ops One', system-ui, sans-serif; font-weight: 400; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
-  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); margin: 6px 0; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 1vw + 0.9vh, 19px); margin: 6px 0; }
   .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'Black Ops One', system-ui, sans-serif; font-size: clamp(14px, 3.5vw, 18px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: #10260f; cursor: pointer; }
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 
@@ -34,11 +36,31 @@
       radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)),
       url('backgrounds/smithereens.jpg') center/cover no-repeat, #0e1a12;
   }
-  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 5vw, 32px); max-width: 560px; max-height: 100%; overflow-y: auto; touch-action: pan-y; }
-  #start-logo { display: block; width: min(82%, 400px); max-height: 34vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 5vw, 32px); max-width: min(680px, 92vw); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+  #start-logo { display: block; width: min(82%, 440px); max-height: 34dvh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
   #start-overlay h2 { font-size: clamp(32px, 8vw, 64px); line-height: 0.98; color: #fff; text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,79,163,0.55); }
   #start-overlay p { color: rgba(255,255,255,0.9); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay button { margin-top: 22px; padding: 15px 50px; box-shadow: 0 12px 44px rgba(0,0,0,0.5); }
+  /* Short landscape (phones on their side): aim buttons left, FIRE/WPN right, two-column title. */
+  @media (orientation: landscape) and (max-height: 460px) {
+    body.touch #wrap { display: grid; grid-template-columns: 60px 60px auto 96px; grid-template-rows: auto 1fr 1fr; grid-template-areas: "hud hud hud hud" "l r cv f" "l r cv w"; justify-content: center; align-content: center; gap: 4px 10px; padding: 4px 16px env(safe-area-inset-bottom); }
+    body.touch #hud { grid-area: hud; justify-self: center; font-size: 12px; }
+    body.touch canvas { grid-area: cv; width: min(calc(100vw - 300px), calc((100dvh - 34px) * (640 / 400))); }
+    body.touch #touch-controls { display: contents; }
+    body.touch #touch-controls .btn { width: 100%; max-width: none; flex: none; }
+    body.touch #btn-left { grid-area: l; align-self: center; height: 72px; }
+    body.touch #btn-right { grid-area: r; align-self: center; height: 72px; }
+    body.touch #btn-fire { grid-area: f; align-self: end; height: 80px; }
+    body.touch #btn-wpn { grid-area: w; align-self: start; }
+    body.touch #hint { display: none; }
+    #start-overlay .panel { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); grid-template-rows: auto auto auto; align-items: center; column-gap: 20px; padding: 14px 20px; max-width: 780px; text-align: left; }
+    #start-logo, #start-h2 { grid-column: 1; grid-row: 1 / 4; width: 100%; max-height: calc(100dvh - 70px); margin: 0; }
+    #start-overlay p { grid-column: 2; font-size: 13px; line-height: 1.4; margin: 4px 0; }
+    #start-overlay button { grid-column: 2; justify-self: start; margin-top: 8px; padding: 11px 44px; }
+    #over-overlay { padding: 10px; }
+    #over-overlay h2 { font-size: 40px; margin-bottom: 0; }
+    #over-overlay button { margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -87,6 +109,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};

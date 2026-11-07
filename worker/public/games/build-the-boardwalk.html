@@ -9,18 +9,37 @@
   :root { --primary: #C8102E; --secondary: #0A3161; --bg: #0f3d56; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; }
+  #wrap { --reserved: 116px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 8px 24px env(safe-area-inset-bottom); }
+  body.touch #wrap { --reserved: 136px; }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; font-size: clamp(11px, 2.4dvh, 18px); font-weight: 700; }
+  #hud { order: -1; }
   #hud .cash { color: #ffd166; }
-  canvas { display: block; width: min(95vw - 24px, calc(100dvh - 190px)); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.45); border: 3px solid #f4e3c1; cursor: pointer; }
-  #tray { display: flex; gap: 6px; justify-content: center; width: min(95vw - 24px, 520px); }
-  .ride { flex: 1; min-width: 52px; max-width: 110px; height: 56px; border: 3px solid transparent; border-radius: 12px; background: #f4e3c1; color: #0f3d56;
-          font: 800 clamp(10px, 2.7vw, 13px)/1.1 system-ui, sans-serif; user-select: none; -webkit-touch-callout: none; cursor: grab; padding: 2px 3px; touch-action: none; }
+  canvas { display: block; flex: none; width: min(100vw - 48px, 100dvh - var(--reserved)); aspect-ratio: 1; height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.45); border: 3px solid #f4e3c1; cursor: pointer; }
+  #tray { display: flex; gap: 6px; justify-content: center; width: min(100vw - 48px, 560px); }
+  #side { display: contents; }
+  .ride { flex: 1; min-width: 52px; max-width: 120px; height: clamp(52px, 6.5dvh, 64px); border: 3px solid transparent; border-radius: 12px; background: #f4e3c1; color: #0f3d56;
+          font: 800 clamp(10px, 2.7vw, 14px)/1.1 system-ui, sans-serif; user-select: none; -webkit-touch-callout: none; cursor: grab; padding: 2px 3px; touch-action: none; }
   .ride small { display: block; font-weight: 700; color: var(--primary); }
   .ride.sel { border-color: var(--primary); box-shadow: 0 0 0 2px #fff inset; }
   .ride.poor { opacity: .45; }
-  #hint { display: none; font-size: 12px; font-weight: 600; opacity: .8; }
+  #hint { display: none; font-size: clamp(11px, 1.6dvh, 14px); font-weight: 600; opacity: .8; text-align: center; }
   body.touch #hint { display: block; }
+  /* Landscape: canvas on the left, HUD + ride tray in a column beside it. */
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { flex-direction: row; gap: clamp(12px, 2.5vw, 32px); padding: 8px 24px; }
+    canvas { width: min(100dvh - 16px, 100vw - 48px - clamp(150px, 22vw, 300px) - clamp(12px, 2.5vw, 32px)); }
+    #side { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: clamp(8px, 2dvh, 16px); width: clamp(150px, 22vw, 300px); max-height: 100%; }
+    #hud { flex-direction: column; align-items: flex-start; gap: 2px; font-size: clamp(12px, 2.8dvh, 22px); }
+    #tray { flex-direction: column; width: 100%; }
+    .ride { max-width: none; flex: none; height: clamp(44px, 8dvh, 68px); font-size: clamp(13px, 2.8dvh, 18px); }
+    #hint { text-align: left; }
+  }
+  @media (min-aspect-ratio: 5/4) and (max-height: 460px) {
+    #hud { flex-direction: row; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; }
+    #tray { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .ride { height: 46px; font-size: 12px; }
+    .ride:last-child { grid-column: span 2; }
+  }
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,30,44,.92); z-index: 20; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-family: 'Lobster', system-ui, sans-serif; font-weight: 400; font-size: clamp(28px, 7vw, 56px); line-height: 1.05; color: #ffd166; text-shadow: 0 4px 0 var(--primary); }
@@ -39,12 +58,28 @@
   #start-overlay h2 { font-size: clamp(28px, 7vw, 56px); text-shadow: 0 4px 0 var(--primary), 0 3px 34px rgba(0,0,0,0.85); }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay button { margin-top: 22px; padding: 15px 50px; }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    #start-overlay .panel { max-width: 660px; }
+    .overlay p { font-size: 18px; }
+  }
+  /* Short landscape (phone on its side): logo left, copy + Play right. */
+  @media (max-height: 460px) and (orientation: landscape) {
+    .overlay { padding: 10px 24px; }
+    #start-overlay .panel { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr); column-gap: 20px; align-items: center; max-width: 760px; padding: 14px 20px; text-align: left; }
+    #start-overlay .panel > * { grid-column: 2; }
+    #start-overlay .panel > #start-logo { grid-column: 1; grid-row: 1 / span 4; width: 100%; max-height: 70dvh; margin: 0; }
+    #start-overlay p { font-size: 13px; line-height: 1.4; margin: 4px 0; }
+    #start-overlay button { margin-top: 10px; padding: 11px 40px; justify-self: start; }
+    .overlay h2 { font-size: 32px; }
+    .overlay button { margin-top: 10px; }
+  }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <div id="hud"><span id="clock">9:00 AM</span><span class="cash" id="cash">Cash $400</span><span id="score">Score: 400</span><span id="best">Best: 0</span></div>
   <canvas id="game" width="480" height="480"></canvas>
+  <div id="side">
+  <div id="hud"><span id="clock">9:00 AM</span><span class="cash" id="cash">Cash $400</span><span id="score">Score: 400</span><span id="best">Best: 0</span></div>
   <div id="tray">
     <button class="ride sel" data-t="churro">Churros<small>$100</small></button>
     <button class="ride" data-t="arcade">Arcade<small>$250</small></button>
@@ -53,6 +88,7 @@
     <button class="ride" data-t="dipper">Big Dipper<small>$1,500</small></button>
   </div>
   <div id="hint">Drag a ride onto the sand · tap a ride to upgrade it</div>
+  </div>
 </div>
 <div id="start-overlay" class="overlay show"><div class="panel">
   <img id="start-logo" src="logos/build-the-boardwalk.png" alt="Build the Boardwalk" onerror="this.remove(); document.getElementById('start-h2').style.display='block';">
@@ -88,6 +124,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height), inside: clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom }; };
 
   const keys = {};

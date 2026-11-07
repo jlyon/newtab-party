@@ -17,8 +17,11 @@
   /* play-area width: fill the viewport height, 3:2 aspect; touch layout reserves room for the
      pads + hint. Vars live on body so body.touch can override them. 100vw - 48px keeps a 24px
      margin from the screen edges on phones so drags don't start in the back-swipe zone. */
-  body { --reserved: 110px; --cw: min(calc(100vw - 48px), 1120px, calc((100dvh - var(--reserved)) * 1.5)); }
-  body.touch { --reserved: 330px; }
+  /* --reserved = height of everything stacked with the canvas (title, HUD, pads, hint);
+     --side = width taken beside it (edge margins, or the pads in touch landscape). */
+  body { --reserved: 84px; --side: 48px; --cw: min(calc(100vw - var(--side)), 1180px, calc((100dvh - var(--reserved)) * 1.5)); }
+  body.touch { --reserved: 300px; }
+  @media (min-width: 700px) and (min-height: 600px) { body.touch { --reserved: 350px; } }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg);
@@ -31,11 +34,11 @@
     align-items: center; justify-content: center;
     height: 100%; padding: 6px;
   }
-  h1 { margin: 0 0 6px; font-size: clamp(15px, 4.5vw, 22px); letter-spacing: 2px; text-transform: uppercase; }
+  h1 { margin: 0 0 6px; font-size: clamp(15px, 4.5vw, 22px); line-height: 1.2; letter-spacing: 2px; text-transform: uppercase; }
   #hud {
     width: var(--cw);
     display: flex; justify-content: space-between;
-    font-size: clamp(11px, 1.4vw, 18px); margin-bottom: 6px; opacity: 0.9;
+    font-size: clamp(12px, 1.5vw, 20px); line-height: 1.2; margin-bottom: 6px; opacity: 0.9;
   }
   canvas {
     background: #04060d;
@@ -52,7 +55,7 @@
   #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 13px); opacity: 0.6; margin-top: 8px; text-align: center; }
   body.touch #touch-hint { display: block; }
   /* tablets: bigger pads, spread to the canvas edges for thumb reach */
-  @media (min-width: 700px) {
+  @media (min-width: 700px) and (min-height: 600px) {
     .pad { grid-template-columns: repeat(3, 66px); grid-template-rows: repeat(3, 66px); gap: 8px; }
     .btn { height: 66px; min-width: 60px; font-size: 26px; }
     #fireBtn { height: 140px; width: 130px; font-size: 18px; }
@@ -124,6 +127,56 @@
   }
   #start-overlay .play:hover { opacity: 1; transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 /* On-screen controls are for touch devices only; revealed after first touch (body.touch). */
+
+  /* Short screens (TV, phone landscape): the arcade topbar already names the game, so drop the
+     in-page title and give that height to the canyon. */
+  @media (max-height: 600px) {
+    h1 { display: none; }
+    body { --reserved: 50px; }
+  }
+  /* Touch landscape: D-pad left of the canyon, FIRE right of it, so the play area keeps the
+     full height instead of sharing it with the pads. */
+  @media (orientation: landscape) {
+    body.touch { --reserved: 116px; --side: 400px; }
+    body.touch #wrap {
+      display: grid; justify-content: center; align-content: center; column-gap: 16px;
+      grid-template-columns: auto auto auto;
+      grid-template-areas: ". title ." "pad hud fire" "pad cv fire" ". hint .";
+    }
+    body.touch h1 { grid-area: title; justify-self: center; }
+    body.touch #hud { grid-area: hud; }
+    body.touch canvas { grid-area: cv; }
+    body.touch #controls { display: contents; }
+    body.touch .pad { grid-area: pad; align-self: center; }
+    body.touch #fireBtn { grid-area: fire; align-self: center; }
+    body.touch #touch-hint { grid-area: hint; margin-top: 4px; }
+  }
+  @media (orientation: landscape) and (max-height: 600px) {
+    body.touch { --reserved: 58px; --side: 312px; }
+    body.touch #wrap { column-gap: 14px; }
+    body.touch #hud { margin-bottom: 4px; }
+    body.touch #touch-hint { margin-top: 3px; font-size: 11px; line-height: 1.2; }
+  }
+
+  /* Start card: logo beside the text on short landscape screens so the button stays on screen. */
+  #start-overlay .card img { display: block; width: min(82%, 400px); max-height: 40dvh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (max-height: 500px) and (orientation: landscape) {
+    .overlay { padding: 10px 20px; }
+    #start-overlay .card {
+      display: grid; grid-template-columns: auto 1fr; column-gap: 22px; align-items: center;
+      max-width: 720px; padding: 18px 24px; text-align: left;
+    }
+    #start-overlay .card img { grid-row: 1 / span 2; width: min(34vw, 240px); max-height: calc(100dvh - 60px); margin: 0; }
+    #start-overlay .card p { margin: 0 0 14px; line-height: 1.5; }
+    #start-overlay .play { justify-self: start; margin-top: 0; }
+    #overlay .card h2 { margin-bottom: 8px; font-size: clamp(22px, 9dvh, 38px); }
+    #overlay .card p { margin-bottom: 12px; }
+  }
+  /* Big screens: scale the start card up so it isn't a small island. */
+  @media (min-width: 1200px) and (min-height: 700px) {
+    #start-overlay .card { max-width: 640px; }
+    #start-overlay .card p { font-size: 17px; }
+  }
 </style>
 </head>
 <body>
@@ -147,7 +200,7 @@
 
 <div id="start-overlay" class="overlay">
   <div class="card">
-    <img src="logos/fly-by-the-seat-of-your-pants.png" alt="Fly by the Seat of Your Pants" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <img src="logos/fly-by-the-seat-of-your-pants.png" alt="Fly by the Seat of Your Pants">
     <p id="controls-hint">Arrows / WASD to fly &middot; Space to shoot. On mobile: D-pad, drag on the canyon to steer, tap it to fire, or tilt. Dodge the canyon walls and asteroids. Survive. Score = distance flown + 25 per asteroid blasted.</p>
     <button class="play" id="start-btn">&#9658; Punch it</button>
   </div>

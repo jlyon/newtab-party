@@ -10,11 +10,14 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #17332a; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; }
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font-size: clamp(12px, 1.3vw + 0.6vh, 20px); font-weight: 700; }
   #hud .to { color: var(--primary); letter-spacing: 2px; }
   #clock.low { color: #d81b60; }
   #mute { border: 0; background: none; font-size: 18px; cursor: pointer; padding: 6px 8px; min-width: 36px; min-height: 36px; }
-  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (600 / 420))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,60,30,.25); cursor: crosshair; }
+  body.touch #mute { min-width: 44px; min-height: 44px; }
+  #wrap { --reserved: 58px; }
+  body.touch #wrap { --reserved: 84px; }
+  canvas { display: block; width: min(calc(100vw - 48px), calc((100dvh - var(--reserved)) * (600 / 420))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,60,30,.25); cursor: crosshair; }
   #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
   body.touch #touch-controls { display: flex; }
   .btn { height: 56px; min-width: 56px; flex: 1; max-width: 140px; border: 0; border-radius: 12px; font-size: 17px; font-weight: 700; color: #fff;
@@ -25,17 +28,25 @@
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(10,30,40,.88); color: #fff; z-index: 20; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-family: 'Bungee', system-ui, sans-serif; font-weight: 400; font-size: clamp(30px, 8vw, 60px); color: var(--primary); text-shadow: 3px 3px 0 var(--secondary); }
-  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); margin: 6px 0; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 1vw + 0.9vh, 19px); margin: 6px 0; }
   .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'Bungee', system-ui, sans-serif; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: #fff; cursor: pointer; box-shadow: 0 6px 0 var(--secondary); }
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
-  .keys { opacity: .8; font-size: clamp(12px, 2.8vw, 14px); }
-  @media (orientation: landscape) and (max-height: 520px) {
-    #wrap { flex-direction: row; flex-wrap: wrap; gap: 6px 12px; }
-    #hud { width: 100%; }
-    canvas { width: min(70vw, calc((100dvh - 60px) * (600 / 420))); }
-    body.touch #touch-controls { flex-direction: column; width: auto; }
-    .btn { max-width: none; flex: 0 0 auto; min-width: 72px; }
-    body.touch #hint { display: none; }
+  .keys { opacity: .8; font-size: clamp(12px, 0.8vw + 0.8vh, 17px); }
+  /* Short landscape (phones on their side): HUD becomes a column beside the court, two-column title. */
+  @media (orientation: landscape) and (max-height: 460px) {
+    #wrap { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; grid-template-areas: "hud cv" "hint cv"; justify-content: center; align-content: center; gap: 10px 16px; padding: 4px 24px env(safe-area-inset-bottom); }
+    #hud { grid-area: hud; flex-direction: column; align-items: flex-start; align-self: end; gap: 4px; font-size: 13px; max-width: 150px; }
+    #hint { grid-area: hint; align-self: start; max-width: 150px; text-align: left; }
+    canvas { grid-area: cv; width: min(calc(100vw - 230px), calc((100dvh - 10px) * (600 / 420))); }
+    #start-overlay.show { display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); align-items: center; column-gap: 20px; padding: 10px 24px; }
+    #start-overlay h2 { font-size: 42px; margin: 0; }
+    #start-overlay .panel { padding: 12px 18px; max-width: 520px; text-align: left; }
+    #start-overlay p { font-size: 13px; line-height: 1.38; margin: 3px 0; }
+    #start-overlay .keys { font-size: 12px; }
+    #start-overlay button { margin-top: 8px; padding: 10px 36px; }
+    #over-overlay { padding: 10px; }
+    #over-overlay h2 { font-size: 40px; margin-bottom: 0; }
+    #over-overlay button { margin-top: 8px; }
   }
   /* ── Landing screen — gameplay background + themed title ── */
   #start-overlay {
@@ -45,7 +56,7 @@
   }
   #start-overlay h2 { font-family: 'Bungee', system-ui, sans-serif; font-size: clamp(36px, 8vw, 72px); line-height: 0.98; color: #fff; text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,79,163,0.7); }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
-  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); border-radius: 18px; padding: 24px 28px; max-width: 560px; }
+  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); border-radius: 18px; padding: 24px 28px; max-width: min(640px, 92vw); }
   #start-overlay button { font-family: 'Bungee', system-ui, sans-serif; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 </style>
@@ -64,6 +75,7 @@
   <h2>The Jen 10</h2>
   <div class="panel"><p>You are Jen. Jen does not shoot. Jen drops dimes to her cutting coworkers.</p>
   <p>Sidekick guards wherever Jen is looking. Look one way, pass the other. Three turnovers and you're benched.</p>
+  <p>Sell it: look at a real coworker, not the wall. Stare anywhere too long and Sidekick gets suspicious and stops buying it.</p>
   <p class="keys">Keyboard: ← → look · ↑ pick a coworker · Space pass</p>
   <button id="start-btn">Play</button>
 </div>
@@ -95,6 +107,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};
@@ -186,6 +199,7 @@
   const F = 250, HOR = 140, CAMY = 1.62;
   const RIM = { x: 0, y: 3.05, z: 7.4 }, BASE_Z = 8.6;
   const BALL_V = 0.19, SHOT_CLOCK = 720;
+  const clockMax = () => Math.max(420, SHOT_CLOCK - (dimes || 0) * 10);   // the shot clock gets shorter as you get better
   let yaw = 0;
   function proj(x, y, z) {
     const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -201,6 +215,7 @@
   const CHEERS = ['SYNERGY!', 'CIRCLE BACK!', 'PER MY LAST PASS', 'TAKE IT OFFLINE', 'VALUE ADD!', 'MOVE THE NEEDLE', 'LOW-HANGING FRUIT', 'BANDWIDTH!'];
   const CROWD = Array.from({ length: 90 }, (_, i) => ({ x: -12 + (i % 30) * 0.83 + (Math.random() - 0.5) * 0.3, row: Math.floor(i / 30), c: [PINK, BLUE, '#fff', '#ffd23f'][i % 4], ph: Math.random() * 6 }));
 
+  let stare = 0, anchor = 0, sus = 0, susWarned = false;
   let tut = null, score, dimes, streak, turnovers, clock, t, gaze, gazeT, coach, coworkers, defenders, ball, layup, popups, parts, state, deadT, spawnT, sel, cycleLatch, fireLatch, pending, nameIdx, shake, flash, handT, lastPassAng;
 
   function hud() {
@@ -212,7 +227,7 @@
     c.classList.toggle('low', clock < 180);
   }
   function reset() {
-    score = 0; dimes = 0; streak = 0; turnovers = 0; clock = SHOT_CLOCK; t = 0; gaze = 0; gazeT = 0; yaw = 0; coach = 0;
+    score = 0; dimes = 0; streak = 0; turnovers = 0; clock = SHOT_CLOCK; stare = 0; anchor = 0; sus = 0; susWarned = false; t = 0; gaze = 0; gazeT = 0; yaw = 0; coach = 0;
     coworkers = []; ball = null; layup = null; popups = []; parts = []; state = 'hold'; deadT = 0; spawnT = 40; sel = null;
     cycleLatch = false; fireLatch = false; pending = null; nameIdx = Math.floor(Math.random() * NAMES.length); shake = 0; flash = 0; handT = 0; lastPassAng = 0;
     defenders = [makeDef('SIDEKICK', 3.0, 1.0, 1.8, 4.4, 'lane')];
@@ -285,6 +300,8 @@
     }
     return { x: c.x, z: c.z };
   }
+  // A look-off only fools Sidekick if Jen is looking at an actual teammate.
+  const decoyAt = (g, except) => coworkers.find(c => c !== except && passable(c) && Math.abs(angOf(c.x, c.z) - g) < 0.2);
   const passable = c => (c.state === 'cut' || c.state === 'wait') && Math.abs(c.x) < 7.6;
   const angOf = (x, z) => Math.atan2(x, z);
   function throwTo(c) {
@@ -294,10 +311,16 @@
     lastPassAng = diff;
     ball = { x: HAND.x, y: HAND.y, z: HAND.z, vx: (p.x - HAND.x) / d * BALL_V, vz: (p.z - HAND.z) / d * BALL_V, dist: d, trav: 0, target: c, diff, spin: 0 };
     // Sidekick's reaction: instant if you stared at the target, slower the more no-look it is
-    const smart = Math.min(1, dimes / 30);
-    defenders.forEach((df, i) => { df.react = diff < 12 ? 5 : Math.min(55, 14 + diff * (0.7 - smart * 0.3)) - i * 3; });
+    const smart = Math.min(1, dimes / 30), sold = !!decoyAt(gaze, c);
+    ball.sold = sold;
+    defenders.forEach((df, i) => {
+      let r = diff < 12 ? 5 : Math.min(55, 14 + diff * (0.7 - smart * 0.3)) - i * 3;
+      if (!sold && diff >= 12) r = Math.min(r, 16 - i * 2);      // staring at the wall fools nobody for long
+      df.react = r * (1 - sus) + 3 * sus;                         // a suspicious Sidekick jumps the lane instantly
+    });
     state = 'flight'; handT = 16; sfx('pass');
     if (diff < 12) popup('TELEGRAPHED 😬', W / 2, 84, '#d81b60', true);
+    else if (sus > 0.6) popup('HE SAW THAT COMING 🤨', W / 2, 84, '#d81b60', true);
   }
   function popup(text, x, y, color, big) { popups.push({ text, x, y, color, life: 75, big: !!big }); }
   function burst(x, y, n, cols) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 5 - 1, life: 50 + Math.random() * 30, c: cols[i % cols.length], r: 2 + Math.random() * 3 }); }
@@ -317,6 +340,12 @@
     if (right()) gazeT += gs;
     gazeT = Math.max(-0.95, Math.min(0.95, gazeT));
     gaze += (gazeT - gaze) * 0.055; // her eyes lag behind your cursor: that lag IS the no-look window
+    // Suspicion: park Jen's eyes in one spot and Sidekick stops reading them. You have to keep selling it.
+    if (Math.abs(gaze - anchor) > 0.22) { anchor = gaze; stare = 0; } else if (state === 'hold') stare++;
+    const patience = Math.max(30, 80 - (dimes || 0) * 2) + (decoyAt(gaze) ? 25 : 0);
+    sus = tut ? 0 : Math.max(0, Math.min(1, (stare - patience) / 50));
+    if (sus >= 1 && !susWarned) { susWarned = true; popup("SIDEKICK: \"SHE'S BEEN STARING AT THAT SPOT FOREVER\"", W / 2, 84, '#d81b60', true); }
+    if (sus === 0) susWarned = false;
     // tiny coaching at the start
     if (t === 30) popups.push({ text: 'JEN LOOKS WHERE YOUR CURSOR GOES 👀', x: W / 2, y: 300, color: '#fff', life: 170, big: true });
     if (t === 210) popups.push({ text: 'SIDEKICK FOLLOWS HER EYES', x: W / 2, y: 300, color: '#fff', life: 170, big: true });
@@ -335,9 +364,9 @@
     if (fire()) { if (!fireLatch) throwTo(sel); fireLatch = true; } else fireLatch = false;
     if (pending) { throwTo(pending); pending = null; }
 
-    if (!tut && dimes >= 8 && defenders.length < 2) { defenders.push(makeDef('SIDEKICK JR.', 4.8, 0.82, 3.4, 6.4, 'lane')); popup('SIDEKICK BROUGHT A SIDEKICK', W / 2, 84, BLUE, true); sfx('whistle'); }
-    if (dimes >= 18 && defenders.length < 3) { defenders.push(makeDef("SIDEKICK'S INTERN", 6.0, 0.7, 4.5, 7.4, 'man')); popup('THE INTERN IS IN MAN COVERAGE', W / 2, 84, BLUE, true); sfx('whistle'); }
-    if (dimes >= 30 && defenders.length < 4) { defenders.push(makeDef('SIDEKICK (EVIL)', 2.2, 0.95, 1.6, 3.6, 'mirror')); popup('A SECOND SIDEKICK?! WHO APPROVED THIS', W / 2, 84, '#d81b60', true); sfx('whistle'); }
+    if (!tut && dimes >= 5 && defenders.length < 2) { defenders.push(makeDef('SIDEKICK JR.', 4.8, 0.82, 3.4, 6.4, 'lane')); popup('SIDEKICK BROUGHT A SIDEKICK', W / 2, 84, BLUE, true); sfx('whistle'); }
+    if (dimes >= 13 && defenders.length < 3) { defenders.push(makeDef("SIDEKICK'S INTERN", 6.0, 0.7, 4.5, 7.4, 'man')); popup('THE INTERN IS IN MAN COVERAGE', W / 2, 84, BLUE, true); sfx('whistle'); }
+    if (dimes >= 22 && defenders.length < 4) { defenders.push(makeDef('SIDEKICK (EVIL)', 2.2, 0.95, 1.6, 3.6, 'mirror')); popup('A SECOND SIDEKICK?! WHO APPROVED THIS', W / 2, 84, '#d81b60', true); sfx('whistle'); }
 
     // Defenders: read Jen's eyes, guard that lane; lunge at passes after a reaction delay
     const ramp = Math.min(0.022, dimes * 0.0009);
@@ -361,7 +390,8 @@
         if (list.length) {
           // hottest cutter = closest to the rim
           const hot = list.reduce((a, b) => (Math.hypot(a.x - RIM.x, a.z - RIM.z) < Math.hypot(b.x - RIM.x, b.z - RIM.z) ? a : b));
-          read = gaze * trust + angOf(hot.x, hot.z) * (1 - trust);
+          const tr = trust * (1 - sus) * (decoyAt(gaze) ? 1 : 0.55);   // eyes on nobody = only half believable
+          read = gaze * tr + angOf(hot.x, hot.z) * (1 - tr);
         }
         d.read += (read - d.read) * 0.1;
         const dz = [3.0, 4.8, 6.0, 2.2][i] || 4;
@@ -381,7 +411,7 @@
 
     if (state === 'hold') {
       if (!tut) clock--;
-      if (clock <= 0) { turnover('SHOT CLOCK! JEN REFUSES TO SHOOT'); clock = SHOT_CLOCK; }
+      if (clock <= 0) { turnover('SHOT CLOCK! JEN REFUSES TO SHOOT'); clock = clockMax(); }
     } else if (state === 'flight') {
       const tg = ball.target;
       if (tg && tg.state !== 'gone') {
@@ -403,13 +433,14 @@
         if (catcher && tut) { sfx('catch'); catcher.hands = 1; ball = null; state = 'hold'; tutCatch(catcher, ball ? 0 : lastPassAng); }
         else if (catcher) {
           streak++; dimes++;
-          const nolook = Math.round(Math.max(0, ball.diff - 12) * 4);
-          const pts = 100 + nolook + 25 * (streak - 1) + (catcher !== tg ? 50 : 0);
+          const nolook = Math.round(Math.max(0, ball.diff - 12) * (ball.sold ? 5 : 1));
+          const pts = 100 + nolook + (ball.sold && ball.diff >= 14 ? 75 : 0) + 25 * (streak - 1) + (catcher !== tg ? 50 : 0);
           score += pts;
           const sp = proj(catcher.x, 1.9, catcher.z) || { x: W / 2, y: 120 };
           popup('+' + pts, sp.x, sp.y - 10, PINK);
           if (catcher !== tg) popup('WRONG GUY. STILL COUNTS.', W / 2, 84, BLUE, true);
-          else if (ball.diff >= 45) { popup('NO-LOOK DIME! 🙈', W / 2, 84, PINK, true); sfx('big'); }
+          else if (ball.diff >= 45 && ball.sold) { popup('SOLD IT! NO-LOOK DIME! 🙈', W / 2, 84, PINK, true); sfx('big'); }
+          else if (ball.diff >= 45) popup('NO-LOOK... AT THE WALL? SELL IT ON A COWORKER', W / 2, 84, BLUE, true);
           else if (ball.diff >= 14) popup(CHEERS[(Math.random() * CHEERS.length) | 0], W / 2, 84, BLUE, true);
           if (streak > 1) popup('STREAK x' + streak, W / 2, 108, '#7d4cff', false);
           if (dimes % 10 === 0) popup(dimes + ' DIMES. PROMOTION PENDING.', W / 2, 130, PINK, true);
@@ -430,7 +461,7 @@
         if (rp) burst(rp.x, rp.y, 26, [PINK, BLUE, '#fff', '#ffd23f']);
         sfx('swish');
       }
-      if (L.k >= 54) { c.state = 'exit'; c.exitX = c.x < 0 ? -9 : 9; layup = null; state = 'hold'; clock = SHOT_CLOCK; }
+      if (L.k >= 54) { c.state = 'exit'; c.exitX = c.x < 0 ? -9 : 9; layup = null; state = 'hold'; clock = clockMax(); }
     } else if (state === 'dead') {
       deadT--;
       if (deadT <= 0) {
@@ -444,7 +475,7 @@
           gameOver('Benched.', msgs[(Math.random() * msgs.length) | 0]);
           return;
         }
-        state = 'hold'; clock = SHOT_CLOCK;
+        state = 'hold'; clock = clockMax();
       }
     }
     handT = Math.max(0, handT - 1); shake *= 0.85; flash = Math.max(0, flash - 0.04);
@@ -666,6 +697,13 @@
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#17332a'; ctx.lineWidth = 2;
     [-11, 11].forEach(o => { ctx.beginPath(); ctx.ellipse(cx + o, y, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#17332a'; ctx.beginPath(); ctx.arc(cx + o + gaze * 4, y + 2, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; });
     ctx.font = 'bold 10px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText("JEN'S EYES", cx, y + 24);
+    const sp = tut ? 0 : Math.min(1, stare / (Math.max(30, 80 - (dimes || 0) * 2) + (decoyAt(gaze) ? 25 : 0) + 50));
+    if (sp > 0.15) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(cx - 34, y + 30, 68, 6);
+      ctx.fillStyle = sus > 0 ? '#d81b60' : '#ffd23f'; ctx.fillRect(cx - 34, y + 30, 68 * sp, 6);
+      ctx.fillStyle = sus > 0 ? '#ff7aa8' : 'rgba(255,255,255,0.8)'; ctx.font = 'bold 9px system-ui';
+      ctx.fillText(sus > 0 ? 'SIDEKICK IS ONTO YOU 🤨' : 'SUSPICION', cx, y + 46);
+    }
   }
   function draw() {
     ctx.save();

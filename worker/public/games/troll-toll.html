@@ -9,9 +9,9 @@
   :root { --primary: #ff7a2f; --secondary: #7ddc5a; --bg: #0e2233; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
-  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
-  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (360 / 600))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 8px 24px max(8px, env(safe-area-inset-bottom)); }
+  #hud { display: flex; gap: 18px; font-size: clamp(12px, 0.9vw + 0.9vh, 20px); opacity: .85; }
+  canvas { display: block; flex: none; width: min(calc(100vw - 48px), calc((100dvh - 80px) * (360 / 600))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
   #touch-controls { display: none; gap: 8px; justify-content: center; width: 100%; max-width: 420px; }
   body.touch #touch-controls { display: flex; }
   .btn { height: 56px; min-width: 48px; flex: 1; max-width: 90px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
@@ -21,12 +21,45 @@
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); font-family: 'Luckiest Guy', system-ui, sans-serif; letter-spacing: 1px; }
-  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
-  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-family: 'Luckiest Guy', system-ui, sans-serif; }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 0.8vw + 1.1vh, 20px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(15px, 0.8vw + 1.2vh, 22px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; font-family: 'Luckiest Guy', system-ui, sans-serif; }
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
   #start-overlay h2 { font-size: clamp(40px, 11vw, 76px); text-shadow: 0 4px 0 #7a2c06, 0 0 30px rgba(255,122,47,.5); }
   #start-overlay .cast { font-size: clamp(28px, 8vw, 40px); letter-spacing: 6px; margin: 4px 0; }
   #start-overlay .hint { color: var(--secondary); }
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)),
+      url('backgrounds/troll-toll.jpg') center/cover no-repeat;
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+  #start-overlay .hint { color: var(--secondary); }
+  #start-overlay button { box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
+  /* ── Short landscape (phone landscape, TV): HUD beside the canvas, two-column title ── */
+  @media (orientation: landscape) and (max-height: 560px) {
+    #wrap { flex-direction: row; gap: clamp(12px, 3vw, 32px); padding: 8px max(24px, env(safe-area-inset-right)) 8px max(24px, env(safe-area-inset-left)); }
+    #hud { flex-direction: column; gap: 6px; font-size: clamp(12px, 3.4vh, 20px); width: clamp(84px, 16vw, 170px); text-align: right; }
+    #start-overlay.show { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); grid-template-rows: 1fr auto auto auto 1fr; column-gap: clamp(16px, 4vw, 48px); align-items: center; padding: 12px max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left)); }
+    #start-overlay h2 { grid-column: 1; grid-row: 1 / 4; align-self: end; margin: 0; font-size: clamp(36px, min(7vw, 16vh), 76px); }
+    #start-overlay .cast { grid-column: 1; grid-row: 4 / 6; align-self: start; margin-top: 8px; font-size: clamp(26px, 9vh, 40px); }
+    #start-overlay p { grid-column: 2; grid-row: 2; margin: 0 0 8px; font-size: clamp(13px, 3.6vh, 18px); }
+    #start-overlay p.hint { grid-row: 3; margin: 0; }
+    #start-overlay button { grid-column: 2; grid-row: 4; justify-self: center; margin-top: clamp(10px, 3vh, 18px); }
+    #over-overlay h2 { font-size: clamp(28px, 11vh, 52px); margin: 0 0 4px; }
+    #over-overlay p { margin: 6px 0; font-size: clamp(13px, 3.6vh, 18px); }
+    #over-overlay button { margin-top: 10px; }
+  }
+  /* ── Touch + landscape (phone, iPad): HUD + fire on the left, D-pad on the right, canvas full height ── */
+  @media (orientation: landscape) {
+    body.touch #wrap { flex-direction: row; gap: clamp(12px, 3vw, 32px); padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
+    body.touch #hud { flex-direction: column; gap: 6px; width: 200px; align-self: stretch; justify-content: flex-start; padding-top: 6px; text-align: right; font-size: clamp(12px, 2.4vh + 0.4vw, 20px); }
+    body.touch #touch-controls { display: grid; width: 200px; max-width: none; grid-template-columns: repeat(3, 62px); grid-template-rows: repeat(3, 62px); gap: 6px;
+      grid-template-areas: ". up ." "left . right" ". down ."; justify-content: center; align-content: center; }
+    body.touch .btn { width: 100%; max-width: none; height: 100%; }
+    #btn-up { grid-area: up; } #btn-left { grid-area: left; } #btn-right { grid-area: right; } #btn-down { grid-area: down; }
+    body.touch #btn-fire { position: fixed; left: max(36px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); width: 84px; height: 84px; border-radius: 50%; font-size: 30px; }
+  }
 </style>
 </head>
 <body>
@@ -43,7 +76,7 @@
 </div>
 <div id="start-overlay" class="overlay show">
   <h2>Troll Toll</h2>
-  <div class="cast">🐶🐱🐘🐉</div>
+  <div class="cast">🐉🐘🐶🐱</div>
   <p>The bridge is gone. Hop your crew across the river on logs and nutria (the divers sink, careful) and get each one into a den. Touch the troll and it collects its toll. The dragon can torch it: toll-free crossings score double.</p>
   <p class="hint">Arrows / WASD or swipe to hop · Space / 🔥 to breathe fire (dragon only)</p>
   <button id="start-btn">Play</button>
@@ -69,12 +102,28 @@
   const W = 360, H = 600;
   function fitCanvas() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = canvas.getBoundingClientRect().width || W;
-    canvas.width = Math.max(1, Math.round(cssW * dpr));
-    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    // Fit into the space #wrap has left after its other visible children (HUD, touch controls),
+    // above/below in the column layout or beside the canvas in the landscape row layout.
+    const wrap = canvas.parentElement, cs = getComputedStyle(wrap), row = cs.flexDirection.indexOf('row') === 0;
+    const gap = parseFloat(row ? cs.columnGap : cs.rowGap) || 0;
+    let aw = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    let ah = wrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    for (const el of wrap.children) {
+      if (el === canvas) continue;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.position === 'fixed' || st.position === 'absolute') continue;
+      if (row) aw -= el.offsetWidth + gap; else ah -= el.offsetHeight + gap;
+    }
+    const cssW = Math.max(60, Math.floor(Math.min(aw, ah * W / H)));
+    const bw = Math.max(1, Math.round(cssW * dpr)), bh = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    if (canvas.style.width === cssW + 'px' && canvas.width === bw && canvas.height === bh) return;   // resizing clears the canvas: only when needed
+    canvas.style.width = cssW + 'px'; canvas.style.height = Math.floor(cssW * H / W) + 'px';
+    canvas.width = bw; canvas.height = bh;
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  window.addEventListener('touchstart', () => setTimeout(fitCanvas, 0), { once: true, passive: true });   // body.touch reveals the controls
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => fitCanvas()); for (const el of canvas.parentElement.children) if (el !== canvas) ro.observe(el); }
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {};
@@ -120,10 +169,10 @@
   // ===== TROLL TOLL =====
   const CELL = 40, START_ROW = 13, HOME_ROW = 1, SAND_ROW = 7;
   const ANIMALS = [
+    { e: '🐉', name: 'Dragon',   splash: 'Dragon meets river. Water: super effective.' },
+    { e: '🐘', name: 'Elephant', splash: 'Six tons of elephant, zero tons of buoyancy.' },
     { e: '🐶', name: 'Dog',      splash: 'The dog went for a swim. Honestly? Thrilled about it.' },
     { e: '🐱', name: 'Cat',      splash: 'The cat touched water. It will never forgive you.' },
-    { e: '🐘', name: 'Elephant', splash: 'Six tons of elephant, zero tons of buoyancy.' },
-    { e: '🐉', name: 'Dragon',   splash: 'Dragon meets river. Water: super effective.' },
   ];
   const DENS = [1, 3, 5, 7].map(c => c * CELL + CELL / 2);
   // row, type, length (cells), gap (cells), count, speed, dir, diving lane
@@ -177,7 +226,7 @@
     score = 0; level = 1; lives = 3; animalIdx = 0; dying = 0; frame = 0; burns = 0; fireCd = 0;
     flames = []; parts = []; dens = [null, null, null, null]; toast = null; lastMsg = '';
     makeLanes(); respawn(); spawnTroll(); setScore();
-    say(ANIMALS[0].name + ' goes first. Good luck.', 100);
+    say('Dragon goes first. Space / 🔥 to torch the troll!', 150);
   }
 
   function burst(x, y, colors, n, spd) {
@@ -320,80 +369,150 @@
   }, { passive: false });
 
   // ---- drawing ----
+  const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  // Static scenery (grass tufts, pebbles, reeds) laid out once so it doesn't jitter.
+  const SCENERY = (() => { let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const tufts = [], pebbles = [], reeds = [], lilies = [];
+    for (let i = 0; i < 28; i++) tufts.push({ x: rnd() * W, y: (rnd() < .5 ? CELL : CELL * 13) + 4 + rnd() * 28, h: 5 + rnd() * 6 });
+    for (let i = 0; i < 24; i++) pebbles.push({ x: rnd() * W, y: CELL * 7 + 6 + rnd() * 28, r: 1.5 + rnd() * 2.5, c: rnd() < .5 ? '#bda56a' : '#e9d9a8' });
+    for (let i = 0; i < 10; i++) reeds.push({ x: rnd() * W, y: rnd() < .5 ? CELL * 2 : CELL * 13, up: false, h: 14 + rnd() * 10, ph: rnd() * 6 });
+    for (let i = 0; i < 6; i++) lilies.push({ x: 20 + rnd() * (W - 40), y: CELL * 7 + 2, r: 5 + rnd() * 3 });
+    return { tufts, pebbles, reeds, lilies }; })();
+
+  function drawWater(fr) {
+    const g = ctx.createLinearGradient(0, CELL * 2, 0, CELL * 13); g.addColorStop(0, '#2b86a8'); g.addColorStop(.5, '#1f6f91'); g.addColorStop(1, '#174f6b');
+    ctx.fillStyle = g; ctx.fillRect(0, CELL * 2, W, CELL * 11);
+    // sunlit caustic bands
+    ctx.fillStyle = 'rgba(255,255,255,.045)';
+    for (let i = 0; i < 6; i++) { const y = CELL * 2 + ((fr * .35 + i * 73) % (CELL * 11)); ctx.fillRect(0, y, W, 3); }
+    // flowing ripples per lane
+    ctx.lineWidth = 1.5;
+    for (const r of RIVER_ROWS) { const l = lanes[r], off = ((fr * l.speed * l.dir * 0.6) % 60 + 60) % 60, y = rowY(r);
+      ctx.strokeStyle = 'rgba(255,255,255,.14)';
+      for (let x = -60 + off; x < W + 60; x += 60) { ctx.beginPath(); ctx.moveTo(x, y + 13); ctx.quadraticCurveTo(x + 8, y + 9, x + 16, y + 13); ctx.quadraticCurveTo(x + 24, y + 17, x + 32, y + 13); ctx.stroke(); }
+      ctx.strokeStyle = 'rgba(0,0,0,.08)';
+      for (let x = -60 + off + 30; x < W + 60; x += 60) { ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.quadraticCurveTo(x + 10, y - 16, x + 20, y - 12); ctx.stroke(); } }
+    // shoreline foam
+    ctx.fillStyle = 'rgba(255,255,255,.22)';
+    for (let x = 0; x < W; x += 14) { const h = 2 + Math.sin(fr * .08 + x * .3) * 1.5; ctx.fillRect(x, CELL * 2, 9, h); ctx.fillRect(x + 5, CELL * 13 - h, 9, h); ctx.fillRect(x + 3, CELL * 7 - h, 8, h); ctx.fillRect(x + 8, CELL * 8, 8, h); }
+  }
+  function drawBank(y, fr) {
+    ctx.fillStyle = '#4a8a3c'; ctx.fillRect(0, y, W, CELL);
+    const g = ctx.createLinearGradient(0, y, 0, y + CELL); g.addColorStop(0, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(0,0,0,.18)');
+    ctx.fillStyle = g; ctx.fillRect(0, y, W, CELL);
+    ctx.strokeStyle = '#2f6a28'; ctx.lineWidth = 2;
+    for (const t of SCENERY.tufts) if (t.y > y && t.y < y + CELL) { const sway = Math.sin(fr * .05 + t.x) * 1.2;
+      ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x - 3 + sway, t.y - t.h); ctx.moveTo(t.x + 2, t.y); ctx.lineTo(t.x + 1 + sway, t.y - t.h - 2); ctx.moveTo(t.x + 4, t.y); ctx.lineTo(t.x + 6 + sway, t.y - t.h + 1); ctx.stroke(); }
+  }
+  function drawReeds(fr) {
+    ctx.lineWidth = 2;
+    for (const r of SCENERY.reeds) { const base = r.y === CELL * 2 ? CELL * 2 : CELL * 13, dir = r.y === CELL * 2 ? 1 : -1, sway = Math.sin(fr * .04 + r.ph) * 3;
+      ctx.strokeStyle = '#2f6a28'; ctx.beginPath(); ctx.moveTo(r.x, base); ctx.quadraticCurveTo(r.x + sway, base + dir * r.h * .6, r.x + sway * 1.5, base + dir * r.h); ctx.stroke();
+      ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.ellipse(r.x + sway * 1.5, base + dir * r.h, 2.2, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function drawSandbar(fr) {
+    const g = ctx.createLinearGradient(0, CELL * 7, 0, CELL * 8); g.addColorStop(0, '#efdca6'); g.addColorStop(1, '#cdb37a');
+    ctx.fillStyle = g; ctx.fillRect(0, CELL * 7, W, CELL);
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(0, CELL * 7 + 2, W, 2);
+    for (const p of SCENERY.pebbles) { ctx.fillStyle = p.c; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r * 1.3, p.r, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const l of SCENERY.lilies) { ctx.fillStyle = '#3d8f45'; ctx.beginPath(); ctx.arc(l.x, l.y - 6, l.r, .4, Math.PI * 2 - .3); ctx.lineTo(l.x, l.y - 6); ctx.fill(); }
+  }
+  function drawDens() {
+    DENS.forEach((dx, i) => {
+      const y = rowY(1);
+      ctx.fillStyle = '#6b5538'; ctx.beginPath(); ctx.ellipse(dx, y + 6, 21, 18, 0, Math.PI, 0); ctx.lineTo(dx + 21, y + 20); ctx.lineTo(dx - 21, y + 20); ctx.fill();
+      ctx.fillStyle = '#4e3b27'; for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.ellipse(dx + k * 12, y - 6 + Math.abs(k) * 5, 6, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+      const g = ctx.createRadialGradient(dx, y + 8, 2, dx, y + 8, 16); g.addColorStop(0, '#000'); g.addColorStop(1, '#1b1410');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(dx, y + 7, 14, 13, 0, Math.PI, 0); ctx.lineTo(dx + 14, y + 20); ctx.lineTo(dx - 14, y + 20); ctx.fill();
+      if (dens && dens[i]) emoji(dens[i], dx, y + 4, 24);
+      else { ctx.fillStyle = 'rgba(125,220,90,.9)'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('OPEN', dx, y + 13); }
+    });
+  }
   function drawNutria(x, y, dir, sink) {
     ctx.save(); ctx.translate(x, y + sink * 8); ctx.globalAlpha = 1 - sink * 0.85; if (dir < 0) ctx.scale(-1, 1);
-    ctx.strokeStyle = '#4a2f1c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-14, 4); ctx.quadraticCurveTo(-22, 10, -19, 0); ctx.stroke();
-    ctx.fillStyle = '#7a5233'; ctx.beginPath(); ctx.ellipse(-2, 2, 15, 11, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#8c6240'; ctx.beginPath(); ctx.ellipse(11, -2, 8, 7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff8c1a'; ctx.fillRect(15, 2, 2.5, 4); ctx.fillRect(17.7, 2, 2.5, 4);         // famous orange teeth
-    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(13, -5, 1.6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#6b4329'; ctx.beginPath(); ctx.arc(7, -8, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(17, -1); ctx.lineTo(24, -3); ctx.moveTo(17, 0); ctx.lineTo(24, 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(0, 10, 18, 5, 0, 0, Math.PI * 2); ctx.fill();   // wet shadow
+    ctx.strokeStyle = '#4a2f1c'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-14, 4); ctx.quadraticCurveTo(-24, 9 + Math.sin(frame * .25 + x) * 3, -21, 0); ctx.stroke();
+    const bg = ctx.createLinearGradient(0, -9, 0, 12); bg.addColorStop(0, '#9a6b44'); bg.addColorStop(1, '#5e3d22');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(-2, 2, 15, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#a97a4f'; ctx.beginPath(); ctx.ellipse(11, -2, 8, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c9a47a'; ctx.beginPath(); ctx.ellipse(14, 1, 5, 4, 0, 0, Math.PI * 2); ctx.fill();          // muzzle
+    ctx.fillStyle = '#ff8c1a'; ctx.fillRect(15, 2, 2.5, 4); ctx.fillRect(17.7, 2, 2.5, 4);                        // famous orange teeth
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(13, -5, 1.7, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(18, -0.5, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(13.6, -5.6, .6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6b4329'; ctx.beginPath(); ctx.arc(7, -8, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d7a07a'; ctx.beginPath(); ctx.arc(7, -8, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(17, -1); ctx.lineTo(25, -4); ctx.moveTo(17, 0); ctx.lineTo(25, 1); ctx.moveTo(17, 1); ctx.lineTo(24, 4); ctx.stroke();
     ctx.restore();
-    if (sink > 0.3) { ctx.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x - 8 + i * 8, y - 6 + Math.sin(frame * .2 + i) * 3, 2, 0, Math.PI * 2); ctx.fill(); } }
+    if (sink > 0.3) { ctx.fillStyle = 'rgba(255,255,255,.55)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x - 8 + i * 8, y - 6 + Math.sin(frame * .2 + i) * 3, 2, 0, Math.PI * 2); ctx.fill(); } }
   }
   function drawLog(x, y, len) {
-    const w = len * CELL - 6;
-    ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.roundRect(x + 3, y - 13, w, 26, 12); ctx.fill();
-    ctx.strokeStyle = '#4e2f16'; ctx.lineWidth = 2;
-    for (let i = 1; i < len * 2; i++) { ctx.beginPath(); ctx.moveTo(x + 3 + i * 20, y - 11); ctx.lineTo(x + 3 + i * 20 - 4, y + 11); ctx.stroke(); }
-    ctx.fillStyle = '#b9864d'; ctx.beginPath(); ctx.ellipse(x + 3 + w - 6, y, 6, 12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#8a5a2b'; ctx.beginPath(); ctx.ellipse(x + 3 + w - 6, y, 3, 6, 0, 0, Math.PI * 2); ctx.stroke();
+    const w = len * CELL - 6, x0 = x + 3;
+    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.roundRect(x0 + 2, y - 9, w, 26, 12); ctx.fill();
+    const g = ctx.createLinearGradient(0, y - 13, 0, y + 13); g.addColorStop(0, '#9a6a3c'); g.addColorStop(.45, '#6e4625'); g.addColorStop(1, '#3f2612');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x0, y - 13, w, 26, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.5;
+    for (let i = 1; i < len * 2; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * 20, y - 11); ctx.quadraticCurveTo(x0 + i * 20 - 6, y, x0 + i * 20 - 3, y + 11); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.beginPath(); ctx.moveTo(x0 + 8, y - 8); ctx.lineTo(x0 + w - 10, y - 8); ctx.stroke();
+    ctx.fillStyle = '#4e8a3a'; ctx.beginPath(); ctx.ellipse(x0 + w * .35, y - 10, 5, 2.5, -.3, 0, Math.PI * 2); ctx.fill();   // moss
+    ctx.fillStyle = '#c99a5e'; ctx.beginPath(); ctx.ellipse(x0 + w - 6, y, 6, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.2; for (const r of [2.5, 5.5, 8.5]) { ctx.beginPath(); ctx.ellipse(x0 + w - 6, y, r * .5, r, 0, 0, Math.PI * 2); ctx.stroke(); }
   }
   function drawTroll(x, y, angry) {
     ctx.save(); ctx.translate(x, y + Math.sin(frame * .1) * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 12, 22 + Math.sin(frame * .15) * 3, 6, 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#5c8f3c'; ctx.beginPath(); ctx.ellipse(0, 2, 18, 17, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e8e0c0'; ctx.beginPath(); ctx.moveTo(-12, -11); ctx.lineTo(-17, -22); ctx.lineTo(-7, -14); ctx.fill(); ctx.beginPath(); ctx.moveTo(12, -11); ctx.lineTo(17, -22); ctx.lineTo(7, -14); ctx.fill();
-    ctx.fillStyle = '#3e6b25'; ctx.beginPath(); ctx.ellipse(0, -12, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -3, 4, 0, Math.PI * 2); ctx.arc(6, -3, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = angry ? '#d22' : '#111'; ctx.beginPath(); ctx.arc(-6, -2, 2, 0, Math.PI * 2); ctx.arc(6, -2, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, -9); ctx.lineTo(-3, -6); ctx.moveTo(10, -9); ctx.lineTo(3, -6); ctx.stroke();
-    ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.ellipse(0, 8, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.fillRect(-5, 5, 3, 3); ctx.fillRect(2, 5, 3, 3);
-    ctx.fillStyle = '#ffe066'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.fillText('$', 20, -10 + Math.sin(frame * .2) * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 2;
+    for (const k of [0, 1]) { const r = ((frame * .5 + k * 20) % 40); ctx.globalAlpha = 1 - r / 40; ctx.beginPath(); ctx.ellipse(0, 12, 14 + r, 4 + r * .3, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    const bg = ctx.createRadialGradient(-5, -5, 2, 0, 2, 20); bg.addColorStop(0, '#79b155'); bg.addColorStop(1, '#3f6d2a');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(0, 2, 18, 17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a6326'; for (const [wx, wy] of [[-9, 6], [8, 8], [2, -14], [-13, -4]]) { ctx.beginPath(); ctx.arc(wx, wy, 2.2, 0, Math.PI * 2); ctx.fill(); }   // warts
+    ctx.fillStyle = '#f0e6c8'; ctx.beginPath(); ctx.moveTo(-12, -11); ctx.lineTo(-18, -23); ctx.lineTo(-6, -14); ctx.fill(); ctx.beginPath(); ctx.moveTo(12, -11); ctx.lineTo(18, -23); ctx.lineTo(6, -14); ctx.fill();
+    ctx.fillStyle = '#2c4d1c'; ctx.beginPath(); ctx.ellipse(0, -12, 13, 5, 0, 0, Math.PI * 2); ctx.fill();   // hair
+    ctx.strokeStyle = '#2c4d1c'; ctx.lineWidth = 2; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 5, -14); ctx.lineTo(i * 5 + (i % 2 ? 2 : -2), -21); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -3, 4.5, 0, Math.PI * 2); ctx.arc(6, -3, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = angry ? '#d22' : '#111'; ctx.beginPath(); ctx.arc(-6, -2, 2.2, 0, Math.PI * 2); ctx.arc(6, -2, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#1e3314'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-11, -10); ctx.lineTo(-2, -6); ctx.moveTo(11, -10); ctx.lineTo(2, -6); ctx.stroke();
+    ctx.fillStyle = '#5b8f3e'; ctx.beginPath(); ctx.ellipse(0, 2, 4, 3, 0, 0, Math.PI * 2); ctx.fill();   // nose
+    ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.ellipse(0, 9, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-6, 6, 3, 4); ctx.fillRect(3, 6, 3, 4);
+    ctx.fillStyle = '#ffe066'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$', 21, -10 + Math.sin(frame * .2) * 2);
     ctx.restore();
   }
   function emoji(ch, x, y, size, flip) {
     ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
-    ctx.font = size + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = size + 'px ' + EMOJI_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(ch, 0, 2); ctx.restore();
+  }
+  function drawFlame(f) {
+    const a = Math.atan2(f.vy, f.vx);
+    ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 12); g.addColorStop(0, '#fff6c2'); g.addColorStop(.4, '#ffd23f'); g.addColorStop(.8, '#ff7a2f'); g.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(10, 0); ctx.quadraticCurveTo(0, -9 - Math.random() * 3, -12, 0); ctx.quadraticCurveTo(0, 9 + Math.random() * 3, 10, 0); ctx.fill();
+    ctx.restore();
   }
   function draw() {
     if (!lanes) { makeLanes(); }
     ctx.clearRect(0, 0, W, H);
     const fr = frame || 0;
-    // water
-    const g = ctx.createLinearGradient(0, CELL * 2, 0, CELL * 13); g.addColorStop(0, '#1c6e8f'); g.addColorStop(1, '#155571');
-    ctx.fillStyle = g; ctx.fillRect(0, CELL * 2, W, CELL * 11);
-    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 2;
-    for (const r of RIVER_ROWS) { const l = lanes[r], off = ((fr * l.speed * l.dir * 0.6) % 60 + 60) % 60;
-      for (let x = -60 + off; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, rowY(r) + 12); ctx.quadraticCurveTo(x + 10, rowY(r) + 8, x + 20, rowY(r) + 12); ctx.stroke(); } }
-    // header + banks
+    drawWater(fr);
     ctx.fillStyle = '#0b1b28'; ctx.fillRect(0, 0, W, CELL);
-    ctx.fillStyle = '#3d7a3a'; ctx.fillRect(0, CELL, W, CELL); ctx.fillRect(0, CELL * 13, W, CELL);
-    ctx.fillStyle = '#2f6230'; for (let x = 0; x < W; x += 12) { ctx.fillRect(x, CELL * 2 - 4, 8, 4); ctx.fillRect(x + 6, CELL * 13, 8, 4); }
-    ctx.fillStyle = '#d9c38a'; ctx.fillRect(0, CELL * 7, W, CELL);
-    ctx.fillStyle = '#c4ad73'; for (let x = 8; x < W; x += 26) ctx.fillRect(x, CELL * 7 + 14 + (x % 3) * 5, 4, 3);
+    drawBank(CELL, fr); drawBank(CELL * 13, fr);
+    drawSandbar(fr);
     ctx.fillStyle = '#081420'; ctx.fillRect(0, CELL * 14, W, CELL);
-    // dens
-    DENS.forEach((dx, i) => {
-      ctx.fillStyle = '#1d3a1b'; ctx.beginPath(); ctx.ellipse(dx, rowY(1) + 4, 17, 15, 0, Math.PI, 0); ctx.lineTo(dx + 17, rowY(1) + 18); ctx.lineTo(dx - 17, rowY(1) + 18); ctx.fill();
-      if (dens && dens[i]) emoji(dens[i], dx, rowY(1) + 2, 26);
-    });
+    drawDens();
     // platforms
     for (const r of RIVER_ROWS) { const l = lanes[r];
       for (const it of l.items) {
         if (l.type === 'log') drawLog(it.x, rowY(r), it.len);
         else { const s = frame === undefined ? 0 : sinkOf(it); for (let c = 0; c < it.len; c++) drawNutria(it.x + c * CELL + CELL / 2, rowY(r), l.dir, s); }
       } }
+    drawReeds(fr);
     // troll
     if (troll) {
       if (troll.alive) drawTroll(troll.x, rowY(troll.row), true);
       else if (troll.burnAnim < 60) { ctx.globalAlpha = 1 - troll.burnAnim / 60; ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(troll.burnX, troll.burnY + troll.burnAnim * .3, 16, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
     }
-    for (const f of flames || []) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(f.x, f.y, 6, 0, Math.PI * 2); ctx.fill(); }
+    for (const f of flames || []) drawFlame(f);
     for (const p of parts || []) { ctx.globalAlpha = Math.min(1, p.life / 20); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
     // HUD row
@@ -401,14 +520,13 @@
       ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText('LV ' + level, 8, 14);
       const tf = Math.max(0, timeLeft / crossTime());
-      ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(50, 9, 150, 10);
-      ctx.fillStyle = tf < .25 ? '#ff5050' : '#7ddc5a'; ctx.fillRect(50, 9, 150 * tf, 10);
+      ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.roundRect(50, 9, 150, 10, 5); ctx.fill();
+      ctx.fillStyle = tf < .25 ? '#ff5050' : '#7ddc5a'; ctx.beginPath(); ctx.roundRect(50, 9, Math.max(6, 150 * tf), 10, 5); ctx.fill();
       ctx.textAlign = 'right';
       if (troll && troll.alive) { ctx.fillStyle = '#ff9a5a'; ctx.fillText('TROLL: TOLLING', W - 8, 14); }
       else if (troll) { ctx.fillStyle = '#7ddc5a'; ctx.fillText('TOLL-FREE ' + Math.ceil(troll.deadT / 60) + 's', W - 8, 14); }
       ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '11px system-ui';
       ctx.fillText('Now: ' + ANIMALS[animalIdx].name, 8, 31);
-      // bottom row: lives + queue
       ctx.fillStyle = '#ff5a6a'; ctx.font = '16px system-ui'; ctx.textAlign = 'left';
       ctx.fillText('♥'.repeat(Math.max(0, lives)), 8, rowY(14));
       ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '11px system-ui'; ctx.textAlign = 'right'; ctx.fillText('up next', W - 104, rowY(14));
@@ -421,14 +539,18 @@
       lines.push(cur);
       const bh = lines.length * 17 + 12, by = CELL * 7 + 20 - bh / 2;
       ctx.globalAlpha = Math.min(1, toast.t / 20);
-      ctx.fillStyle = 'rgba(8,20,32,.85)'; ctx.beginPath(); ctx.roundRect(16, by, W - 32, bh, 10); ctx.fill();
+      ctx.fillStyle = 'rgba(8,20,32,.88)'; ctx.beginPath(); ctx.roundRect(16, by, W - 32, bh, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,122,47,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.fillStyle = '#fff'; lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 14 + i * 17));
       ctx.globalAlpha = 1;
     }
-    // player
-    if (player && running) {
-      const a = ANIMALS[animalIdx], y = rowY(player.row) - Math.sin((player.hop / 8) * Math.PI) * 8;
-      if (!dying) emoji(a.e, player.x, y, 30, player.face === 'right');
+    // player (with drop shadow + hop squash)
+    if (player && running && !dying) {
+      const a = ANIMALS[animalIdx], h = Math.sin((player.hop / 8) * Math.PI), y = rowY(player.row) - h * 10;
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(player.x, rowY(player.row) + 12, 13 - h * 4, 4 - h, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(player.x, y); ctx.scale(1 - h * .08, 1 + h * .12); ctx.translate(-player.x, -y);
+      emoji(a.e, player.x, y, 30, player.face === 'right');
+      ctx.restore();
     }
   }
 

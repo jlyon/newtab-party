@@ -18,15 +18,20 @@
   @media (pointer: coarse) { .tc { display: inline; } .kb { display: none; } }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; }
   h1 { margin: 0; font-size: clamp(13px, 3.5vw, 20px); letter-spacing: 2px; }
+  /* --reserved: height of everything stacked with the pitch (title, gaps, touch controls);
+     --side: width taken beside it (edge margins, or the touch controls in landscape). */
+  body { --reserved: 70px; --side: 5vw; }
   canvas { border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-    width: min(95vw, calc((100dvh - 70px) * 600 / 420));
-    height: auto; display: block; touch-action: none; cursor: crosshair; }
+    width: min(calc(100vw - var(--side)), calc((100dvh - var(--reserved)) * 600 / 420));
+    aspect-ratio: 600 / 420; height: auto; display: block; touch-action: none; cursor: crosshair; }
   /* touch controls: only shown once a real touch happens (body.touch) */
   #controls { display: none; gap: 8px; align-items: center; width: min(95vw - 48px, 720px); flex-wrap: wrap; justify-content: center;
     padding-bottom: env(safe-area-inset-bottom); }
   body.touch #controls { display: flex; }
-  body.touch canvas { width: min(95vw - 48px, calc((100dvh - 220px) * 600 / 420)); }   /* side margins keep drags away from the back-swipe edge */
+  body.touch { --reserved: 220px; --side: calc(5vw + 48px); }   /* side margins keep drags away from the back-swipe edge */
   .ctrl-group { display: flex; gap: 5px; }
+  #left-ctrls { gap: 8px; flex-wrap: wrap; justify-content: center; }
+  #right-ctrls { flex: 1; align-items: center; gap: 8px; min-width: 200px; }
   .btn { padding: 8px 12px; height: 56px; min-width: 52px; font-size: clamp(11px, 3vw, 14px); border: 2px solid var(--primary);
     background: rgba(0,0,0,0.3); color: var(--primary); cursor: pointer; border-radius: 6px;
     user-select: none; -webkit-touch-callout: none; white-space: nowrap; transition: transform 0.08s ease; }
@@ -95,6 +100,49 @@
   #start-btn:active { transform: scale(0.97); }
   #start-card img { display: block; width: min(82%, 400px); max-height: 34dvh; margin: 0 auto 12px; object-fit: contain;
     filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  /* Short screens (TV, phone landscape): the arcade topbar already names the game. */
+  @media (max-height: 600px) {
+    h1 { display: none; }
+    body { --reserved: 16px; }
+  }
+  /* Wide touch screens (tablets): the controls fit on one row under the pitch. */
+  @media (min-width: 700px) and (min-height: 601px) { body.touch { --reserved: 130px; } }
+  /* Phone landscape: aim/curve buttons left of the pitch, KICK + power bar right of it. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    body.touch { --reserved: 56px; --side: 390px; }
+    body.touch #wrap { display: grid; justify-content: center; align-content: center; column-gap: 14px; row-gap: 6px;
+      grid-template-columns: auto auto auto; grid-template-areas: ". title ." "left cv right"; }
+    body.touch h1 { grid-area: title; text-align: center; }
+    body.touch canvas { grid-area: cv; }
+    body.touch #controls { display: contents; }
+    body.touch #left-ctrls { grid-area: left; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 10px; align-self: center; }
+    body.touch #right-ctrls { grid-area: right; display: flex; flex-direction: column; gap: 12px; align-self: center; align-items: stretch; width: 120px; min-width: 0; flex: none; }
+    body.touch #left-ctrls > .ctrl-group { gap: 8px; }
+    body.touch .ctrl-group .btn { width: 98px; }
+    body.touch #btn-kick { height: 96px; }
+    body.touch #power-bar-wrap { flex: none; min-width: 0; }
+  }
+  @media (orientation: landscape) and (max-height: 600px) {
+    body.touch { --reserved: 12px; --side: 360px; }
+    body.touch #wrap { column-gap: 12px; }
+    body.touch .ctrl-group .btn { width: 84px; height: 50px; padding: 4px 6px; }
+    body.touch #left-ctrls { gap: 8px; }
+    body.touch #left-ctrls > .ctrl-group { gap: 6px; }
+    body.touch #right-ctrls { width: 100px; }
+  }
+  /* Start card on short landscape screens: logo beside the copy, nations side by side. */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #start-overlay { padding: 10px 20px; }
+    #start-card { display: grid; grid-template-columns: auto 1fr; column-gap: 20px; align-items: center;
+      max-width: 760px; padding: 14px 22px !important; }
+    #start-card img { grid-row: 1 / span 3; width: min(30vw, 220px) !important; max-height: calc(100dvh - 60px) !important; margin: 0 !important; }
+    #start-card p { margin: 0 0 10px !important; max-width: none; }
+    .team-row { flex-direction: row; gap: 12px !important; margin: 0 0 12px !important; }
+    select { max-width: 30vw; }
+    #start-btn { justify-self: center; margin-top: 0; padding: 12px 40px; }
+    #overlay { padding: 10px 20px; }
+    #overlay button { margin-top: 10px; }
+  }
   @media (max-height: 720px) {
     #start-card { padding: 16px 18px 20px; }
     #start-card img { max-height: 18dvh; margin-bottom: 6px; }
@@ -102,6 +150,13 @@
     .team-row { gap: 6px; margin-bottom: 12px; }
     select { padding: 8px 6px; }
   }
+  /* Big screens / TV: larger start-card copy so it reads from across the room. */
+  @media (min-width: 900px) {
+    #start-overlay #start-card p { font-size: clamp(14px, 1.1vw + 4px, 18px); }
+    #start-overlay .team-row label { font-size: 14px; }
+    #start-overlay select { font-size: 16px; }
+  }
+  @media (min-width: 1200px) and (min-height: 700px) { #start-card { max-width: 600px; } }
 </style>
 </head>
 <body>
@@ -109,16 +164,20 @@
   <h1>BEND IT LIKE MAXI</h1>
   <canvas id="game" width="600" height="420"></canvas>
   <div id="controls">
-    <div class="ctrl-group">
-      <button class="btn" id="btn-left">◀ Aim</button>
-      <button class="btn" id="btn-right">Aim ▶</button>
+    <div id="left-ctrls" class="ctrl-group">
+      <div class="ctrl-group">
+        <button class="btn" id="btn-left">◀ Aim</button>
+        <button class="btn" id="btn-right">Aim ▶</button>
+      </div>
+      <div class="ctrl-group">
+        <button class="btn" id="btn-cleft">↶ Curve</button>
+        <button class="btn" id="btn-cright">Curve ↷</button>
+      </div>
     </div>
-    <div class="ctrl-group">
-      <button class="btn" id="btn-cleft">↶ Curve</button>
-      <button class="btn" id="btn-cright">Curve ↷</button>
+    <div id="right-ctrls" class="ctrl-group">
+      <button class="btn" id="btn-kick">⚽ KICK</button>
+      <div id="power-bar-wrap"><div id="power-bar"></div></div>
     </div>
-    <button class="btn" id="btn-kick">⚽ KICK</button>
-    <div id="power-bar-wrap"><div id="power-bar"></div></div>
   </div>
 </div>
 <div id="start-overlay">

@@ -32,12 +32,12 @@
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px;
     padding: 8px 0 env(safe-area-inset-bottom); }
   h1 { margin: 0; font-size: clamp(15px, 4vw, 22px); letter-spacing: 2px; }
-  #hud { display: flex; gap: clamp(10px, 4vw, 20px); font-size: clamp(11px, 3vw, 14px); opacity: 0.85; white-space: nowrap; }
+  #hud { display: flex; gap: clamp(10px, 4vw, 20px); font-size: clamp(12px, 1.3vw + 0.6vh, 20px); opacity: 0.85; white-space: nowrap; }
   canvas { border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 6px 24px rgba(0,0,0,0.6); border-radius: 6px;
     width: min(95vw, calc((100dvh - var(--reserved)) * 1.7778)); height: auto; display: block; cursor: pointer;
     user-select: none; -webkit-touch-callout: none; }
   body.portrait canvas { width: min(95vw, calc((100dvh - var(--reserved)) * 1.3333)); }
-  #hint { font-size: clamp(10px, 2.5vw, 13px); opacity: 0.5; }
+  #hint { font-size: clamp(11px, 1vw + 0.8vh, 17px); opacity: 0.6; }
   body.touch #hint { display: none; }
   #touch-hint { display: none; font-size: clamp(11px, 2.8vw, 14px); opacity: 0.6; text-align: center; padding: 0 16px; }
   body.touch #touch-hint { display: block; }
@@ -100,6 +100,16 @@
   }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
   #start-overlay button:active { transform: scale(0.97); filter: brightness(0.95); }
+  /* Phones on their side: drop the title row so the slope gets the height (JUMP stays beside it). */
+  @media (orientation: landscape) and (max-height: 460px) and (min-width: 700px) {
+    body.touch { --reserved: 66px; }
+    body.touch h1 { display: none; }
+    body.touch #wrap { row-gap: 4px; padding-top: 4px; }
+    body.touch #hud { font-size: 12px; }
+    body.touch #touch-hint { font-size: 12px; }
+    body.touch #touch-controls { width: 112px; }
+    body.touch #touch-controls button { min-height: 112px; }
+  }
 </style>
 </head>
 <body>

@@ -12,9 +12,12 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'DM Mono', ui-monospace, Menlo, monospace; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; font-variant-numeric: tabular-nums; }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, calc(0.85vw + 6.5px), 18px); opacity: .9; font-variant-numeric: tabular-nums; }
   #hud b { color: var(--primary); font-weight: 500; }
-  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (560 / 420))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); cursor: crosshair; touch-action: none; }
+  /* --reserved: height stacked with the canvas (HUD, gaps, touch hint); --side: width beside it. */
+  body { --reserved: 52px; --side: 48px; }
+  body.touch { --reserved: 80px; }
+  canvas { display: block; width: min(calc(100vw - var(--side)), calc((100dvh - var(--reserved)) * (560 / 420))); aspect-ratio: 560 / 420; height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); cursor: crosshair; touch-action: none; }
   #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; font-size: 12px; color: var(--ghost); letter-spacing: .06em; text-align: center; }
   body.touch #touch-controls { display: flex; }
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,22,40,.88); z-index: 20; }
@@ -49,6 +52,20 @@
     transition: transform 0.14s ease, filter 0.14s ease;
   }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* Phone landscape: HUD stacked in a column left of the field, hint on the right, so the field keeps the height. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    body, body.touch { --reserved: 20px; }
+    #wrap { flex-direction: row; gap: 18px; }
+    #hud { flex-direction: column; gap: 8px; width: 110px; align-items: flex-end; text-align: right; }
+    #touch-controls { width: 110px; text-align: left; }
+  }
+  /* Short screens: tighter title so the button stays on screen. */
+  @media (max-height: 500px) {
+    .overlay { padding: 12px 24px; }
+    .overlay h2 { font-size: clamp(30px, 13dvh, 72px); }
+    #start-overlay button, .overlay button { margin-top: 10px; }
+  }
+  @media (min-width: 1200px) and (min-height: 700px) { .overlay p { font-size: 18px; max-width: 52ch; } .overlay .rules { font-size: 16px; } }
 </style>
 </head>
 <body>
@@ -93,6 +110,7 @@
   }
   let gridCache = null;
   fitCanvas(); addEventListener('resize', fitCanvas);
+  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);   // body.touch changes the layout
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {};

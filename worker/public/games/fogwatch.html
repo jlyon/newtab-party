@@ -10,8 +10,11 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
-  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
-  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (640 / 400))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, calc(0.85vw + 6.5px), 18px); opacity: .85; }
+  /* --reserved: height stacked with the canvas (HUD, gaps, touch buttons, hint); --side: width beside it. */
+  body { --reserved: 48px; --side: 5vw; }
+  body.touch { --reserved: 136px; }
+  canvas { display: block; width: min(calc(100vw - var(--side)), calc((100dvh - var(--reserved)) * (640 / 400))); aspect-ratio: 640 / 400; height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
   #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
   body.touch #touch-controls { display: flex; }
   #touch-hint { display: none; font-size: clamp(11px, 3vw, 13px); opacity: .6; }
@@ -37,6 +40,33 @@
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay button { padding: 15px 50px; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
   #start-overlay .sub { font-family: 'IM Fell English SC', Georgia, serif; color: var(--secondary); font-size: clamp(14px, 3.4vw, 20px); margin: 0 0 6px; letter-spacing: 1px; }
+  /* Phone landscape: ◀ left of the sea, ▶ and ✦ right of it, so the sea keeps the full height. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    body.touch { --reserved: 52px; --side: 260px; }
+    body.touch #wrap { display: grid; justify-content: center; align-content: center; column-gap: 16px; row-gap: 5px;
+      grid-template-columns: auto auto auto; grid-template-areas: ". hud ." "l cv r" "l cv f" ". hint ."; }
+    body.touch #hud { grid-area: hud; justify-content: center; }
+    body.touch canvas { grid-area: cv; }
+    body.touch #touch-hint { grid-area: hint; text-align: center; font-size: 11px; }
+    body.touch #touch-controls { display: contents; }
+    body.touch .btn { width: 96px; height: min(96px, 30dvh); flex: none; }
+    body.touch #btn-left { grid-area: l; align-self: center; }
+    body.touch #btn-right { grid-area: r; align-self: end; margin-bottom: 8px; }
+    body.touch #btn-fire { grid-area: f; align-self: start; margin-top: 8px; }
+  }
+  /* Start screen on short landscape screens: logo beside the copy so the button stays on screen. */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #start-overlay { display: none; padding: 12px 24px; }
+    #start-overlay.show { display: grid; grid-template-columns: auto minmax(0, 560px); column-gap: 24px; justify-content: center; align-content: center; text-align: left; }
+    #start-overlay img { grid-row: 1 / span 4; width: min(30vw, 230px) !important; max-height: calc(100dvh - 40px) !important; margin: 0 !important; align-self: center; }
+    #start-overlay .sub { margin: 0 0 4px; }
+    #start-overlay p { margin: 0 0 8px; font-size: clamp(12px, calc(2.4dvh + 4.5px), 15px); line-height: 1.45; }
+    #start-overlay button { justify-self: start; margin-top: 4px; }
+    #over-overlay { padding: 12px 24px; }
+    #over-overlay h2 { font-size: clamp(30px, 13dvh, 64px); }
+    #over-overlay button { margin-top: 10px; }
+  }
+  @media (min-width: 1200px) and (min-height: 700px) { .overlay p { font-size: 18px; max-width: 52ch; } }
 </style>
 </head>
 <body>
@@ -85,6 +115,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  if (window.ResizeObserver) new ResizeObserver(() => fitCanvas()).observe(canvas);   // body.touch changes the layout
   const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
 
   const keys = {}, held = {};

@@ -43,6 +43,18 @@
     padding-bottom: env(safe-area-inset-bottom); }
   body.touch #touch-hint { display: block; }
   body.touch canvas { cursor: default; }
+  /* portrait: title, HUD, table, hint stacked; #side only groups them for landscape */
+  #side { display: contents; }
+  h1 { order: -2; } #hud { order: -1; } #touch-hint { order: 1; }
+  /* landscape: table on the left, title + HUD + hint in a column beside it */
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { flex-direction: row; gap: clamp(14px, 3vw, 40px); padding: 8px 24px; }
+    canvas, body.touch canvas { width: min(calc((100dvh - 16px) * 0.875), 100vw - 48px - clamp(150px, 24vw, 320px) - clamp(14px, 3vw, 40px)); flex: none; }
+    #side { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: clamp(8px, 2.4dvh, 20px); width: clamp(150px, 24vw, 320px); }
+    h1 { font-size: clamp(14px, min(2.2vw, 4.4dvh), 30px); letter-spacing: 2px; }
+    #hud, body.touch #hud { width: auto; flex-direction: column; gap: clamp(2px, 1dvh, 8px); font-size: clamp(12px, 3dvh, 20px); }
+    #touch-hint { text-align: left; font-size: clamp(11px, 2.6dvh, 14px); }
+  }
   #overlay, #start-overlay { touch-action: none; }
   #overlay button, #start-overlay button { min-height: 52px; user-select: none; -webkit-touch-callout: none; }
   #overlay .final-score { color: #fff; font-size: clamp(22px, 6vw, 34px); font-weight: bold; letter-spacing: 2px; margin: 10px 0 0;
@@ -55,7 +67,7 @@
   }
   #overlay h2 { color: var(--secondary); font-size: clamp(22px, 8vw, 40px); margin: 0 0 10px; letter-spacing: 3px; text-shadow: 0 0 10px var(--secondary); }
   #overlay p { color: var(--primary); margin: 6px 0; max-width: 520px; font-size: clamp(12px, 3.5vw, 15px); }
-  #overlay .sub { color: var(--secondary); font-size: clamp(11px, 3vw, 13px); opacity: 0.85; }
+  #overlay .sub { color: var(--secondary); font-size: clamp(11px, 3vw, 14px); opacity: 0.85; }
   #overlay button {
     margin-top: 18px; padding: 12px 26px; font-size: clamp(14px, 4vw, 16px);
     background: var(--primary); color: var(--bg); border: none;
@@ -104,11 +116,17 @@
     box-shadow: 0 12px 44px rgba(0,0,0,0.5), 0 0 26px rgba(255,215,0,0.55);
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    #start-overlay p, #overlay p { font-size: 18px; max-width: 46ch; }
+    #start-overlay img { max-height: min(42dvh, 360px) !important; width: min(82%, 480px) !important; }
+  }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); background: var(--primary, #FFD700); box-shadow: 0 16px 54px rgba(0,0,0,0.55), 0 0 34px rgba(255,215,0,0.7); }
 </style>
 </head>
 <body>
 <div id="wrap">
+  <canvas id="game" width="560" height="640"></canvas>
+  <div id="side">
   <h1>BLOUNCERROOZAL</h1>
   <div id="hud">
     <span>HIGH ROLLER</span>
@@ -116,8 +134,8 @@
     <span id="lives">Lives: 3</span>
     <span id="speed">Speed: x1.0</span>
   </div>
-  <canvas id="game" width="560" height="640"></canvas>
   <div id="touch-hint">Drag anywhere on the table to move the paddle · tap to launch</div>
+  </div>
 </div>
 <div id="start-overlay">
   <img src="logos/blouncerroozal.png" alt="Blouncerroozal" style="display:block;width:min(82%,400px);max-height:min(40dvh,260px);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
@@ -166,6 +184,7 @@
   }
   fitCanvas();
   window.addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const scoreEl = document.getElementById('score');
   const livesEl = document.getElementById('lives');
   const speedEl = document.getElementById('speed');

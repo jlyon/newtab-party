@@ -75,7 +75,7 @@ If the user goes off-script and just describes their game freeform, don't force 
 
 There are no per-genre templates anymore (they made every game look and feel the same). You **design the mechanic, the art, the HUD and the feel yourself** for this user, this theme, this joke. What you do get is one small engine scaffold with the boring parts already right:
 
-- `assets/scaffold.html` — viewport/touch CSS, DPR-crisp responsive canvas, keyboard + on-screen `holdBtn` controls (touch-only), fixed-step 60 Hz loop, `postHi`, title screen with Play and game-over overlay with Enter-to-restart. **No game logic.** Read it, copy it to the game file, replace the placeholders, then build the game inside the `GAME-SPECIFIC SECTION` (`reset`, `step`, `draw`, plus whatever input handlers the design needs). Keep the boilerplate intact; it's what passes the QA harness.
+- `assets/scaffold.html` — viewport/touch CSS, DPR-crisp responsive canvas (with the short-landscape side layout), keyboard + on-screen `holdBtn` controls (touch-only), fixed-step 60 Hz loop, `postHi`, title screen with Play and game-over overlay with Enter-to-restart. **No game logic.** Read it, copy it to the game file, replace the placeholders, then build the game inside the `GAME-SPECIFIC SECTION` (`reset`, `step`, `draw`, plus whatever input handlers the design needs). Keep the boilerplate intact; it's what passes the QA harness.
 
 For DOM/board games (cards, minesweeper, CYOA, word games, tycoon) the canvas parts of the scaffold don't apply: keep its CSS rules, focus/touch detection, `postHi`, overlays and Enter handling, and build the board in HTML. Scrolling content goes in a container with `overflow-y: auto; touch-action: pan-y` (the body is `touch-action: none`).
 
@@ -241,13 +241,31 @@ Viewport meta must disable pinch- and double-tap-zoom on every game and screen �
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 ```
 
-**Responsive canvas.** Canvas must scale down to fit phones in portrait. Use:
-```css
-canvas { width: min(Xpx, 95vw); height: auto; display: block; }
-```
-where X is the canvas's `width` attribute. All game coordinates stay fixed at the canvas resolution; CSS scaling handles the visual resize. Always scale touch/mouse coordinates from screen space to canvas space: `const x = (clientX - rect.left) * (W / rect.width)`.
+**Every game is responsive: six sizes, one layout that flexes.** The game runs in an iframe under the arcade's 40px topbar on the web, in the Chrome new tab, in an iOS app and in an Android TV app. Design for all of these (iframe CSS px):
 
-**Controls below canvas.** Place mobile buttons BELOW the canvas in a flex row. Minimum touch target: `height: 52px; min-width: 48px`. Style with `user-select: none; -webkit-touch-callout: none` so long-press doesn't select. `.btn:active, .btn.held { background: var(--primary); }` gives clear press feedback.
+| size | where | input |
+|---|---|---|
+| 390x660 | phone portrait | touch |
+| **844x340** | **phone landscape (the hardest one)** | touch |
+| 810x1000 / 1080x730 | iPad portrait / landscape | touch |
+| 1440x820 | desktop | keyboard + mouse |
+| 960x500 | TV (1080p at 2x), viewed from a couch | remote: arrows + Enter, or a virtual pointer |
+
+**Responsive canvas.** Size the canvas from the space actually left over, never a fixed width:
+```css
+:root { --reserved: 56px; --side: 24px; }      /* height for the HUD; width margin */
+body.touch { --reserved: 140px; }              /* + the touch controls, only once they're shown */
+canvas { width: min(100vw - var(--side), calc((100dvh - var(--reserved)) * (W / H))); height: auto; display: block; }
+```
+Reserve only what is visible: desktop and TV never show touch controls, so they must not lose 150px to them (that left TV canvases at ~70% of the height). All game coordinates stay fixed at the logical W x H; CSS scaling handles the visual size. Always scale touch/mouse coordinates from screen space to canvas space: `const x = (clientX - rect.left) * (W / rect.width)`. Refit the backing store on `resize` **and** with a `ResizeObserver` on the canvas (layout changes when `body.touch` appears), deferred with `requestAnimationFrame` and skipped when the size didn't change; the scaffold does this.
+
+**Short landscape: go sideways.** At phone landscape (and TV, ~500px tall) a column layout leaves a ~150px canvas. Under `@media (orientation: landscape) and (max-height: 520px)`: switch `#wrap` to a 3-column grid (HUD + title in a left column, canvas full height in the middle, touch controls in the right column), set `--reserved` to ~16px and `--side` to the width of the side columns, and hide or shrink anything decorative (in-page h1, long hints). Split controls by thumb when the game has both: movement on the left, actions on the right. Aim for a play area ≥ 260px tall at 844x340. The scaffold has a working version of this.
+
+**Title and game-over screens fit every size.** The Play button and instructions are visible without scrolling at 844x340: in short landscape put the logo/title in a left column and the text + button on the right (two-column card), tighten margins, and cap the logo's height with `dvh`. Overlays get `overflow-y: auto; touch-action: pan-y` as a safety net only.
+
+**Readable on big screens.** Size text with `clamp()` on `vmin`/`dvh`, not just `vw`, so it grows on desktop and TV: about ≥ 11px on phones and ≥ 14px for HUD and body text at 960x500. DOM/board games scale the board up to fill the height on big screens instead of sitting in a fixed 520px column, and in landscape put the info panel beside the board.
+
+**Controls below canvas (portrait).** In portrait, place mobile buttons BELOW the canvas in a flex row (in short landscape they move beside it, see above). Minimum touch target: `height: 52px; min-width: 48px`. Style with `user-select: none; -webkit-touch-callout: none` so long-press doesn't select. `.btn:active, .btn.held { background: var(--primary); }` gives clear press feedback.
 
 **On-screen controls appear on touch devices only (mandatory).** The D-pad / fire / aim buttons are a phone affordance — they MUST NOT show on desktop, where the keyboard/mouse is used. They appear ONLY on mobile/touch. Hide them by default and reveal them only once touch is detected — never toggle them visible from gameplay JS without a touch gate, and never leave them visible by default. This keeps the desktop layout clean while guaranteeing full touch playability.
 ```css
@@ -267,9 +285,9 @@ Pure tap/drag games (CYOA, memory match, minesweeper, tycoon, battleship, beer/p
 
 **Every game explains itself on touch.** With `body.touch` the player sees on-screen buttons for every action, or a one-line gesture hint ("Swipe or tilt to steer · tap to jump", "Drag to aim, release to throw", "Long-press to flag") under the canvas. The title screen instructions are phrased for both inputs.
 
-**Tablet too.** At iPad portrait (810x1080) and landscape (1080x810) the canvas scales up with the same CSS formula, buttons stay ≥ 56px within thumb reach, and landscape still fits `100dvh` (move controls beside or over the canvas with an `(orientation: landscape)` media query if needed).
+**Tablet too.** At iPad portrait and landscape the canvas scales up with the same formula, buttons stay ≥ 56px within thumb reach, and landscape still fits `100dvh` (in touch landscape at any height, controls can sit beside the canvas or in its bottom corners).
 
-**Layout must work at 375px wide in portrait.** Use `clamp()` for font sizes. Wrap the whole page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` so it centers nicely at any size.
+**Small and huge.** Also check 375x560 (small phone) and 1920x1000. Wrap the page in `display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%` (or the landscape grid) so it centers at any size.
 
 ## Finish the title screen (themed font — always)
 
@@ -291,7 +309,7 @@ Run the house harness; both must be clean for the new game. In a checkout, from 
 
 ```bash
 node scripts/qa/lint.mjs <slug>              # scoring, fixed-step loop, viewport, touch gating, no 100vh
-SHOTS=1 node scripts/qa/smoke.mjs <slug>     # desktop, iPhone 13, iPhone SE, iPad portrait + landscape
+SHOTS=1 node scripts/qa/smoke.mjs <slug>     # desktop, iPhone 13 portrait + landscape, iPhone SE, iPad portrait + landscape, TV
 ```
 
 Outside a checkout, the same scripts ship with this plugin. Point them at the folder that holds the game:
@@ -304,7 +322,7 @@ GAMES_DIR="$PWD" SHOTS=1 SHOTS_DIR="$PWD/qa-shots" node "$QA/smoke.mjs" <slug>
 
 If Playwright isn't available and the user doesn't want to install it, still run the lint, then check the game by reading it carefully against the mobile and scoring rules above, and say that the device smoke test was skipped.
 
-The smoke test loads the game, clicks Play, feeds generic keyboard and touch input, and reports page errors, overflow, clipped or tiny canvases, off-screen or small buttons, and content that can't be scrolled by touch. Then **look at the screenshots** (`scripts/qa/shots/` in a checkout, `SHOTS_DIR` otherwise) for every mode and fix what you see. (Needs Playwright: `npm i -D playwright` in `scripts/qa`, or the cloud session's global install.) Don't skip this: it's what lets you design freely without shipping a broken phone build.
+The smoke test loads the game, clicks Play, feeds generic keyboard and touch input, and reports page errors, overflow, clipped or undersized canvases (under 60% of the limiting dimension), off-screen or small buttons, and content that can't be scrolled by touch. Then **look at the screenshots** (`scripts/qa/shots/` in a checkout, `SHOTS_DIR` otherwise) for every mode and fix what you see. (Needs Playwright: `npm i -D playwright` in `scripts/qa`, or the cloud session's global install.) Don't skip this: it's what lets you design freely without shipping a broken phone build.
 
 At this point the game is playable and self-contained. **Stop and ask before doing anything site-related.**
 

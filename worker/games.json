@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "scheduleEpoch": "2026-11-04",
+  "scheduleEpoch": "2026-11-07",
   "schedule": [
-    "tendy-slapper",
-    "opposites-attract",
-    "slingshot-sally",
+    "the-jen-10",
+    "troll-toll",
+    "toad-tower",
     "swingin-safari",
     "red-light-green-fight",
     "echo-location",
@@ -29,7 +29,9 @@
     "fogwatch",
     "vertigo",
     "wild-cats",
-    "the-jen-10"
+    "tendy-slapper",
+    "opposites-attract",
+    "slingshot-sally"
   ],
   "scheduleHistory": [
     {
@@ -137,6 +139,39 @@
         "rack-attack",
         "smithereens",
         "yedric-bombs"
+      ]
+    },
+    {
+      "scheduleEpoch": "2026-11-04",
+      "schedule": [
+        "tendy-slapper",
+        "opposites-attract",
+        "slingshot-sally",
+        "swingin-safari",
+        "red-light-green-fight",
+        "echo-location",
+        "moonslayer",
+        "burnin-glory",
+        "build-the-boardwalk",
+        "sweep-the-strait",
+        "deja-loop",
+        "weiners-and-tubs",
+        "oligarchs-dilemma",
+        "fly-by-the-seat-of-your-pants",
+        "frosty-freefall",
+        "penalty-panic",
+        "blouncerroozal",
+        "prompter-payday",
+        "bend-it-like-maxi",
+        "abominable-speedway",
+        "rack-attack",
+        "smithereens",
+        "yedric-bombs",
+        "maze-muncher-sugar-rush",
+        "fogwatch",
+        "vertigo",
+        "wild-cats",
+        "the-jen-10"
       ]
     }
   ],
@@ -495,6 +530,24 @@
       "controls": "Move the mouse or your finger to look, click or tap a coworker to pass. Keyboard: arrows look, up picks a coworker, Space passes. Three turnovers and you are benched.",
       "type": "sports",
       "logo": "a smirking cartoon point guard in a pink #10 jersey and dark sunglasses throwing a no-look basketball pass, mint green court crest"
+    },
+    {
+      "id": "troll-toll",
+      "name": "Troll Toll",
+      "file": "games/troll-toll.html",
+      "description": "Frogger on a troll-infested river. The bridge is gone, so hop a dragon, an elephant, a dog and a cat across on logs and nutria rafts into their dens. Touch the troll and it collects its toll; the dragon can torch it for double points.",
+      "controls": "Arrows / WASD or swipe to hop. Space or the fire button breathes fire (dragon only). Diving nutria sink. Levels never end, lives do.",
+      "type": "frogger",
+      "logo": "a smug green river troll with a gold dollar sign, half-submerged, with a tiny dragon blowing a flame at it, a nutria with orange teeth swimming by, round woodland crest"
+    },
+    {
+      "id": "toad-tower",
+      "name": "Toad Tower",
+      "file": "games/toad-tower.html",
+      "description": "Bubble Bobble in a haunted wizard tower. Wartholomew the frog wizard traps living candles in magic bubbles and pops them for loot, floor after floor. One life, and if you dawdle the Snuffer comes for you.",
+      "controls": "Arrows move, Up or Z jumps, Space or X blows a bubble. Bump a trapped candle to pop it, pop touching bubbles for combos, hold jump to bounce on bubbles. Grab the potion for a Magic Surge.",
+      "type": "platformer",
+      "logo": "a green frog wizard in a purple pointy hat with a gold star, holding a glowing wand, a big green magic bubble with an angry lit candle trapped inside, round midnight-purple tower crest with gold trim"
     }
   ]
 }

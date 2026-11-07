@@ -43,7 +43,7 @@ newtab-party/
 ├── package.json               # npm scripts for everything (run from the root)
 ├── scripts/
 │   ├── qa/lint.mjs            # Static rules every game must pass
-│   ├── qa/smoke.mjs           # Playwright run on desktop, iPhone and iPad
+│   ├── qa/smoke.mjs           # Playwright run on desktop, iPhone, iPad and TV
 │   ├── gen_logos.mjs          # Batch logo generator (Gemini API)
 │   ├── schedule_game.mjs      # Add games to the rotation (npm run schedule)
 │   ├── retire_game.mjs        # Retire games from the rotation (npm run retire)
@@ -180,7 +180,7 @@ SHOTS=1 npm run qa:smoke -- [id ...]        # screenshots go to scripts/qa/shots
 MODES=desktop,mobile npm run qa:smoke -- my-game
 ```
 
-The lint checks for score scaling, a fixed-step game loop, the viewport meta tag, touch-gated controls and `100vh`. The smoke test serves the games locally, clicks Play, feeds keyboard and touch input, and flags page errors, overflow, clipped canvases, off-screen or tiny buttons, and content that can't be scrolled by touch. It runs on desktop, iPhone 13, iPhone SE, and iPad in both orientations.
+The lint checks for score scaling, a fixed-step game loop, the viewport meta tag, touch-gated controls and `100vh`. The smoke test serves the games locally, clicks Play, feeds keyboard and touch input, and flags page errors, overflow, clipped canvases, off-screen or tiny buttons, and content that can't be scrolled by touch. It runs on desktop, iPhone 13 in both orientations, iPhone SE, iPad in both orientations, and a 960x500 TV viewport.
 
 It needs Playwright. Run `npm i -D playwright` in `scripts/qa`, or set `CHROMIUM_PATH` to an existing Chromium.
 

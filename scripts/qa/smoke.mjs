@@ -1,4 +1,5 @@
-// Smoke-test newtab.party games on desktop, iPhone 13, iPhone SE, iPad portrait and iPad landscape.
+// Smoke-test newtab.party games on desktop, iPhone 13 (portrait + landscape), iPhone SE, iPad portrait + landscape and TV.
+// Sizes are the game iframe (the arcade's 40px topbar already subtracted); landscape phone is the tightest fit.
 // Loads each game, clicks Play, feeds generic keyboard/touch input and reports page errors,
 // layout overflow, clipped canvases, off-screen or tiny buttons and non-scrollable content.
 // usage: node scripts/qa/smoke.mjs [game-id ...]        (no args = every game)
@@ -120,6 +121,9 @@ async function layoutReport(page) {
     if (cv && vis(cv)) { const r = cv.getBoundingClientRect(); out.canvas = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
       if (r.right > innerWidth + 1 || r.left < -1) out.issues.push('canvas clipped horizontally');
       if (r.bottom > innerHeight + 1 || r.top < -1) out.issues.push(`canvas clipped vertically (top ${Math.round(r.top)} bottom ${Math.round(r.bottom)} vs ${innerHeight})`);
+      // The main canvas should use most of the limiting dimension (phone landscape: move controls beside it).
+      const fill = Math.max(r.width / innerWidth, r.height / innerHeight);
+      if (cv.width > 100 && fill < 0.6) out.issues.push(`canvas small: ${Math.round(r.width)}x${Math.round(r.height)} uses ${Math.round(fill * 100)}% of the ${r.width / innerWidth > r.height / innerHeight ? 'width' : 'height'}`);
     }
     const small = [];
     for (const b of document.querySelectorAll('button, .btn, [role=button]')) {
@@ -136,9 +140,12 @@ async function layoutReport(page) {
 const results = [];
 for (const id of ids) {
   const url = `http://127.0.0.1:${PORT}/${id}.html`;
-  for (const mode of (process.env.MODES ? process.env.MODES.split(',') : ['desktop', 'mobile', 'mobile-se', 'tablet', 'tablet-land'])) {
+  for (const mode of (process.env.MODES ? process.env.MODES.split(',') : ['desktop', 'mobile', 'mobile-land', 'mobile-se', 'tablet', 'tablet-land', 'tv'])) {
     const mobile = mode.startsWith('mobile') || mode.startsWith('tablet');
-    const ctx = await browser.newContext(mode === 'mobile'
+    const ctx = await browser.newContext(mode === 'mobile-land'
+      ? { ...devices['iPhone 13 landscape'], viewport: { width: 844, height: 340 }, deviceScaleFactor: 2 }
+      : mode === 'tv' ? { viewport: { width: 960, height: 500 }, deviceScaleFactor: 1 }   // Android TV WebView, 1080p at 2x
+      : mode === 'mobile'
       ? { ...devices['iPhone 13'], deviceScaleFactor: 2 }
       : mode === 'mobile-se' ? { ...devices['iPhone SE'], deviceScaleFactor: 2 }
       : mode === 'tablet' ? { ...devices['iPad (gen 7)'], deviceScaleFactor: 1 }

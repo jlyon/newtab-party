@@ -43,11 +43,11 @@
   }
   #status b{color:var(--primary)}
   .quip{display:inline-block;color:#d8c389;font-style:italic}
-  .layout{display:flex;gap:16px;width:100%;max-width:1100px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+  .layout{display:flex;gap:16px;width:100%;max-width:1400px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
   @media (min-width:1000px){.layout{flex-wrap:nowrap}}
   .ladder{display:grid;grid-template-rows:repeat(8,auto);grid-auto-flow:column;gap:3px;align-content:start}
   .rung{
-    font-size:clamp(9px,2.3vw,12px);padding:4px 9px;border-radius:6px;
+    font-size:clamp(9px,min(2.3vw,1.75dvh),15px);padding:0.33em 0.75em;border-radius:6px;
     background:linear-gradient(180deg,#241b08,#181103);border:1px solid #3a2c08;white-space:nowrap;
     display:flex;justify-content:space-between;gap:10px;min-width:152px;transition:opacity .3s;
   }
@@ -60,23 +60,27 @@
   /* board width is derived from the height left under the HUD so the page never scrolls:
      boardH = 4*caseH + 3*gap, caseH = caseW/1.18, caseW = (B-30)/4  =>  B = (availH-30)*1.18 + 30 */
   /* >=1000px: ladder and board side by side; board also bounded by the width left beside the ladder */
-  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(520px,calc(100vw - 600px),calc((100dvh - 290px) * 1.18 + 30px));align-content:start}
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(680px,calc(100vw - 640px),calc((100dvh - 290px) * 1.18 + 30px));align-content:start;container-type:inline-size}
   @media (max-width:999px){
     /* ladder stacks above the board: compact amounts-only ladder (4x4) */
     .board{width:min(93vw,calc((100dvh - 420px) * 1.18 + 30px))}
     .ladder{grid-template-rows:repeat(4,auto);width:min(93vw,380px);grid-template-columns:repeat(4,1fr)}
-    .rung{min-width:0;padding:3px 4px;justify-content:center;gap:0}
+    .rung{min-width:0;padding:3px 4px;justify-content:center;gap:0;font-size:clamp(11px,2.8vw,14px);letter-spacing:-.2px}
     .rung span:first-child{display:none}
     .layout{gap:10px}
   }
   @media (max-width:700px){
-    .board{width:min(93vw,calc((100dvh - 345px - env(safe-area-inset-bottom)) * 1.18 + 30px))}
+    /* status reserves room for an offer + a two-line quip so the board never gets pushed */
+    .board{width:min(91vw,calc((100dvh - 363px - env(safe-area-inset-bottom)) * 1.18 + 30px))}
+    #status{min-height:72px;font-size:clamp(13px,3.6vw,19px);line-height:1.3;margin:4px auto}
+    .offer{font-size:clamp(24px,7vw,48px);line-height:1.15}
+    .controls{margin:8px 0 2px}.hint{margin-top:4px}.tag{margin-bottom:2px}
   }
   .case{
     aspect-ratio:1.18/1;border:none;border-radius:11px;cursor:pointer;position:relative;
     background:
       linear-gradient(160deg,#ffe487 0%,#e3b53c 38%,#9c761a 100%);
-    color:#2a2000;font-weight:bold;font-size:clamp(15px,4.5vw,22px);
+    color:#2a2000;font-weight:bold;font-size:max(14px,4.4cqw);
     display:flex;align-items:center;justify-content:center;overflow:hidden;
     box-shadow:0 4px 0 #4a3705, inset 0 2px 3px rgba(255,255,255,.55), inset 0 -6px 10px rgba(80,55,0,.4);
     transition:transform .1s, box-shadow .1s;
@@ -88,16 +92,16 @@
   @media (hover:hover){.case:not(.opened):hover{transform:translateY(-2px);box-shadow:0 6px 0 #4a3705, 0 0 14px rgba(245,197,66,.35), inset 0 2px 3px rgba(255,255,255,.55), inset 0 -6px 10px rgba(80,55,0,.4)}}
   .case:not(.opened):active{transform:translateY(3px);box-shadow:0 1px 0 #4a3705, inset 0 2px 3px rgba(255,255,255,.5)}
   .case.mine{outline:3px solid var(--primary);box-shadow:0 0 20px rgba(245,197,66,.85), 0 4px 0 #4a3705}
-  .case.mine::after{content:"YOURS";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:9px;letter-spacing:1px;color:#3a2c00;z-index:3}
+  .case.mine::after{content:"YOURS";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:max(9px,1.9cqw);letter-spacing:1px;color:#3a2c00;z-index:3}
   .case.opening{animation:pop .45s ease}
   @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.12) rotate(-3deg)}100%{transform:scale(1)}}
   .case.opened{
     background:radial-gradient(circle at 50% 30%, #1c150b, #0d0905);color:#8a7338;cursor:default;
-    box-shadow:inset 0 0 0 1px #2e2410;font-size:clamp(8px,2.4vw,11px);text-align:center;line-height:1.05;padding:3px;
+    box-shadow:inset 0 0 0 1px #2e2410;font-size:max(8px,2.2cqw);text-align:center;line-height:1.05;padding:3px;
   }
   .case.opened svg{width:62%;height:auto;display:block;margin:0 auto 1px}
-  .case.opened .num{position:absolute;top:2px;left:4px;font-size:9px;color:#5e4f28;z-index:3}
-  .case.opened .v{color:var(--accent);display:block;font-size:clamp(9px,2.6vw,12px);font-weight:bold}
+  .case.opened .num{position:absolute;top:2px;left:4px;font-size:max(9px,1.9cqw);color:#5e4f28;z-index:3}
+  .case.opened .v{color:var(--accent);display:block;font-size:max(9px,2.6cqw);font-weight:bold}
   .controls{display:flex;gap:14px;justify-content:center;margin:12px 0 4px;flex-wrap:wrap;visibility:hidden}
   .controls.on{visibility:visible}
   .btn:hover{filter:brightness(1.08)}
@@ -122,14 +126,15 @@
   @keyframes reveal{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
   /* the whole game column is a touch-scrollable container: it fits 100dvh in the sizes we target,
      and if a long status/offer ever pushes it past the fold the player can still scroll it */
-  .wrap{position:relative;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;
+  .wrap{position:relative;width:100%;max-width:1400px;display:flex;flex-direction:column;align-items:center;
     flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-  .hint{font-size:11px;color:#8a7842;margin-top:8px;letter-spacing:1px;flex:0 0 auto}
+  .wrap>*{flex-shrink:0}
+  .hint{font-size:clamp(11px,1.3vw,15px);color:#8a7842;margin-top:8px;letter-spacing:1px;flex:0 0 auto}
 
   /* Banker bot panel */
   .banker{display:flex;align-items:center;gap:10px;justify-content:center;margin:2px auto 4px;min-height:0}
   .banker svg{width:54px;height:54px;flex:0 0 auto}
-  .banker .name{font-size:12px;letter-spacing:2px;color:#9c8a52;text-transform:uppercase}
+  .banker .name{font-size:clamp(11px,1.3vw,15px);letter-spacing:2px;color:#9c8a52;text-transform:uppercase}
   .thinking{display:flex;flex-direction:column;align-items:center;gap:10px;animation:reveal .3s ease}
   .thinking .calc{font-size:clamp(15px,4.5vw,22px);color:var(--primary);letter-spacing:1px}
   .thinking svg{width:96px;height:96px;animation:bob 1s ease-in-out infinite}
@@ -169,6 +174,36 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #startOverlay .play:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.06); }
+  #startOverlay p { font-size: clamp(13px, min(3.6vw, 3.2dvh), 20px); }
+
+  /* Short landscape (phones on their side, TV): header, status, ladder and Deal buttons on the
+     left, the case board on the right, sized from the height so all 16 cases are on screen. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    body { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+    .wrap { --bw: min(52vw, calc((100dvh - 24px - env(safe-area-inset-bottom) - 24px) * 1.18 + 24px));
+      display: grid; max-width: none; column-gap: clamp(14px, 3vw, 32px); justify-items: center; align-items: center;
+      grid-template-columns: minmax(0, 1fr) var(--bw);
+      grid-template-rows: 1fr auto auto auto auto auto auto auto 1fr;
+      grid-template-areas: ". board" "h1 board" "tag board" "banker board" "status board" "ladder board" "controls board" "hint board" ". board"; }
+    .wrap > h1 { grid-area: h1; font-size: clamp(20px, 7dvh, 40px); margin: 0; }
+    .tag { grid-area: tag; margin-bottom: 2px; }
+    .banker { grid-area: banker; margin: 0 auto 2px; }
+    #status { grid-area: status; min-height: 0; margin: 2px auto 4px; font-size: clamp(13px, 4dvh, 20px); line-height: 1.3; }
+    .offer { font-size: clamp(24px, 9dvh, 44px); line-height: 1.1; }
+    .thinking .calc { font-size: clamp(14px, 4.4dvh, 22px); }
+    .layout { display: contents; }
+    .ladder { grid-area: ladder; width: auto; max-width: 100%; grid-template-columns: repeat(4, auto); }
+    .board { grid-area: board; width: var(--bw); gap: 8px; align-self: center; }
+    .controls { grid-area: controls; margin: 6px 0 0; }
+    .controls .btn { min-height: 48px; padding: 10px 22px; font-size: clamp(14px, 4dvh, 20px); }
+    .hint { grid-area: hint; margin-top: 6px; text-align: center; }
+    #startOverlay { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); align-content: center;
+      justify-items: center; column-gap: 24px; padding: 12px 24px; }
+    #startOverlay img { grid-column: 1; grid-row: 1 / span 2; max-height: calc(100dvh - 24px); width: 100%; margin: 0; }
+    #startOverlay p, #startOverlay .play { grid-column: 2; }
+    #startOverlay p { margin-bottom: 0; }
+    #startOverlay .play { margin-top: clamp(12px, 4dvh, 24px); }
+  }
 </style>
 </head>
 <body>

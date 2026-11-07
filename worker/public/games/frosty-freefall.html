@@ -37,6 +37,46 @@
   #start-overlay h2 { font-size: clamp(38px, 9vw, 66px); color: #fff; text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(127,212,255,0.7); }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay button { margin-top: 22px; padding: 15px 50px; box-shadow: 0 12px 44px rgba(0,0,0,0.5); }
+  /* ── Responsive pass: reserve only what is shown; controls beside the canvas in landscape ── */
+  :root { --rsv: 56px; }
+  body.touch { --rsv: 150px; }
+  #hud { font-size: clamp(12px, min(3vw, 2.6dvh), 20px); }
+  canvas { width: min(95vw - 24px, calc((100dvh - var(--rsv)) * (360 / 580))); }
+  #hint { font-size: clamp(11px, 3vw, 13px); }
+  #start-overlay .panel { width: min(100%, clamp(520px, 64dvh, 780px)); max-width: none; }
+  #start-logo { width: min(82%, 50dvh); max-height: 34dvh; }
+  .overlay p { font-size: clamp(13px, min(3vw, 2.3dvh), 22px); }
+  .overlay h2 { font-size: clamp(32px, min(9vw, 8dvh), 80px); }
+  .overlay button { font-size: clamp(18px, min(4.5vw, 3dvh), 30px); }
+  /* Touch landscape (tablet / phone sideways): ◀ ▶ sit in the bottom corners, canvas takes the height. */
+  @media (orientation: landscape) {
+    body.touch { --rsv: 56px; }
+    body.touch canvas { width: min(100vw - 300px, calc((100dvh - var(--rsv)) * (360 / 580))); }
+    body.touch #touch-controls { position: fixed; inset: 0; pointer-events: none; z-index: 5; width: auto; }
+    body.touch #touch-controls .btn { position: absolute; pointer-events: auto; bottom: calc(20px + env(safe-area-inset-bottom));
+      width: clamp(72px, 10vw, 110px); height: clamp(72px, 10vw, 110px); max-width: none; font-size: 28px; }
+    body.touch #btn-left { left: 24px; }
+    body.touch #btn-right { right: 24px; }
+    body.touch #hint { display: none; }
+  }
+  /* Short landscape (phone sideways, TV): HUD in a side column, canvas uses the full height. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    #wrap { display: grid; grid-template-columns: 1fr auto 1fr; column-gap: 18px; align-items: center; padding: 6px 12px; }
+    #hud { grid-area: 1 / 1; justify-self: end; align-self: start; flex-direction: column; align-items: flex-end; gap: 4px;
+      font-size: clamp(12px, 4.4dvh, 20px); padding-top: 4px; }
+    canvas, body.touch canvas { grid-area: 1 / 2; width: min(100vw - 300px, calc((100dvh - 14px) * (360 / 580))); }
+    .overlay { padding: 12px; }
+    #start-overlay .panel { display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto auto auto 1fr; column-gap: 22px;
+      align-items: center; width: min(820px, 100%); padding: 16px 22px; text-align: left; }
+    #start-overlay .panel > p:first-of-type { grid-area: 2 / 2; }
+    #start-overlay .panel > p:last-of-type { grid-area: 3 / 2; }
+    #start-overlay .panel > button { grid-area: 4 / 2; }
+    #start-logo { grid-row: 1 / 6; width: auto; max-width: 34vw; height: calc(100dvh - 64px); max-height: 300px; margin: 0; }
+    #start-overlay p { margin: 0 0 8px; font-size: clamp(12px, 4dvh, 17px); line-height: 1.45; }
+    #start-overlay button { justify-self: start; margin-top: 4px; padding: 12px 40px; }
+    .overlay h2 { font-size: clamp(28px, 12dvh, 56px); margin-bottom: 4px; }
+    .overlay button { margin-top: 10px; }
+  }
 </style>
 </head>
 <body>

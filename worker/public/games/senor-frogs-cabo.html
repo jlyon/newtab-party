@@ -55,7 +55,7 @@
     width: min(95vw, calc(100dvh - 90px)); height: auto; display: block; border-radius: 8px;
     background: #0c0016; }
   /* phones: >= 24px non-game margin at the screen edges so swipes don't start the browser back gesture */
-  body.touch canvas { width: min(100vw - 48px, calc(100dvh - 240px)); }
+  body.touch canvas { width: min(100vw - 48px, calc(100dvh - 275px)); }
   #touch-hint { display: none; font-size: clamp(10px, 2.8vw, 13px); opacity: 0.75; text-align: center; padding: 0 8px; }
   body.touch #touch-hint { display: block; }
   @media (min-width: 700px) {
@@ -63,7 +63,6 @@
     body.touch #dpad { grid-template-columns: repeat(3, 76px); grid-template-rows: repeat(2, 64px); }
     body.touch .dp { width: 76px; height: 64px; font-size: 26px; }
   }
-  @media (orientation: landscape) and (max-height: 500px) { .marquee, #touch-hint { display: none !important; } body.touch canvas { width: min(100vw - 48px, calc(100dvh - 170px)); } }
   #dpad { display: none; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 6px;
     padding-bottom: env(safe-area-inset-bottom); }
   body.touch #dpad { display: grid; }
@@ -80,7 +79,7 @@
     background: rgba(12,0,22,0.9); flex-direction: column; text-align: center; padding: 20px; z-index: 10; }
   #start-card { max-width: 440px; }
   #start-card h2 { color: var(--primary); font-size: clamp(22px,6vw,34px); margin: 0 0 14px; letter-spacing: 1px; text-shadow: 2px 2px 0 var(--secondary); }
-  #start-card p { color: var(--accent); font-size: 13px; line-height: 1.6; margin: 0 0 26px; font-style: italic; }
+  #start-card p { color: var(--accent); font-size: clamp(13px, 1.6vw, 16px); line-height: 1.6; margin: 0 0 26px; font-style: italic; }
   #start-btn { padding: 12px 36px; font-size: 16px; font-weight: 700; letter-spacing: 2px;
     background: var(--primary); color: var(--bg); border: none; cursor: pointer; border-radius: 24px; font-family: inherit; transition: opacity 0.15s; }
   #start-btn:hover { opacity: 0.85; }
@@ -133,10 +132,47 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s;
   }
   #start-btn:hover { opacity: 1; transform: translateY(-2px) scale(1.04); box-shadow: 0 16px 54px rgba(255,31,142,0.55); }
+
+  /* ── Responsive layout ──
+     Portrait: title, HUD, floor, hint, D-pad stacked (#side only groups them for landscape).
+     Landscape: title + HUD + hint + D-pad in a column on the left, floor at full height beside it. */
+  #side { display: contents; }
+  .marquee { order: -2; } #hud { order: -1; } #touch-hint { order: 1; } #dpad { order: 2; }
+  canvas { flex: none; aspect-ratio: 1; }
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { flex-direction: row; gap: clamp(14px, 3vw, 40px); padding: 8px 24px; }
+    #side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(6px, 2dvh, 16px); width: clamp(180px, 24vw, 340px); text-align: center; }
+    .marquee { gap: 6px; }
+    .bulbs { display: none; }
+    h1 { font-size: clamp(16px, min(2.4vw, 5dvh), 34px); line-height: 1.15; }
+    #hud { flex-direction: column; align-items: center; gap: clamp(2px, 0.8dvh, 8px); border-radius: 14px; font-size: clamp(12px, 3dvh, 20px); padding: 6px 14px; }
+    #touch-hint { font-size: clamp(11px, 2.6dvh, 14px); padding: 0; }
+    #dpad { padding: 0; }
+    canvas, body.touch canvas { width: min(100dvh - 16px, 100vw - 48px - clamp(180px, 24vw, 340px) - clamp(14px, 3vw, 40px)); }
+    body.touch #side { width: max(244px, clamp(180px, 24vw, 340px)); }
+    body.touch canvas { width: min(100dvh - 16px, 100vw - 48px - max(244px, clamp(180px, 24vw, 340px)) - clamp(14px, 3vw, 40px)); }
+  }
+  @media (min-aspect-ratio: 5/4) and (max-height: 460px) {
+    h1 { font-size: 15px; letter-spacing: 1px; }
+    #hud { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: 12px; }
+    #touch-hint { font-size: 11px; }
+    #start-card { display: flex; align-items: center; gap: 20px; max-width: 760px; text-align: left; padding: 14px 20px !important; }
+    #start-card img { width: 36% !important; max-height: 70dvh !important; margin: 0 !important; flex: none; }
+    #start-card .start-copy { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    #start-card p { margin-bottom: 12px; font-size: 13px; }
+    #overlay h2 { font-size: 30px; }
+    #overlay button { margin-top: 10px; }
+  }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    #start-card { max-width: 620px; }
+    #start-card p { font-size: 17px; }
+    #overlay p { font-size: 18px; max-width: 520px; }
+  }
 </style>
 </head>
 <body>
 <div id="wrap">
+  <div id="side">
   <div class="marquee">
     <span class="bulbs">🟢🔴🟡</span>
     <h1>Señor Frog's: Conga Chaos</h1>
@@ -147,7 +183,6 @@
     <span id="score">Conga line: 0</span>
     <span id="hi">Best: 0</span>
   </div>
-  <canvas id="game" width="440" height="440"></canvas>
   <div id="touch-hint">Swipe to turn · tap the left / right half to turn that way · or use the arrows</div>
   <div id="dpad">
     <button class="dp" id="dp-up">▲</button>
@@ -155,12 +190,16 @@
     <button class="dp" id="dp-down">▼</button>
     <button class="dp" id="dp-right">▶</button>
   </div>
+  </div>
+  <canvas id="game" width="440" height="440"></canvas>
 </div>
 <div id="start-overlay">
   <div id="start-card">
     <img src="logos/senor-frogs-cabo.png" alt="Señor Frog's: Conga Chaos" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+    <div class="start-copy">
     <p id="controls-hint">Lead the conga line · keyboard: arrows / WASD · touch: swipe, tap the left / right half of the floor to turn, or use the arrow buttons · recruit thirsty tourists · dodge the walls, your own line, AND the spills, cactus &amp; tables 💦🌵🪑 · more obstacles pile up the bigger you get</p>
     <button id="start-btn">▶ Start the conga</button>
+    </div>
   </div>
 </div>
 <div id="overlay">
@@ -202,6 +241,7 @@
   }
   fitCanvas();
   addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   window.addEventListener('touchstart', () => { document.body.classList.add('touch'); setTimeout(fitCanvas, 50); }, { once: true, passive: true });
   // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
   window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });

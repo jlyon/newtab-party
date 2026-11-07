@@ -93,6 +93,32 @@
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
   #start-btn:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.06); background: var(--primary, #FF7AAE); }
+
+  /* ── Responsive sizing ─────────────────────────────────────────── */
+  #start-logo { display: block; width: min(82%, 460px); max-height: 40dvh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  #start-overlay p { font-size: clamp(13px, min(2.1vw, 3.6dvh), 22px); max-width: min(92vw, 36ch); }
+  #start-overlay #start-btn { font-size: clamp(16px, min(2.2vw, 4.4dvh), 28px); margin-top: clamp(4px, 2dvh, 24px); padding: 0.6em 2.2em; }
+  #overlay h2 { font-size: clamp(26px, min(7vw, 9dvh), 60px); }
+  #overlay p { font-size: clamp(13px, min(2vw, 3.6dvh), 22px); max-width: min(92vw, 40ch); }
+  #overlay #overScore { font-size: clamp(18px, min(4.5vw, 6dvh), 36px); }
+  #overlay button { font-size: clamp(15px, min(2vw, 4dvh), 24px); margin-top: clamp(10px, 3dvh, 24px); }
+  /* Wide screens: title, HUD and hint in a side column, the basket fills the height. */
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { display: grid; grid-template-columns: auto auto; grid-template-rows: 1fr auto auto auto 1fr;
+      justify-content: center; align-items: center; column-gap: clamp(14px, 3vw, 48px); row-gap: clamp(6px, 2dvh, 18px); padding: 10px 12px; }
+    h1 { grid-column: 1; grid-row: 2; font-size: clamp(18px, min(2.6vw, 6dvh), 44px); text-align: center; }
+    #hud { grid-column: 1; grid-row: 3; flex-direction: column; align-items: center; font-size: clamp(12px, min(1.6vw, 3.6dvh), 22px); gap: clamp(2px, 1dvh, 10px); }
+    #hint { grid-column: 1; grid-row: 4; max-width: 16em; font-size: clamp(11px, min(1.2vw, 2.8dvh), 17px); }
+    #board { grid-column: 2; grid-row: 1 / -1; max-height: calc(100dvh - 20px); max-width: calc(100vw - 24px - var(--side, 200px)); }
+  }
+  /* Short landscape (phone landscape, TV): logo left, copy + button right. */
+  @media (max-height: 520px) and (orientation: landscape) {
+    #start-overlay { display: grid; grid-template-columns: minmax(0, min(38vw, 72dvh)) minmax(0, 30em); grid-auto-rows: min-content;
+      align-content: center; justify-content: center; column-gap: clamp(16px, 4vw, 48px); text-align: left; }
+    #start-logo { grid-row: 1 / span 2; align-self: center; width: 100%; max-height: 84dvh; margin: 0; }
+    #start-overlay p { max-width: none; margin-bottom: 8px; }
+    #start-overlay #start-btn { justify-self: start; }
+  }
 </style>
 </head>
 <body>
@@ -109,7 +135,7 @@
   <div id="hint">Tap to tiptoe · Long-press (or right-click) to mark a 🐰<span id="hint-pan"> · Drag to pan the basket</span></div>
 </div>
 <div id="start-overlay">
-  <img src="logos/tippity-toes.png" alt="Tippity Toes" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <img id="start-logo" src="logos/tippity-toes.png" alt="Tippity Toes">
   <p>Tap / click a tile to tiptoe across the basket. Long-press (or right-click) to mark a 🐰 over a suspected egg. Clear every safe tile without cracking one of the 40 eggs.</p>
   <button id="start-btn">🐣 Start hopping</button>
 </div>
@@ -275,11 +301,20 @@
   const GAP = 3;
 
   function cellSize() {
-    const reserved = wrapEl.querySelector('h1').offsetHeight + document.getElementById('hud').offsetHeight
-      + document.getElementById('hint').offsetHeight + 8 * 3 + 24;
-    const availW = Math.min(window.innerWidth - 16, 760);
-    const availH = window.innerHeight - reserved;
-    let sz = Math.min(40, Math.floor(availW / COLS) - GAP, Math.floor(availH / ROWS) - GAP);
+    const h1 = wrapEl.querySelector('h1'), hud = document.getElementById('hud'), hint = document.getElementById('hint');
+    let availW, availH;
+    if (getComputedStyle(wrapEl).display === 'grid') {
+      // Side-column layout: the board gets the full height and the width left of the side column.
+      const side = Math.max(h1.offsetWidth, hud.offsetWidth, hint.offsetWidth);
+      const colGap = parseFloat(getComputedStyle(wrapEl).columnGap) || 16;
+      wrapEl.style.setProperty('--side', Math.ceil(side + colGap) + 'px');
+      availW = window.innerWidth - 24 - side - colGap - 8;
+      availH = window.innerHeight - 24;
+    } else {
+      availW = Math.min(window.innerWidth - 16, 1100);
+      availH = window.innerHeight - (h1.offsetHeight + hud.offsetHeight + hint.offsetHeight + 8 * 3 + 24);
+    }
+    let sz = Math.min(56, Math.floor(availW / COLS) - GAP, Math.floor(availH / ROWS) - GAP);
     // Finger-sized tiles on touch devices; the board pans inside #board when it does not fit.
     if (document.body.classList.contains('touch')) sz = Math.max(sz, 30);
     return Math.max(14, sz);

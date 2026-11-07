@@ -14,6 +14,7 @@
   canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (440 / 440))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
   #hint { display: none; font-size: 13px; opacity: .75; }
   body.touch #hint { display: block; }
+
   .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
   .overlay.show { display: flex; }
   .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
@@ -28,6 +29,41 @@
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); background: rgba(10,8,10,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 18px; }
   #start-overlay h2 { text-shadow: 0 3px 30px rgba(0,0,0,0.85); }
   #start-logo { display: none; width: min(82%, 400px); max-height: 40vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  /* ── Responsive layout ──
+     Portrait: HUD, canvas, touch controls stacked; --reserved is the height the non-canvas rows need.
+     Landscape: canvas at full height in the middle, HUD to its left, touch pads in the bottom corners. */
+  #wrap { --reserved: 48px; padding: 8px 12px env(safe-area-inset-bottom); }
+  body.touch #wrap { --reserved: 72px; }
+  canvas { flex: none; aspect-ratio: 1; width: min(100vw - 24px, (100dvh - var(--reserved)) * 1); }
+  .pad { display: flex; gap: 10px; flex: 1; justify-content: center; max-width: 240px; }
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "hud cv hint" "padl cv padr"; gap: 8px clamp(12px, 3vw, 40px); padding: 8px 24px; align-items: center; }
+    canvas { grid-area: cv; width: min((100dvh - 16px) * 1, 100vw - 340px); }
+    #hud { grid-area: hud; justify-self: end; flex-direction: column; align-items: flex-end; gap: clamp(2px, 1dvh, 10px); text-align: right; font-size: clamp(13px, 3.4dvh, 24px); }
+    #hud span:empty { display: none; }
+    #hint { grid-area: hint; justify-self: start; max-width: 20ch; font-size: clamp(12px, 3dvh, 16px); line-height: 1.35; }
+    body.touch #touch-controls { display: contents; }
+    .pad { flex: none; max-width: none; }
+    .pad-l { grid-area: padl; justify-self: end; }
+    .pad-r { grid-area: padr; justify-self: start; }
+    .btn { flex: none; width: clamp(60px, 7vw, 84px); max-width: none; height: clamp(60px, 17dvh, 84px); margin: 0; }
+  }
+  /* Short landscape (phone on its side): logo on the left, copy + button on the right; compact game-over. */
+  .start-copy { display: contents; }
+  @media (max-height: 460px) and (orientation: landscape) {
+    .overlay { padding: 10px 24px; }
+    .overlay h2, #start-overlay h2 { font-size: 34px; }
+    .overlay p, #start-overlay p { font-size: 13px; line-height: 1.4; margin: 4px 0; }
+    .overlay button, #start-overlay button { margin-top: 10px; padding: 11px 36px; }
+    #start-overlay { flex-direction: row; gap: 24px; }
+    #start-overlay > img, #start-overlay > h2 { flex: 0 1 34%; width: 34% !important; max-height: 72dvh !important; margin: 0 !important; }
+    .start-copy { display: flex; flex-direction: column; align-items: center; flex: 0 1 52ch; min-width: 0; }
+    .start-copy p { padding: 10px 14px !important; }
+  }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    .overlay p, #start-overlay p { font-size: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -39,8 +75,10 @@
 <div id="start-overlay" class="overlay show">
   <img id="start-logo" src="logos/red-light-green-fight.png" alt="Red Light Green Fight" onload="this.style.display='block';this.nextElementSibling.style.display='none'">
   <h2><span class="r">Red Light</span><br><span class="g">Green</span> Fight</h2>
+  <div class="start-copy">
   <p>You run the stoplights. Click or tap an intersection (or press 1&ndash;4) to flip which way gets green. Every car that makes it through scores a point. One crash and it's over. Leave people waiting too long and the rage meter blows, which also ends it. More roads open as you go.</p>
   <button id="start-btn">Play</button>
+  </div>
 </div>
 <div id="over-overlay" class="overlay">
   <h2 id="over-title">Game over</h2>
@@ -69,6 +107,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
   fitCanvas(); addEventListener('resize', fitCanvas);
+  try { new ResizeObserver(fitCanvas).observe(canvas); } catch (e) {}
   const toLogical = (cx, cy) => { const r = canvas.getBoundingClientRect(); return { x: (cx - r.left) * (W / r.width), y: (cy - r.top) * (H / r.height) }; };
 
   addEventListener('keydown', e => {

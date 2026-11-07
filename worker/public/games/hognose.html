@@ -40,6 +40,22 @@
   #dp-left  { grid-column: 1; grid-row: 2; }
   #dp-down  { grid-column: 2; grid-row: 2; }
   #dp-right { grid-column: 3; grid-row: 2; }
+  /* Portrait: title, HUD, board, D-pad, hint stacked (#side only groups them for landscape). */
+  #side { display: contents; }
+  h1 { order: -2; } #hud { order: -1; } #dpad { order: 1; } #touch-hint { order: 2; }
+  /* Landscape: title + HUD + hint on the left, board in the middle, D-pad on the right. */
+  @media (min-aspect-ratio: 5/4) {
+    #wrap { flex-direction: row; gap: clamp(14px, 3vw, 40px); padding: 8px 24px; }
+    #side { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: clamp(6px, 2dvh, 16px); width: clamp(140px, 20vw, 280px); }
+    h1 { font-size: clamp(16px, min(3vw, 5dvh), 34px); }
+    #hud { flex-direction: column; align-items: flex-start; gap: clamp(2px, 1dvh, 8px); font-size: clamp(12px, 3dvh, 20px); }
+    #touch-hint { order: 0; text-align: left; font-size: clamp(11px, 2.6dvh, 14px); max-width: none; }
+    canvas, body.touch canvas { flex: none; width: min(100dvh - 16px, 100vw - 48px - clamp(140px, 20vw, 280px) - clamp(14px, 3vw, 40px)); }
+    body.touch #side { width: max(204px, clamp(140px, 20vw, 280px)); }
+    body.touch canvas { width: min(100dvh - 16px, 100vw - 48px - max(204px, clamp(140px, 20vw, 280px)) - clamp(14px, 3vw, 40px)); }
+    #dpad { grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 60px); padding: 0; }
+    .dp { width: 64px; height: 60px; }
+  }
   .overlay { position: fixed; inset: 0; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.8); flex-direction: column; text-align: center; padding: 20px; }
   #overlay { display: none; }
@@ -75,7 +91,7 @@
   }
   #start-overlay p:last-of-type {
     color: rgba(255,255,255,0.55);
-    font-size: clamp(11px, 3vw, 13px); letter-spacing: 0.5px; margin-top: 8px;
+    font-size: clamp(11px, 3vw, 14px); letter-spacing: 0.5px; margin-top: 8px;
   }
   #start-overlay button {
     margin-top: 26px; padding: 15px 52px;
@@ -87,25 +103,32 @@
     box-shadow: 0 12px 44px rgba(0,0,0,0.55);
     transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
   }
+  @media (min-width: 1200px) and (min-height: 760px) {
+    #start-overlay p { font-size: 19px; max-width: 40ch; }
+    #start-overlay p:last-of-type { font-size: 15px; }
+    #start-overlay img { width: min(80%, 460px) !important; max-height: 44dvh !important; }
+  }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); box-shadow: 0 16px 54px rgba(0,0,0,0.6); }
 </style>
 </head>
 <body>
 <div id="wrap">
+  <div id="side">
   <h1>HOGNOSE</h1>
   <div id="hud">
     <span>Snake: Hognose</span>
     <span id="score">Score: 0</span>
     <span id="hi">Best: 0</span>
   </div>
-  <canvas id="game" width="440" height="440"></canvas>
+  <div id="touch-hint">Swipe, tap beside the head, or use the D-pad to steer</div>
   <div id="dpad">
     <button class="dp" id="dp-up">▲</button>
     <button class="dp" id="dp-left">◀</button>
     <button class="dp" id="dp-down">▼</button>
     <button class="dp" id="dp-right">▶</button>
   </div>
-  <div id="touch-hint">Swipe, tap beside the head, or use the D-pad to steer</div>
+  </div>
+  <canvas id="game" width="440" height="440"></canvas>
 </div>
 <div id="start-overlay" class="overlay">
   <img src="logos/hognose.png" alt="Hognose" style="display:block;width:min(80%,380px);max-height:40vh;margin:0 auto 10px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
