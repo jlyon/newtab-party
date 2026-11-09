@@ -68,6 +68,17 @@
     #over-overlay p { margin: 6px auto; }
     #over-overlay button { margin-top: 8px; }
   }
+  /* ── Logo as the title (the alt text stands in if the image fails to load) ── */
+  #start-overlay h2.logo-title { margin: 0 0 10px; }
+  #start-overlay .start-logo { display: block; width: auto; height: auto; max-width: min(100%, 82vw, 400px); max-height: min(34dvh, 400px); margin: 0 auto; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (orientation: landscape) and (max-height: 560px) {
+    #start-overlay h2.logo-title { margin: 0 0 4px; }
+    #start-overlay .start-logo { max-height: 26dvh; }
+  }
+  @media (orientation: landscape) and (max-height: 460px) {
+    #start-overlay h2.logo-title { margin: 0; }
+    #start-overlay .start-logo { max-height: min(60dvh, 260px); }
+  }
 </style>
 </head>
 <body>
@@ -85,7 +96,7 @@
 <div id="start-overlay" class="overlay show">
   <div class="panel">
     <div class="emoji">🌽🍬🦷</div>
-    <h2>Maze Muncher:<br>Sugar Rush</h2>
+    <h2 class="logo-title"><img class="start-logo" src="logos/maze-muncher-sugar-rush.png" alt="Maze Muncher: Sugar Rush"></h2>
     <p>You hoarded ALL the candy. The dentists want it back. You're lost in a midnight corn maze: grab every sweet before they catch you. Snag a 🍫 king-size bar for a Sugar Rush and bonk them back to the office.</p>
     <p class="how">Arrows / WASD to walk and turn · Touch: hold ▲▼◀▶ or drag the maze. Listen for the drill.</p>
     <button id="start-btn">Play</button>

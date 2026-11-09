@@ -49,16 +49,33 @@
     #over-overlay button { margin-top: 8px; }
   }
   /* ── Landing screen — gameplay background + themed title ── */
-  #start-overlay {
+  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
+  #start-overlay { background: #0b0b10; }
+  #start-overlay::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
     background:
-      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)),
-      url('backgrounds/the-jen-10.jpg') center/cover no-repeat;
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.62)), url('backgrounds/the-jen-10.jpg') center/cover no-repeat;
+    filter: blur(6px) saturate(0.75) brightness(0.8);
   }
   #start-overlay h2 { font-family: 'Bungee', system-ui, sans-serif; font-size: clamp(36px, 8vw, 72px); line-height: 0.98; color: #fff; text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(255,79,163,0.7); }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); border-radius: 18px; padding: 24px 28px; max-width: min(640px, 92vw); }
   #start-overlay button { font-family: 'Bungee', system-ui, sans-serif; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
   #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* ── Logo as the title (the alt text stands in if the image fails to load) ── */
+  #start-overlay h2.logo-title { margin: 0 0 10px; }
+  #start-overlay .start-logo { display: block; width: auto; height: auto; max-width: min(100%, 82vw, 400px); max-height: min(34dvh, 400px); margin: 0 auto; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (orientation: portrait) and (max-height: 620px) {
+    #start-overlay .start-logo { max-height: 22dvh; }
+  }
+  @media (orientation: landscape) and (max-height: 560px) {
+    #start-overlay h2.logo-title { margin: 0 0 6px; }
+    #start-overlay .start-logo { max-height: 22dvh; }
+  }
+  @media (orientation: landscape) and (max-height: 460px) {
+    #start-overlay h2.logo-title { margin: 0; }
+    #start-overlay .start-logo { max-height: min(72dvh, 300px); }
+  }
 </style>
 </head>
 <body>
@@ -72,7 +89,7 @@
   <div id="touch-controls"></div>
 </div>
 <div id="start-overlay" class="overlay show">
-  <h2>The Jen 10</h2>
+  <h2 class="logo-title"><img class="start-logo" src="logos/the-jen-10.png" alt="The Jen 10"></h2>
   <div class="panel"><p>You are Jen. Jen does not shoot. Jen drops dimes to her cutting coworkers.</p>
   <p>Sidekick guards wherever Jen is looking. Look one way, pass the other. Three turnovers and you're benched.</p>
   <p>Sell it: look at a real coworker, not the wall. Stare anywhere too long and Sidekick gets suspicious and stops buying it.</p>

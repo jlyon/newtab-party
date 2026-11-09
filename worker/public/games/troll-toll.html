@@ -28,10 +28,13 @@
   #start-overlay .cast { font-size: clamp(28px, 8vw, 40px); letter-spacing: 6px; margin: 4px 0; }
   #start-overlay .hint { color: var(--secondary); }
   /* ── Landing screen — gameplay background + themed title ── */
-  #start-overlay {
+  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
+  #start-overlay { background: #0b0b10; }
+  #start-overlay::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
     background:
-      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)),
-      url('backgrounds/troll-toll.jpg') center/cover no-repeat;
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/troll-toll.jpg') center/cover no-repeat;
+    filter: blur(6px) saturate(0.75) brightness(0.8);
   }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay .hint { color: var(--secondary); }
@@ -60,6 +63,13 @@
     #btn-up { grid-area: up; } #btn-left { grid-area: left; } #btn-right { grid-area: right; } #btn-down { grid-area: down; }
     body.touch #btn-fire { position: fixed; left: max(36px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); width: 84px; height: 84px; border-radius: 50%; font-size: 30px; }
   }
+  /* ── Logo as the title (the alt text stands in if the image fails to load) ── */
+  #start-overlay h2.logo-title { margin: 0 0 10px; }
+  #start-overlay .start-logo { display: block; width: auto; height: auto; max-width: min(100%, 82vw, 400px); max-height: min(34dvh, 400px); margin: 0 auto; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  @media (orientation: landscape) and (max-height: 560px) {
+    #start-overlay h2.logo-title { margin: 0; }
+    #start-overlay .start-logo { max-height: min(50dvh, 300px); }
+  }
 </style>
 </head>
 <body>
@@ -75,7 +85,7 @@
   </div>
 </div>
 <div id="start-overlay" class="overlay show">
-  <h2>Troll Toll</h2>
+  <h2 class="logo-title"><img class="start-logo" src="logos/troll-toll.png" alt="Troll Toll"></h2>
   <div class="cast">🐉🐘🐶🐱</div>
   <p>The bridge is gone. Hop your crew across the river on logs and nutria (the divers sink, careful) and get each one into a den. Touch the troll and it collects its toll. The dragon can torch it: toll-free crossings score double.</p>
   <p class="hint">Arrows / WASD or swipe to hop · Space / 🔥 to breathe fire (dragon only)</p>

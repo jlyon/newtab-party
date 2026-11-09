@@ -17,6 +17,7 @@ for (const id of ids) {
   if (/100vh/.test(s)) issues.push('uses 100vh (prefer 100dvh / 100%)');
   if (/document\.addEventListener\('touchstart',\s*e\s*=>\s*\{\s*e\.preventDefault/.test(s)) issues.push('document-level touchstart preventDefault (kills button taps)');
   if (/#touch-controls|touch-controls|mobile-controls|class="btn|id="btn-/.test(s) && !/body\.touch/.test(s)) issues.push('on-screen buttons without body.touch gating');
+  if (fs.existsSync(path.join(DIR, 'logos', id + '.png')) && !s.includes(`logos/${id}.png`)) issues.push(`logos/${id}.png exists but the start screen doesn't show it`);
   console.log(`${issues.length ? '✗' : '✓'} ${id}`); for (const i of issues) console.log('    ' + i);
   if (issues.length) bad++;
 }

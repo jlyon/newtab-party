@@ -30,10 +30,13 @@
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 
   /* ── Landing screen — gameplay background + themed title ── */
-  #start-overlay {
+  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
+  #start-overlay { background: #14213d; }
+  #start-overlay::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
     background:
-      radial-gradient(84% 68% at 50% 45%, rgba(10,18,36,0.5), rgba(10,18,36,0.4) 72%, rgba(10,18,36,0.72)),
-      url('backgrounds/wild-cats.jpg') center/cover no-repeat, #14213d;
+      radial-gradient(84% 68% at 50% 45%, rgba(10,18,36,0.5), rgba(10,18,36,0.4) 72%, rgba(10,18,36,0.72)), url('backgrounds/wild-cats.jpg') center/cover no-repeat;
+    filter: blur(6px) saturate(0.75) brightness(0.8);
   }
   #start-overlay .panel { background: rgba(14,24,46,0.66); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 5vw, 32px); max-width: min(640px, 100%); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
   #start-logo { display: block; width: min(82%, 400px); max-height: 32vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }

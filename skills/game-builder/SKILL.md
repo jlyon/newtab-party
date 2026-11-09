@@ -385,6 +385,10 @@ Rules that keep it from looking broken:
 - **Legibility first.** If the start screen is text-heavy (long description) or the screenshot is
   bright/busy, wrap the content in a glassy panel (`background: rgba(10,8,10,0.6); backdrop-filter:
   blur(7px); border-radius: 18px; padding: 32px; max-width: 560px`) instead of relying on the scrim.
+- **Busy screenshot? Push it back.** If the scene still competes with the title (a crowd, a bright
+  wall of sprites, baked-in HUD text), move the scrim + `url()` layers off `#start-overlay` onto
+  `#start-overlay::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  filter: blur(6px) saturate(0.75) brightness(0.8); }` and give `#start-overlay` a plain dark background.
 - **Don't let the title overflow.** Keep `font-size` clamps moderate (roughly `max 60–80px`, less for
   wide/condensed fonts) so the title never clips horizontally or spills past the container — especially
   inside a card or a small artbox. Reduce `letter-spacing` for wide script/serif fonts.
