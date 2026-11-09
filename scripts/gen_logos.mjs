@@ -113,7 +113,7 @@ function buildPrompt(game, hint) {
   if (scene && !scene.endsWith('.')) scene += '.';
   // Nano Banana fumbles long or invented words; spell them out letter by letter.
   let spelled = '';
-  const words = name.replace(/'/g, '').split(/\s+/).filter(w => /^[A-Za-z]+$/.test(w));
+  const words = name.replace(/'/g, '').split(/\s+/).filter(w => /^\p{L}+$/u.test(w));   // \p{L}: accented words (Déjà) need spelling out most
   const odd = words.filter(w => w.length >= 5 || !COMMON_WORDS.has(w.toLowerCase()));
   if (odd.length) spelled = ' (spelled ' + odd.slice(0, 4).map(w => `${w}: ${w.toUpperCase().split('').join('-')}`).join(', ') + ')';
   return PROMPT.replaceAll('{name}', name).replace('{emblem}', emblem).replace('{scene}', scene).replace('{spelled}', spelled);
