@@ -1,7 +1,8 @@
-import type { Env, Game, GamesData, ScheduleEra } from './types';
+import type { Env, Game, GamesData, GameStats, ScheduleEra } from './types';
 import * as db from './db';
 import { isNameAllowed, reporterId } from './moderation';
-import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, renderRetiredGames, renderPrivacy, esc } from './render';
+import { renderArcade, renderLeaderboard, renderReplay, renderGamesCalendar, renderRetiredGames, renderPrivacy, esc, GAME_SORTS } from './render';
+import type { GameSort, RankedGame } from './render';
 import gamesData from '../games.json';
 
 // Day 0 = 2026-05-01 UTC — must match the extension's DAY_EPOCH exactly.
@@ -56,6 +57,49 @@ function retiredEntries(today: string): { game: Game; lastAired: string | null }
   }
   // Most recently retired first.
   return out.sort((a, b) => (b.lastAired ?? '').localeCompare(a.lastAired ?? ''));
+}
+
+// Every game that has aired (or has plays on record), with its first/last airing and
+// all-time totals, ordered for one of the /games sort views. Unaired games stay hidden.
+function rankedGames(today: string, sort: GameSort, stats: GameStats[]): RankedGame[] {
+  const games = getGames();
+  const DAY = 86400000;
+  const eras = [...(DATA.scheduleHistory ?? []).map((e) => e.scheduleEpoch), DATA.scheduleEpoch].filter(Boolean) as string[];
+  const start = eras.sort()[0] ?? today;
+  const aired = new Map<string, { first: string; last: string }>();
+  for (let ms = Date.parse(start + 'T00:00:00Z'), end = Date.parse(today + 'T00:00:00Z'); ms <= end; ms += DAY) {
+    const date = new Date(ms).toISOString().slice(0, 10);
+    const g = getDailyGame(games, date);
+    if (!g) continue;
+    const a = aired.get(g.id);
+    if (a) a.last = date; else aired.set(g.id, { first: date, last: date });
+  }
+  const byId = new Map(stats.map((r) => [r.game_id, r]));
+  const out: RankedGame[] = [];
+  for (const game of games) {
+    const a = aired.get(game.id), st = byId.get(game.id);
+    if (!a && !st) continue;
+    const debut = [a?.first, st?.first_played].filter(Boolean).sort()[0] as string;
+    out.push({
+      game,
+      plays: st?.plays ?? 0,
+      boards: st?.boards ?? 0,
+      named: st?.named ?? 0,
+      debut,
+      lastAired: a?.last ?? null,
+      isToday: a?.last === today,
+      retired: isRetired(game.id, today),
+    });
+  }
+  const byName = (x: RankedGame, y: RankedGame) => x.game.name.localeCompare(y.game.name);
+  const cmp: Record<GameSort, (x: RankedGame, y: RankedGame) => number> = {
+    plays: (x, y) => y.plays - x.plays || y.named - x.named || byName(x, y),
+    boards: (x, y) => y.boards - x.boards || y.plays - x.plays || byName(x, y),
+    named: (x, y) => y.named - x.named || y.plays - x.plays || byName(x, y),
+    newest: (x, y) => y.debut.localeCompare(x.debut) || byName(x, y),
+    az: byName,
+  };
+  return out.sort(cmp[sort]);
 }
 
 function isRetired(id: string, dateStr: string): boolean {
@@ -286,6 +330,13 @@ export default {
     if (pathname === '/games' && method === 'GET') {
       const games = getGames();
       const today = todayUTC();
+      const retiredCount = games.filter((g) => isRetired(g.id, today)).length;
+      // ?sort=plays|boards|named|newest|az swaps the calendar for a ranked grid.
+      const sortParam = url.searchParams.get('sort') as GameSort | null;
+      if (sortParam && (GAME_SORTS as readonly string[]).includes(sortParam)) {
+        const stats = await db.getGameStats(env.DB);
+        return html(renderGamesCalendar({ today, cells: [], retiredCount, sort: sortParam, ranked: rankedGames(today, sortParam, stats) }));
+      }
       const DAY = 86400000;
       const L = eraFor(today)?.schedule.length || games.length || 1;
       const span = Math.max(L, 28); // cover at least one full rotation so every game appears
@@ -303,7 +354,6 @@ export default {
         const date = new Date(ms).toISOString().slice(0, 10);
         cells.push({ date, game: getDailyGame(games, date), isToday: date === today, isFuture: date > today });
       }
-      const retiredCount = games.filter((g) => isRetired(g.id, today)).length;
       return html(renderGamesCalendar({ today, cells, retiredCount }));
     }
 

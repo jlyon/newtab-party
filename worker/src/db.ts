@@ -1,4 +1,4 @@
-import type { Play, DailyEntry } from './types';
+import type { Play, DailyEntry, GameStats } from './types';
 import { isNameAllowed, normalizeName, REPORT_HIDE_THRESHOLD } from './moderation';
 
 // Names reported by REPORT_HIDE_THRESHOLD different people, lowercased. A missing
@@ -145,6 +145,24 @@ export async function deletePlay(
     .bind(id)
     .run();
   return (result.meta.changes as number) > 0;
+}
+
+// All-time totals per game for the /games sort views. Only the aired day's plays are
+// recorded, so distinct play days = days the game had a leaderboard.
+export async function getGameStats(db: D1Database): Promise<GameStats[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT
+        game_id,
+        COUNT(*)                         AS plays,
+        COUNT(DISTINCT date(played_at))  AS boards,
+        COUNT(player_name)               AS named,
+        MIN(date(played_at))             AS first_played
+      FROM plays
+      GROUP BY game_id`,
+    )
+    .all<GameStats>();
+  return results;
 }
 
 export async function getRecentPlays(

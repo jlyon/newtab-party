@@ -34,6 +34,15 @@ export interface Play {
   played_at: string;
 }
 
+// All-time totals for one game, for sorting the /games library.
+export interface GameStats {
+  game_id: string;
+  plays: number;          // every recorded play
+  boards: number;         // days it had a leaderboard (distinct UTC days with plays)
+  named: number;          // plays with a name on the board
+  first_played: string;   // YYYY-MM-DD of its first recorded play
+}
+
 export interface DailyEntry {
   play_date: string;
   game_id: string;

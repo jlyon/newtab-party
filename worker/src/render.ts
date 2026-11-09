@@ -511,6 +511,28 @@ export interface CalCell {
   isFuture: boolean;
 }
 
+// /games sort views (?sort=...). The calendar is the default when no sort is given.
+export const GAME_SORTS = ['plays', 'boards', 'named', 'newest', 'az'] as const;
+export type GameSort = (typeof GAME_SORTS)[number];
+const SORT_LABELS: Record<GameSort, string> = {
+  plays: 'Most played',
+  boards: 'Most leaderboards',
+  named: 'Most names on the board',
+  newest: 'Newest',
+  az: 'A–Z',
+};
+
+export interface RankedGame {
+  game: Game;
+  plays: number;
+  boards: number;            // days it had a leaderboard
+  named: number;             // named scores on its boards
+  debut: string;             // YYYY-MM-DD it first aired
+  lastAired: string | null;  // most recent airing up to today (null: only legacy plays on record)
+  isToday: boolean;
+  retired: boolean;
+}
+
 export interface RetiredEntry {
   game: Game;
   lastAired: string | null;   // YYYY-MM-DD of its final airing, if one is in range
@@ -578,6 +600,29 @@ const PRACTICE_CSS = `  * { box-sizing: border-box; margin: 0; padding: 0; }
     .retired-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
     .legend .future-key { display: none; }
   }
+  .sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 22px 0 18px; }
+  .sort-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.35); margin-right: 4px; }
+  .sort a { padding: 7px 13px; border-radius: 999px; background: #14141f; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); font-size: 13px; font-weight: 600; text-decoration: none; transition: border-color 0.12s ease, color 0.12s ease; }
+  .sort a:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+  .sort a[aria-current] { background: #ffd700; border-color: #ffd700; color: #14141f; }
+  .sort + .legend { margin-top: 0; }
+  .rank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px; }
+  .rank-item { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: inherit; }
+  .rank-item .cal-cell { width: 100%; }
+  a.rank-item:hover .cal-cell { transform: translateY(-3px) scale(1.02); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.55); filter: none; opacity: 1; }
+  .rank-num { position: absolute; top: 6px; left: 8px; z-index: 2; font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.6); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .rank-item:nth-child(-n+3) .rank-num { color: #ffd700; }
+  .rank-tag { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; z-index: 2; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.55); text-shadow: 0 1px 4px rgba(0,0,0,0.95); }
+  .rank-cap { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.85); line-height: 1.3; }
+  .rank-cap small { display: block; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.4); margin-top: 3px; }
+  .rank-cap small b { color: rgba(255,255,255,0.8); font-weight: 700; }
+  @media (max-width: 600px) {
+    .sort { gap: 6px; margin: 18px 0 14px; }
+    .sort-label { width: 100%; }
+    .sort a { padding: 6px 11px; font-size: 12px; }
+    .rank-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  }
+  @media (min-width: 1400px) { .rank-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); } }
   .retired-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; padding: 12px 18px; border-radius: 10px; background: #14141f; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.75); font-size: 14px; font-weight: 600; text-decoration: none; transition: border-color 0.12s ease, color 0.12s ease; }
   .retired-link:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
   .retired-link .count { font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 700; }
@@ -590,7 +635,7 @@ const PRACTICE_CSS = `  * { box-sizing: border-box; margin: 0; padding: 0; }
   @media (max-width: 560px) { .retired-page .retired-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
 `;
 
-export function renderGamesCalendar({ today, cells, retiredCount = 0 }: { today: string; cells: CalCell[]; retiredCount?: number }): string {
+export function renderGamesCalendar({ today, cells, retiredCount = 0, sort = null, ranked = [] }: { today: string; cells: CalCell[]; retiredCount?: number; sort?: GameSort | null; ranked?: RankedGame[] }): string {
   const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -622,6 +667,47 @@ export function renderGamesCalendar({ today, cells, retiredCount = 0 }: { today:
     weeks += `<div class="cal-week">${cells.slice(i, i + 7).map((c, j) => cellHtml(c, i + j)).join('')}</div>`;
   }
 
+  const n = (x: number) => x.toLocaleString('en-US');
+  const plural = (x: number, one: string, many: string) => `${n(x)} ${x === 1 ? one : many}`;
+  // One stat line per game, leading with the number the list is sorted by.
+  const statLine = (r: RankedGame): string => {
+    const parts: Record<'plays' | 'boards' | 'named', string> = {
+      plays: plural(r.plays, 'play', 'plays'),
+      boards: plural(r.boards, 'leaderboard', 'leaderboards'),
+      named: plural(r.named, 'name', 'names'),
+    };
+    if (sort === 'newest') return `Debuted ${esc(fmtDate(r.debut))} · ${parts.plays}`;
+    const lead = sort === 'boards' || sort === 'named' ? sort : 'plays';
+    const rest = (['plays', 'boards', 'named'] as const).filter((k) => k !== lead);
+    return `<b>${parts[lead]}</b> · ${rest.map((k) => parts[k]).join(' · ')}`;
+  };
+  const rankItem = (r: RankedGame, i: number): string => {
+    const name = esc(r.game.name);
+    const tag = r.isToday ? `<span class="cal-badge">Today · counts</span>` : r.retired ? `<span class="rank-tag">Retired</span>` : '';
+    const cls = `cal-cell${r.isToday ? ' is-today' : ''}${r.retired ? ' is-retired' : ''}`;
+    const num = sort === 'az' || sort === 'newest' ? '' : `<span class="rank-num">#${i + 1}</span>`;
+    const tile = `<div class="${cls}">${num}<img class="cal-logo" src="/games/logos/${r.game.id}.png" alt="" loading="lazy">${tag}</div>`;
+    const cap = `<div class="rank-cap">${name}<small>${statLine(r)}</small></div>`;
+    const href = r.isToday ? '/' : r.lastAired ? `/play/${r.lastAired}` : '';
+    if (!href) return `<div class="rank-item">${tile}${cap}</div>`;
+    const label = r.isToday ? `Play today's game, ${name}` : `Practice ${name}`;
+    return `<a class="rank-item" href="${href}" aria-label="${esc(label)}">${tile}${cap}</a>`;
+  };
+  const sortNav = `<nav class="sort" aria-label="Sort games"><span class="sort-label">Sort</span>${
+    [`<a href="/games"${sort ? '' : ' aria-current="page"'}>Calendar</a>`,
+     ...GAME_SORTS.map((k) => `<a href="/games?sort=${k}"${sort === k ? ' aria-current="page"' : ''}>${SORT_LABELS[k]}</a>`)].join('')
+  }</nav>`;
+  const legend = `<div class="legend">
+    <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
+    <span><i class="dot past"></i> Past game (practice, scores not saved)</span>
+    <span class="future-key"><i class="dot future"></i> Not aired yet</span>
+  </div>`;
+  const body = sort
+    ? `<div class="rank-grid">${ranked.map(rankItem).join('')}</div>`
+    : `${legend}
+  <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
+  <div class="cal">${weeks}</div>`;
+
   // Retired games live on their own page (/games/retired).
   const retiredHtml = retiredCount
     ? `<a class="retired-link" href="/games/retired">Retired games <span class="count">${retiredCount}</span> →</a>`
@@ -643,13 +729,8 @@ ${PRACTICE_CSS}</style>
   <h1>You found the back room.</h1>
   <p class="blurb">Recent games, all laid out for you to rehearse until your thumbs give out. Warm up, learn the patterns, run the table.</p>
   <p class="blurb">One catch: the leaderboard only remembers <b>today's game</b>. Everything else here is strictly you versus your own ego. No pressure. No glory. Just reps.</p>
-  <div class="legend">
-    <span><i class="dot today"></i> Today (counts on the leaderboard)</span>
-    <span><i class="dot past"></i> Past game (practice, scores not saved)</span>
-    <span class="future-key"><i class="dot future"></i> Not aired yet</span>
-  </div>
-  <div class="cal-head">${WEEKDAYS.map((d) => `<div>${d}</div>`).join('')}</div>
-  <div class="cal">${weeks}</div>
+  ${sortNav}
+  ${body}
   ${retiredHtml}
   <div class="foot"><a href="/">← Back to today's game</a></div>
 </div>
