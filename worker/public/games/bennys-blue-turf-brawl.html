@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Benny's Blue Turf Brawl</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #DC4405; --secondary: #000000; --bg: #0b3d91; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 6px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; }
+  canvas { display: block; width: min(calc(100vw - 54px), calc((100dvh - 150px) * (640 / 400))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); border: 3px solid var(--secondary); }
+  #touch-controls { display: none; gap: 4px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 48px; flex: 1; max-width: 110px; border: 0; border-radius: 10px; font-size: 20px; color: #fff; padding: 0;
+         background: rgba(0,0,0,.45); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.act { background: rgba(220,68,5,.55); }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(4,18,48,.9); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay { overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; justify-content: safe center; }
+  @media (orientation: landscape) and (max-height: 520px) {
+    #wrap { display: grid; grid-template-columns: auto auto; grid-template-rows: auto 1fr; align-content: center; justify-content: center; column-gap: 10px; row-gap: 4px; }
+    #hud { grid-column: 1; }
+    canvas { grid-column: 1; width: min(calc(100vw - 230px), calc((100dvh - 34px) * (640 / 400))); }
+    body.touch #touch-controls { grid-column: 2; grid-row: 1 / 3; display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; align-content: center; width: auto; }
+    .btn { max-width: none; min-width: 0; }
+    .overlay h2 { font-size: clamp(26px, 7vh, 44px); }
+    .overlay p { font-size: 12px; margin: 3px 0; }
+    .overlay button { margin-top: 8px; padding: 10px 32px; }
+  }
+  .overlay h2 { margin: 0 0 10px; font-family: 'Bangers', Impact, sans-serif; font-weight: 400; letter-spacing: 2px; font-size: clamp(34px, 8vw, 68px); line-height: 1; color: var(--primary); text-shadow: 3px 3px 0 #000; }
+  .overlay p { max-width: 48ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); margin: 6px 0; }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'Bangers', Impact, sans-serif; font-size: clamp(18px, 4vw, 24px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: #fff; box-shadow: 0 4px 0 #000; cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(4,18,48,0.62), rgba(4,18,48,0.5) 72%, rgba(0,0,0,0.75)),
+      url('backgrounds/bennys-blue-turf-brawl.jpg') center/cover no-repeat, #041230;
+  }
+  #start-overlay .panel { background: rgba(4,12,32,.68); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(14px, 4vw, 32px); max-width: 600px; }
+  #start-overlay h2 { font-size: clamp(36px, 8vw, 70px); line-height: .98; text-shadow: 3px 3px 0 #000, 0 3px 34px rgba(0,0,0,.85); }
+  #start-overlay p { color: rgba(255,255,255,.92); text-shadow: 0 2px 10px rgba(0,0,0,.9); }
+  #start-overlay button { margin-top: 22px; padding: 15px 50px; box-shadow: 0 4px 0 #000, 0 12px 44px rgba(0,0,0,.5); }
+  @media (orientation: landscape) and (max-height: 520px) { #start-overlay h2 { font-size: clamp(24px, 8vh, 40px); } #start-overlay .panel { padding: 12px 20px; } #start-overlay button { margin-top: 8px; padding: 10px 36px; } #logo { max-height: 26vh !important; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="640" height="400"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">◀</button>
+    <button class="btn" id="btn-up">▲</button>
+    <button class="btn" id="btn-down">▼</button>
+    <button class="btn" id="btn-right">▶</button>
+    <button class="btn act" id="btn-fire">👊</button>
+    <button class="btn act" id="btn-tail">🌀</button>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show"><div class="panel">
+  <img id="logo" src="logos/bennys-blue-turf-brawl.png" alt="Benny's Blue Turf Brawl" onload="document.getElementById('title-h2').style.display='none'" onerror="this.remove()" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <h2 id="title-h2">Benny's Blue Turf Brawl</h2>
+  <p>Gameday in Boise. The Beavs are 28-point underdogs. Benny did not drive eight hours to lose.</p>
+  <p><b>Arrows / WASD</b> move · <b>Space</b> punch (third hit CHOMPS) · <b>X</b> tail slap.<br>
+     On touch: D-pad, 👊 punch, 🌀 tail slap. <b>Double-tap ◀ / ▶</b> to dash through danger.<br>
+     Punch potatoes back, knock Broncos into each other, and fill the DAM meter to roll a log.</p>
+  <button id="start-btn">Play</button>
+</div></div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 640, H = 400;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right'); holdBtn('btn-up', 'up'); holdBtn('btn-down', 'down'); holdBtn('btn-fire', 'fire'); holdBtn('btn-tail', 'tail');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || held.right;
+  const up    = () => keys['ArrowUp'] || keys['w'] || held.up;
+  const down  = () => keys['ArrowDown'] || keys['s'] || held.down;
+  const fire  = () => keys[' '] || keys['j'] || keys['z'] || held.fire;
+  const tail  = () => keys['x'] || keys['k'] || held.tail;
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  const ZL = 1400, ZG = 2400;                 // lot | gameday gate | blue turf
+  const TOP = 256, BOT = 376, HOR = 236;      // walkable depth band, horizon
+  const FONT = (px) => px + "px Bangers, Impact, sans-serif";
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const SIGNS = ['BENNY WHO?', 'DAM NERDS', 'TURF > TREES', 'PAC-WHAT?', 'CHOP WOOD', 'HI MOM'];
+  const TYPES = {
+    fan:      { hp: 3,  sp: 1.1, dmg: 6,  val: 50,  reach: 34, r: 0 },
+    sign:     { hp: 4,  sp: 1.0, dmg: 9,  val: 80,  reach: 54, r: 0 },
+    thrower:  { hp: 2,  sp: 1.2, dmg: 8,  val: 70,  reach: 0,  r: 0 },
+    defender: { hp: 6,  sp: 1.3, dmg: 12, val: 120, reach: 0,  r: 4,  csp: 4.6 },
+    boss:     { hp: 45, sp: 1.4, dmg: 18, val: 1000, reach: 0, r: 16, csp: 6 },
+  };
+  let bufF = 0, bufT = 0;                     // input buffer: quick taps always register
+  addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === ' ' || k === 'j' || k === 'z') bufF = 9; if (k === 'x' || k === 'k') bufT = 9; });
+  for (const ev of ['touchstart', 'mousedown']) { document.getElementById('btn-fire').addEventListener(ev, () => { bufF = 9; }); document.getElementById('btn-tail').addEventListener(ev, () => { bufT = 9; }); }
+  let score = 0, P, enemies, shots, fx, pops, pies, camX, t, kos, hitstop, shake, bossAt, boss, bossN, upset, gateAt, waveLeft, toast, toastT, spawnT, lockX, chain, chainT;
+
+  function reset() {
+    score = 0; t = 0; kos = 0; hitstop = 0; shake = 0; camX = 0; chain = 0; chainT = 0;
+    P = { x: 120, y: 320, hp: 100, face: 1, atk: 0, kind: '', combo: 0, comboT: 0, cd: 0, tailCd: 0, dam: 0, inv: 0, kx: 0, walk: 0, dash: 0, dashDir: 1, dashCd: 0, tapD: 0, tapT: -99, pl: false, pr: false, bv: 0 };
+    enemies = []; shots = []; fx = []; pops = []; pies = [];
+    gateAt = 420; waveLeft = 0; bossAt = 3600; boss = null; bossN = 0; upset = false; lockX = null; spawnT = 60;
+    toast = 'TAILGATE LOT: GET TO THE FIELD'; toastT = 150;
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  const zoneAt = x => x < ZL ? 0 : x < ZG ? 1 : 2;
+  const beavs = () => upset ? 31 + 7 * (bossN - 1) : Math.min(24, Math.floor(kos / 4) * 3);
+  function pop(x, y, txt, col) { pops.push({ x, y, txt, col: col || '#fff', life: 40 }); }
+  function burst(x, y, col, n) { for (let i = 0; i < n; i++) fx.push({ x, y, vx: rnd(-3, 3), vy: rnd(-4, -1), g: .25, col, life: rnd(15, 30), s: rnd(2, 4) }); }
+  function addScore(n) { score += Math.round(n); document.getElementById('score').textContent = 'Score: ' + score.toLocaleString(); }
+
+  function spawn(type, side) {
+    const T = TYPES[type], diff = camX / 800 + t / 1800;
+    const e = { type, x: side > 0 ? camX + W + 40 : camX - 40, y: rnd(TOP + 6, BOT - 6), hp: Math.round(T.hp * (1 + diff * .06)), face: -side,
+      st: 'idle', tm: 0, cd: rnd(30, 90), stun: 0, kx: 0, dead: 0, oy: rnd(-10, 10), alt: Math.random() < .35, txt: SIGNS[Math.floor(rnd(0, SIGNS.length))], dir: 1, ph: rnd(0, 6) };
+    if (type === 'boss') { e.hp = T.hp + 20 * bossN; e.max = e.hp; e.y = 316; }
+    enemies.push(e); return e;
+  }
+  function spawnWave() {
+    const z = zoneAt(camX + W / 2), r = Math.random();
+    const type = z === 0 ? (r < .7 ? 'fan' : 'thrower') : z === 1 ? (r < .5 ? 'sign' : r < .75 ? 'fan' : 'thrower') : (r < .45 ? 'defender' : r < .65 ? 'sign' : r < .8 ? 'fan' : 'thrower');
+    spawn(type, Math.random() < .7 ? 1 : -1);
+  }
+  function hurt(e, dmg, kb, label) {
+    const B = e.type === 'boss';
+    e.hp -= dmg; e.kx = B ? kb * .15 : kb;
+    if (!B || e.st !== 'charge') { e.stun = B ? 5 : 18; if (!B) e.st = 'idle'; }
+    if (!B && Math.abs(kb) >= 8) { e.fly = 14; e.flyHit = []; }
+    chain++; chainT = 130; P.dam = Math.min(100, P.dam + 6 + dmg * 2);
+    addScore(10 * dmg + Math.min(chain, 30));
+    hitstop = Math.max(hitstop, dmg >= 3 ? 6 : 3); shake = Math.max(shake, dmg >= 3 ? 7 : 4);
+    burst(e.x, e.y - 34, dmg >= 3 ? '#DC4405' : '#fff', 5 + dmg);
+    if (label) pop(e.x, e.y - 70, label, '#ffd23c');
+    if (e.hp <= 0) ko(e, kb);
+  }
+  function ko(e, kb) {
+    e.dead = 45; e.kx = (kb > 0 ? 1 : -1) * 7; kos++; e.fly = 20; e.flyHit = e.flyHit || [];
+    addScore(TYPES[e.type].val + chain * 2);
+    if (Math.random() < .22 || e.type === 'boss') pies.push({ x: e.x, y: e.y });
+    if (e.type !== 'boss' && waveLeft > 0 && --waveLeft === 0 && !boss) { lockX = null; gateAt = camX + 560; toast = 'FIRST DOWN! GO ▶'; toastT = 80; addScore(100); P.hp = Math.min(100, P.hp + 8); }
+    if (e.type === 'boss') {
+      boss = null; lockX = null; waveLeft = 0; gateAt = camX + 560; bossN++; bossAt = camX + 2400; P.hp = Math.min(100, P.hp + 40); hitstop = 14; shake = 16;
+      if (!upset) { upset = true; toast = 'UPSET! BEAVS WIN 31-28!'; }
+      else toast = 'OVERTIME ' + (bossN - 1) + ': BEAVS AGAIN, ' + beavs() + '-28';
+      toastT = 240;
+      for (let i = 0; i < 90; i++) fx.push({ x: camX + rnd(0, W), y: rnd(-80, 60), vx: rnd(-1, 1), vy: rnd(1, 3), g: .02, col: ['#DC4405', '#000', '#fff'][i % 3], life: rnd(80, 160), s: rnd(3, 6) });
+    }
+  }
+  const busy = () => enemies.filter(o => !o.dead && (o.st === 'wind' || o.st === 'charge')).length;
+  function batSpuds(rng) {
+    for (const s of shots) if (!s.log && !s.done && s.k > s.dur * .45 && Math.abs(s.tx - P.x) < rng && Math.abs(s.ty - P.y) < 28) {
+      s.done = true; shots.push({ log: true, spud: true, x: P.x + P.face * 20, y: P.y, vx: P.face * 9, hit: [] }); pop(P.x, P.y - 88, 'RETURN TO SENDER', '#ffd23c'); addScore(25); hitstop = 4; }
+  }
+  function hitP(dmg, kb) {
+    if (P.inv > 0 || P.dash > 0) return;
+    P.hp -= dmg; P.inv = 42; P.kx = kb; chain = 0; shake = Math.max(shake, 8); hitstop = 3;
+    pop(P.x, P.y - 74, 'OOF', '#ff6b6b'); burst(P.x, P.y - 30, '#8a5a2b', 6);
+    if (P.hp <= 0) {
+      P.hp = 0;
+      const zn = ['tailgate lot', 'pregame show', 'blue turf'][zoneAt(P.x)];
+      if (upset) gameOver('Benny Needs A Nap', 'Gassed in overtime, but the Beavs already won ' + beavs() + '-28. Carried off the blue turf a legend.');
+      else gameOver('Benny Got Sacked', 'Dogpiled at the ' + zn + ' with the Beavs down 28-' + beavs() + '. The upset is still out there. Go get it.');
+    }
+  }
+
+  function step() {
+    if (hitstop > 0) { hitstop--; return; }
+    t++;
+    if (shake > 0) shake *= .85; if (shake < .3) shake = 0;
+    if (chainT > 0 && --chainT === 0) chain = 0;
+    if (toastT > 0) toastT--;
+    // ── Benny ──
+    const mx = (right() ? 1 : 0) - (left() ? 1 : 0), my = (down() ? 1 : 0) - (up() ? 1 : 0);
+    if (P.atk > 0) P.atk--; if (P.cd > 0) P.cd--; if (P.tailCd > 0) P.tailCd--; if (P.inv > 0) P.inv--; if (P.comboT > 0) P.comboT--;
+    const sp = P.atk > 4 ? .8 : 1, L = !!left(), R = !!right();
+    if (P.dash > 0) P.dash--; if (P.dashCd > 0) P.dashCd--;
+    for (const [now, was, d] of [[L, P.pl, -1], [R, P.pr, 1]]) if (now && !was) {
+      if (P.tapD === d && t - P.tapT < 16 && P.dashCd <= 0) { P.dash = 11; P.dashDir = d; P.dashCd = 40; burst(P.x, P.y - 6, '#ccc', 6); pop(P.x, P.y - 80, 'ZOOM', '#fff'); }
+      P.tapD = d; P.tapT = t; }
+    P.pl = L; P.pr = R;
+    P.x += mx * 2.7 * sp + P.kx + (P.dash > 0 ? P.dashDir * 6.5 : 0); P.y += my * 1.9 * sp; P.kx *= .8;
+    if (mx) P.face = mx;
+    if (mx || my) P.walk++;
+    const oldC = camX;
+    if (lockX === null) camX = Math.max(camX, P.x - 240);
+    if (camX > oldC) addScore(Math.floor(camX / 10) - Math.floor(oldC / 10));
+    P.x = clamp(P.x, camX + 18, camX + W - 18); P.y = clamp(P.y, TOP, BOT);
+    if (bufF > 0) bufF--; if (bufT > 0) bufT--;
+    if ((fire() || bufF > 0) && P.cd <= 0 && P.atk <= 0) {
+      bufF = 0;
+      P.combo = P.comboT > 0 ? P.combo % 3 + 1 : 1; P.comboT = 48;
+      P.kind = P.combo === 3 ? 'chomp' : 'punch'; P.atk = 12; P.cd = P.combo === 3 ? 22 : 13; P.kx += P.face * (P.combo === 3 ? 5 : 2.5);
+    } else if ((tail() || bufT > 0) && P.tailCd <= 0 && P.atk <= 0) {
+      bufT = 0;
+      P.kind = 'tail'; P.atk = 18; P.tailCd = 80; P.cd = 18;
+      if (P.dam >= 100) { P.dam = 0; shots.push({ log: true, x: P.x, y: P.y, vx: P.face * 7, hit: [] }); pop(P.x, P.y - 84, 'DAM IT!', '#DC4405'); shake = 8; }
+      batSpuds(80);
+      for (const e of enemies) if (!e.dead && Math.abs(e.x - P.x) < 78 + TYPES[e.type].r && Math.abs(e.y - P.y) < 30) hurt(e, 2, (e.x > P.x ? 1 : -1) * 9, 'SLAP!');
+    }
+    if (P.atk === 8 && P.kind !== 'tail') {
+      const ch = P.kind === 'chomp'; batSpuds(60);
+      for (const e of enemies) { if (e.dead) continue; const dx = (e.x - P.x) * P.face;
+        if (dx > -8 && dx < 54 + TYPES[e.type].r && Math.abs(e.y - P.y) < 20) hurt(e, ch ? 3 : 1, P.face * (ch ? 8 : 3), ch ? 'CHOMP!' : (chain % 4 === 3 ? 'POW!' : '')); }
+    }
+    // ── Enemies ──
+    for (const e of enemies) {
+      const T = TYPES[e.type];
+      if (e.fly > 0) { e.fly--; for (const o of enemies) if (o !== e && !o.dead && !e.flyHit.includes(o) && Math.abs(o.x - e.x) < 28 && Math.abs(o.y - e.y) < 20) { e.flyHit.push(o); hurt(o, 2, Math.sign(e.kx || 1) * 6, 'STRIKE!'); } }
+      if (e.dead) { e.dead--; e.x += e.kx; continue; }
+      e.x += e.kx; e.kx *= .85; if (e.cd > 0) e.cd--;
+      if (e.stun > 0) { e.stun--; continue; }
+      const dx = P.x - e.x, dy = P.y + e.oy - e.y, adx = Math.abs(dx);
+      if (e.st !== 'charge' && e.st !== 'tired') e.face = dx > 0 ? 1 : -1;
+      if (e.type === 'fan' || e.type === 'sign') {
+        if (e.st === 'idle') {
+          const tx = P.x - e.face * T.reach * .85 - e.x;
+          if (Math.abs(tx) > 3) e.x += Math.sign(tx) * T.sp; if (Math.abs(dy) > 2) e.y += Math.sign(dy) * T.sp * .7;
+          if (adx < T.reach + 2 && Math.abs(P.y - e.y) < 14 && e.cd <= 0 && busy() < 2) { e.st = 'wind'; e.tm = e.type === 'sign' ? 30 : 22; }
+        } else if (--e.tm <= 0) {
+          if (adx < T.reach + 8 && Math.abs(P.y - e.y) < 18) hitP(T.dmg, e.face * 6);
+          e.st = 'idle'; e.cd = rnd(50, 100);
+        }
+      } else if (e.type === 'thrower') {
+        if (adx < 150) e.x -= e.face * T.sp; else if (adx > 250) e.x += e.face * T.sp;
+        if (Math.abs(dy) > 30) e.y += Math.sign(dy) * .6;
+        if (e.cd <= 0 && e.x > camX + 10 && e.x < camX + W - 10) { shots.push({ x0: e.x, y0: e.y, tx: P.x, ty: P.y, k: 0, dur: 58 }); e.cd = rnd(110, 170); e.tm = 14; }
+        if (e.tm > 0) e.tm--;
+      } else { // defender + boss: line up, wind up, charge
+        const B = e.type === 'boss';
+        if (e.st === 'idle') {
+          if (Math.abs(P.y - e.y) > 3) e.y += Math.sign(P.y - e.y) * T.sp * .8;
+          if (adx > 200) e.x += e.face * T.sp;
+          if (Math.abs(P.y - e.y) < 14 && adx < 270 && e.cd <= 0 && (B || busy() < 2)) { e.st = 'wind'; e.tm = B ? 38 : 28; e.dir = e.face; }
+        } else if (e.st === 'wind') { if (--e.tm <= 0) { e.st = 'charge'; e.tm = B ? 50 : 38; } }
+        else if (e.st === 'charge') {
+          e.x += e.dir * T.csp; e.face = e.dir;
+          if (Math.abs(P.x - e.x) < 26 + T.r && Math.abs(P.y - e.y) < 18) hitP(T.dmg, e.dir * 10);
+          if (B && lockX !== null && (e.x < lockX + 20 || e.x > lockX + W - 20)) { e.x = clamp(e.x, lockX + 20, lockX + W - 20); e.tm = 0; shake = 6; }
+          if (--e.tm <= 0) { e.st = 'tired'; e.tm = B ? 75 : 45; }
+        } else if (--e.tm <= 0) { e.st = 'idle'; e.cd = B ? 40 : 70; }
+      }
+      e.y = clamp(e.y, TOP, BOT);
+    }
+    enemies = enemies.filter(e => !(e.dead === 1) && e.x > camX - 400);
+    // ── Projectiles: potatoes and the log ──
+    for (const s of shots) {
+      if (s.done) continue;
+      if (s.log) {
+        s.x += s.vx;
+        for (const e of enemies) if (!e.dead && !s.hit.includes(e) && Math.abs(e.x - s.x) < 30 + TYPES[e.type].r && Math.abs(e.y - s.y) < 28) { s.hit.push(e); hurt(e, s.spud ? 3 : 6, Math.sign(s.vx) * 12, s.spud ? 'SPUD!' : 'TIMBER!'); if (s.spud) { s.done = true; break; } }
+        if (s.x < camX - 80 || s.x > camX + W + 80) s.done = true;
+      } else if (++s.k >= s.dur) {
+        s.done = true; burst(s.tx, s.ty, '#c9a064', 6);
+        if (Math.abs(P.x - s.tx) < 24 && Math.abs(P.y - s.ty) < 16) hitP(TYPES.thrower.dmg, 0);
+      }
+    }
+    shots = shots.filter(s => !s.done);
+    for (const p of pies) if (Math.abs(p.x - P.x) < 24 && Math.abs(p.y - P.y) < 18) { p.done = true; P.hp = Math.min(100, P.hp + 25); pop(P.x, P.y - 74, 'MARIONBERRY PIE +25', '#c77dff'); }
+    pies = pies.filter(p => !p.done && p.x > camX - 60);
+    for (const f of fx) { f.x += f.vx; f.y += f.vy; f.vy += f.g; f.life--; }
+    fx = fx.filter(f => f.life > 0);
+    for (const p of pops) { p.y -= .7; p.life--; }
+    pops = pops.filter(p => p.life > 0);
+    // ── Spawning + boss ──
+    if (!running) return;
+    const diff = camX / 800 + t / 1800, alive = enemies.filter(e => !e.dead).length;
+    const want = boss ? 3 : waveLeft > 0 ? Math.min(waveLeft, 6, 3 + Math.floor(diff / 2)) : Math.min(3, 1 + Math.floor(diff / 3));
+    if (--spawnT <= 0 && alive < want) { spawnWave(); spawnT = Math.max(24, 80 - diff * 5); }
+    const bv = beavs(); if (bv > P.bv && !upset) { toast = 'FIELD GOAL! BEAVS ' + bv + ', BRONCOS 28'; toastT = 100; } P.bv = bv;
+    if (!boss && !waveLeft && camX >= gateAt && camX < bossAt) { lockX = camX; waveLeft = Math.min(10, 4 + Math.floor(diff)); toast = ['BRONCO NATION SAYS NO', 'NOBODY PASSES', 'DEFEND THE BLUE'][zoneAt(P.x)]; toastT = 90; }
+    if (!boss && !waveLeft && camX >= bossAt) { lockX = camX; boss = spawn('boss', 1); toast = bossN ? 'BUSTER IS BACK AND HE IS MAD' : 'BUSTER WANTS A WORD'; toastT = 150; }
+    if (toastT === 0 && !boss) { const z = zoneAt(P.x); if (z !== step.z) { step.z = z; if (z) { toast = z === 1 ? 'THE PREGAME SHOW' : 'THE BLUE TURF'; toastT = 130; } } }
+  }
+
+  // ── Drawing ──
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); }
+  function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+  function ell(x, y, a, b) { ctx.beginPath(); ctx.ellipse(x, y, a, b, 0, 0, 7); ctx.fill(); }
+  function signTxt(s, x, y, px, maxW) { ctx.font = '800 ' + px + 'px system-ui, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#111';
+    const w = ctx.measureText(s).width; if (w > maxW) ctx.font = '800 ' + Math.floor(px * maxW / w) + 'px system-ui, Arial, sans-serif'; ctx.fillText(s, x, y); ctx.textBaseline = 'alphabetic'; }
+  function txt(s, x, y, px, col, al, mw) { ctx.font = FONT(px); ctx.textAlign = al || 'center'; ctx.lineWidth = Math.max(2, px / 6); ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y, mw); ctx.fillStyle = col; ctx.fillText(s, x, y, mw); }
+  function txtF(s, x, y, px, col, f) { ctx.save(); ctx.translate(x, y); ctx.scale(f, 1); txt(s, 0, 0, px, col); ctx.restore(); }
+  function shadow(w) { ctx.fillStyle = 'rgba(0,0,0,.3)'; ell(0, 0, w, 5); }
+
+  function drawBg() {
+    const g = ctx.createLinearGradient(0, 0, 0, HOR); g.addColorStop(0, '#1d2f6f'); g.addColorStop(.7, '#e8894a'); g.addColorStop(1, '#ffc56e');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, HOR);
+    ctx.fillStyle = '#6b4a3a';                                     // foothills, slow parallax
+    for (let i = -1; i < 6; i++) ell(i * 190 - (camX * .15) % 190 + 60, HOR + 4, 150, 46 + (i * 37 % 3) * 12);
+    // ground per zone
+    const seg = (a, b, col) => { const x0 = Math.max(0, a - camX), x1 = Math.min(W, b - camX); if (x1 > x0) { ctx.fillStyle = col; ctx.fillRect(x0, HOR, x1 - x0, H - HOR); } };
+    seg(-1e4, ZL, '#3b3e46'); seg(ZL, ZG, '#8d8779'); seg(ZG, 1e7, '#1557cf');
+    const i0 = Math.floor((camX - 220) / 180), i1 = Math.ceil((camX + W + 220) / 180);
+    for (let i = i0; i <= i1; i++) {
+      const wx = i * 180, sx = wx - camX, z = zoneAt(wx + 90);
+      if (z === 0) {                                               // tailgate lot
+        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sx + 40, HOR + 4); ctx.lineTo(sx, H); ctx.stroke();
+        const k = ((i % 4) + 4) % 4;
+        if (k === 0) { ctx.fillStyle = '#eee'; rr(sx + 10, 168, 150, 62, 8); ctx.fillStyle = '#1557cf'; ctx.fillRect(sx + 10, 196, 150, 9); ctx.fillStyle = '#7fb6e6'; ctx.fillRect(sx + 24, 178, 30, 14); ctx.fillRect(sx + 66, 178, 30, 14); ctx.fillStyle = '#222'; circ(sx + 40, 232, 9); circ(sx + 130, 232, 9); }
+        else if (k === 1) { ctx.fillStyle = '#1557cf'; ctx.beginPath(); ctx.moveTo(sx + 20, 186); ctx.lineTo(sx + 90, 152); ctx.lineTo(sx + 160, 186); ctx.fill(); ctx.fillStyle = '#ccc'; ctx.fillRect(sx + 26, 186, 3, 48); ctx.fillRect(sx + 151, 186, 3, 48); ctx.fillStyle = '#222'; rr(sx + 74, 212, 32, 14, 4); ctx.fillStyle = 'rgba(255,255,255,.35)'; circ(sx + 90, 200 - (t % 60) / 4, 5 + (t % 60) / 10); }
+        else if (k === 2) {                                        // the traveling orange army
+          for (let j = 0; j < 4; j++) { const b = Math.abs(Math.sin(t / 9 + j * 1.7 + i)) * 7; ctx.fillStyle = '#DC4405'; rr(sx + 30 + j * 28, 200 - b, 18, 30, 4); ctx.fillStyle = '#e7b48f'; circ(sx + 39 + j * 28, 193 - b, 8); ctx.fillStyle = '#000'; ctx.fillRect(sx + 31 + j * 28, 184 - b, 16, 4); }
+          ctx.fillStyle = '#fff'; rr(sx + 40, 150, 92, 24, 3); txt('GO BEAVS', sx + 86, 169, 18, '#DC4405');
+        } else { ctx.fillStyle = '#9b2c2c'; rr(sx + 20, 196, 130, 30, 5); ctx.fillStyle = '#7a2222'; rr(sx + 112, 178, 38, 24, 5); ctx.fillStyle = '#b08a55'; for (let j = 0; j < 5; j++) ell(sx + 40 + j * 15, 192 - (j % 2) * 7, 10, 7); ctx.fillStyle = '#222'; circ(sx + 46, 230, 9); circ(sx + 126, 230, 9); txt('FREE SPUDS', sx + 70, 218, 12, '#fff'); }
+      } else if (z === 1) {                                        // pregame show
+        ctx.fillStyle = '#5c6470'; ctx.fillRect(sx, 120, 181, HOR - 120); ctx.fillStyle = '#4a515c'; ctx.fillRect(sx, 120, 181, 8);
+        const k = Math.round((wx - ZL) / 180);
+        if (k === 2) {                                             // the desk + the headgear pick
+          ctx.fillStyle = '#DC4405'; rr(sx + 4, 130, 172, 28, 4); txt('BIG PREGAME SHOW', sx + 90, 151, 18, '#fff', 'center', 160);
+          ctx.fillStyle = '#222'; rr(sx, 206, 180, 30, 4);
+          for (let j = 0; j < 3; j++) { ctx.fillStyle = ['#345', '#543', '#353'][j]; rr(sx + 22 + j * 54, 184, 28, 26, 4); ctx.fillStyle = '#e7b48f'; circ(sx + 36 + j * 54, 176, 10); }
+          ctx.fillStyle = '#8a5a2b'; circ(sx + 144, 172, 15); circ(sx + 133, 160, 5); circ(sx + 155, 160, 5); ctx.fillStyle = '#fff'; ctx.fillRect(sx + 140, 178, 8, 7);
+          txt('PICK: BEAVS!', sx + 90, 228, 13, '#ff8a3d');
+        } else {
+          for (let j = 0; j < 7; j++) { const b = Math.abs(Math.sin(t / 11 + j * 2.1 + i)) * 5, c = (j + i) % 3; ctx.fillStyle = c === 0 ? '#DC4405' : '#1557cf'; rr(sx + 8 + j * 25, 206 - b, 18, 30, 4); ctx.fillStyle = '#e7b48f'; circ(sx + 17 + j * 25, 199 - b, 8); }
+          ctx.fillStyle = '#fff'; rr(sx + 30, 150 + (i % 2) * 10, 118, 26, 3); signTxt(SIGNS[((i % 6) + 6) % 6], sx + 89, 163 + (i % 2) * 10, 16, 108);
+        }
+        ctx.fillStyle = '#c9ccd2'; ctx.fillRect(sx, 226, 181, 4); ctx.fillRect(sx + 4, 226, 4, 12); ctx.fillRect(sx + 94, 226, 4, 12);
+      } else {                                                     // the blue
+        ctx.fillStyle = '#16203a'; ctx.fillRect(sx, 96, 181, HOR - 96);
+        for (let j = 0; j < 54; j++) { const c = (j * 7 + i * 13) % 11; ctx.fillStyle = c < 6 ? '#2d6fe0' : c < 9 ? '#f26b21' : '#ddd'; ctx.fillRect(sx + (j % 9) * 20 + 4 + (Math.floor(j / 9) % 2) * 8, 104 + Math.floor(j / 9) * 19 - (((j + i + Math.floor(t / 20)) % 13) === 0 ? 3 : 0), 9, 11); }
+        ctx.fillStyle = '#0d1326'; ctx.fillRect(sx, 218, 181, 18);
+        ctx.fillStyle = 'rgba(255,255,255,.8)'; for (let j = 0; j < 3; j++) { ctx.beginPath(); ctx.moveTo(sx + j * 60 + 16, HOR); ctx.lineTo(sx + j * 60 - 14, H); ctx.lineTo(sx + j * 60 - 10, H); ctx.lineTo(sx + j * 60 + 19, HOR); ctx.fill(); }
+        const yd = ((Math.round((wx - ZG) / 180) % 9) + 1) * 10; txt(String(yd > 50 ? 100 - yd : yd), sx + 106, 300, 26, 'rgba(255,255,255,.55)');
+      }
+    }
+    const ez = ZG - camX; if (ez > -130 && ez < W) { ctx.fillStyle = '#f26b21'; ctx.fillRect(ez, HOR, 120, H - HOR); ctx.save(); ctx.translate(ez + 78, 310); ctx.rotate(-Math.PI / 2); txt('BRONCOS', 0, 0, 34, '#fff'); ctx.restore(); }
+  }
+
+  function drawBenny() {
+    const blink = P.inv > 0 && (t >> 2) % 2; if (blink) return;
+    ctx.save(); ctx.translate(P.x - camX, P.y); ctx.scale(1.25, 1.25); shadow(20);
+    if (P.dash > 0) { ctx.rotate(P.dashDir * .4); ctx.globalAlpha = .75; }
+    const a = P.atk, bob = Math.sin(P.walk / 4) * 2, pun = a > 4 && P.kind === 'punch', ch = a > 4 && P.kind === 'chomp', tl = a > 0 && P.kind === 'tail';
+    if (tl) { ctx.strokeStyle = 'rgba(255,255,255,' + a / 18 + ')'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(0, -8, 78 * (1 - a / 26), 22 * (1 - a / 26), 0, 0, 7); ctx.stroke(); }
+    ctx.scale(tl && a > 9 ? -P.face : P.face, 1);
+    ctx.fillStyle = '#5a3a1c'; ctx.save(); ctx.translate(-16, -12); ctx.rotate(tl ? -1.2 + a / 6 : -.35 + bob / 20); ell(-12, 0, 16, 7); ctx.restore();       // the tail
+    ctx.fillStyle = '#6b441f'; rr(-9, -12 + (bob > 0 ? -2 : 0), 7, 12, 2); rr(3, -12 + (bob < 0 ? -2 : 0), 7, 12, 2);
+    ctx.translate(ch ? 8 : 0, bob / 2);
+    ctx.fillStyle = '#DC4405'; rr(-14, -40, 28, 30, 7); ctx.fillStyle = '#000'; ctx.fillRect(-14, -30, 28, 3); txtF('1', 0, -15, 12, '#fff', tl && a > 9 ? -P.face : P.face);
+    ctx.fillStyle = '#8a5a2b'; circ(-7, -62, 5); circ(11, -62, 5); circ(2, -52, 14);
+    ctx.fillStyle = '#c99a63'; ell(10, -47, 8, 6); ctx.fillStyle = '#000'; circ(15, -50, 2.5);
+    ctx.fillStyle = '#fff'; ctx.fillRect(8, -43, ch ? 10 : 7, ch ? 11 : 6); ctx.fillStyle = '#000'; ctx.fillRect(11.5, -43, 1, ch ? 11 : 6);
+    ctx.fillStyle = '#fff'; circ(6, -56, 4); ctx.fillStyle = '#000'; circ(7.5, -56, 2); ctx.fillRect(1, -62, 9, 2.5);
+    ctx.fillStyle = '#8a5a2b'; rr(6, -34, pun ? 30 : 12, 8, 4); circ(pun ? 38 : 18, -30, 6);
+    ctx.restore();
+  }
+  function drawEnemy(e) {
+    const T = TYPES[e.type], sx = e.x - camX; if (sx < -80 || sx > W + 80) return;
+    ctx.save(); ctx.translate(sx, e.y); ctx.scale(1.25, 1.25);
+    if (e.dead) { ctx.globalAlpha = e.dead / 45; ctx.translate(0, -30 - (45 - e.dead) * .6); ctx.rotate((45 - e.dead) * .2 * Math.sign(e.kx)); ctx.translate(0, 30); } else shadow(e.type === 'boss' ? 30 : 18);
+    if (e.stun > 0 && !e.dead) ctx.translate(Math.sin(t * 2) * 2, 0);
+    const wind = e.st === 'wind', bob = Math.sin(t / 5 + e.ph) * 1.5;
+    if (wind && (t >> 2) % 2) txt('!', 0, e.type === 'boss' ? -104 : -78, 24, '#ff3b3b');
+    ctx.scale(e.face, 1);
+    const shirt = e.alt ? '#dfe6f5' : '#1557cf';
+    if (e.type === 'boss') {                                       // Buster: one large angry horse
+      const lean = e.st === 'charge' ? .3 : wind ? -.15 : 0; ctx.rotate(lean);
+      ctx.fillStyle = '#123f9c'; rr(-12, -20, 10, 20, 3); rr(4, -20, 10, 20, 3);
+      ctx.fillStyle = '#1557cf'; rr(-24, -66, 48, 50, 12); ctx.fillStyle = '#f26b21'; ctx.fillRect(-24, -44, 48, 6); txtF('00', 0, -24, 16, '#fff', e.face);
+      ctx.fillStyle = '#b5651d'; rr(-4, -98, 30, 36, 10); rr(12, -84, 30, 20, 8);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-6, -100); ctx.lineTo(-18, -70); ctx.lineTo(-2, -66); ctx.fill();
+      ctx.fillStyle = '#b5651d'; ctx.beginPath(); ctx.moveTo(2, -98); ctx.lineTo(6, -112); ctx.lineTo(12, -98); ctx.fill();
+      ctx.fillStyle = '#fff'; circ(14, -88, 5); ctx.fillStyle = e.st === 'tired' ? '#888' : '#d00'; circ(15.5, -88, 2.5); ctx.fillStyle = '#000'; ctx.fillRect(8, -96, 12, 3); circ(37, -76, 2);
+      if (e.st === 'tired') txtF('@_@', 14, -112, 13, '#fff', e.face);
+      ctx.fillStyle = '#1557cf'; rr(14, -58, 22, 12, 6);
+    } else if (e.type === 'defender') {
+      const lean = e.st === 'charge' ? .45 : wind ? -.15 : 0; ctx.rotate(lean);
+      ctx.fillStyle = '#ddd'; rr(-9, -14, 8, 14, 2); rr(2, -14, 8, 14, 2);
+      ctx.fillStyle = '#1557cf'; rr(-18, -48, 36, 36, 8); ctx.fillStyle = '#f26b21'; rr(-20, -50, 40, 10, 5); txtF('7' + (Math.floor(e.ph) % 9), 0, -22, 13, '#fff', e.face);
+      ctx.fillStyle = '#1557cf'; circ(2, -58, 12); ctx.fillStyle = '#f26b21'; ctx.fillRect(-9, -70, 20, 3); ctx.fillStyle = '#999'; ctx.fillRect(6, -60, 10, 2); ctx.fillRect(6, -55, 10, 2); ctx.fillRect(15, -61, 2, 9);
+      if (e.st === 'tired') txtF('...', 0, -76, 14, '#fff', e.face);
+    } else {
+      ctx.fillStyle = '#2a2f45'; rr(-8, -14 + bob, 7, 14 - bob, 2); rr(2, -14, 7, 14, 2);
+      ctx.fillStyle = shirt; rr(-12, -40, 24, 28, 6);
+      ctx.fillStyle = '#e7b48f'; circ(1, -49, 10); ctx.fillStyle = e.alt ? '#1557cf' : '#f26b21'; ctx.beginPath(); ctx.arc(1, -52, 10, Math.PI, 0); ctx.fill(); ctx.fillRect(4, -54, 12, 3);
+      ctx.fillStyle = '#000'; circ(6, -49, 1.5); ctx.fillRect(3, -44, 6, 1.5);
+      if (e.type === 'sign') { ctx.save(); ctx.translate(8, -36); ctx.rotate(wind ? -.5 : e.cd > 0 && e.cd < 8 ? 1.1 : 0); ctx.fillStyle = '#9a7b4f'; ctx.fillRect(-2, -34, 4, 36); ctx.fillStyle = '#fff'; rr(-36, -58, 72, 26, 3); ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.strokeRect(-36, -58, 72, 26); ctx.scale(e.face, 1); signTxt(e.txt, 0, -45, 12, 66); ctx.restore(); }
+      else if (e.type === 'thrower') { ctx.fillStyle = '#e7b48f'; rr(6, e.tm > 0 ? -58 : -34, 7, 18, 3); ctx.fillStyle = '#b08a55'; ell(-14, -8, 11, 9); if (!e.tm) ell(10, -30, 6, 4.5); }
+      else { ctx.fillStyle = '#e7b48f'; rr(6, wind ? -50 : -34, wind ? 8 : 16, wind ? 18 : 7, 3); }
+    }
+    ctx.restore();
+  }
+  function drawHud() {
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(8, 8, 168, 44, 6);
+    txt('BENNY', 14, 24, 14, '#fff', 'left'); ctx.fillStyle = '#400'; ctx.fillRect(62, 13, 106, 12); ctx.fillStyle = P.hp > 30 ? '#DC4405' : '#ff3b3b'; ctx.fillRect(62, 13, 106 * P.hp / 100, 12);
+    const full = P.dam >= 100; txt('DAM', 14, 44, 14, full && (t >> 3) % 2 ? '#ffd23c' : '#fff', 'left'); ctx.fillStyle = '#2a1c0c'; ctx.fillRect(62, 33, 106, 12); ctx.fillStyle = full ? '#ffd23c' : '#8a5a2b'; ctx.fillRect(62, 33, 106 * P.dam / 100, 12);
+    if (full) txt('TAIL SLAP = LOG!', 14, 68, 13, '#ffd23c', 'left');
+    ctx.fillStyle = 'rgba(0,0,0,.7)'; rr(W / 2 - 130, 8, 260, 28, 6);
+    txt('BEAVS ' + beavs(), W / 2 - 8, 29, 18, '#DC4405', 'right'); txt('BRONCOS 28', W / 2 + 8, 29, 18, '#5b9bff', 'left');
+    if (chain > 1) txt(chain + ' HIT COMBO', W - 12, 30, 16 + Math.min(10, chain / 2), '#ffd23c', 'right');
+    if (boss) { ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(W / 2 - 150, H - 24, 300, 16, 4); ctx.fillStyle = '#1557cf'; ctx.fillRect(W / 2 - 147, H - 21, 294 * Math.max(0, boss.hp) / boss.max, 10); txt('BUSTER', W / 2, H - 11, 12, '#fff'); }
+    else if (running && lockX === null && (t >> 4) % 2) txt('GO ▶', W - 16, 110, 30, '#fff', 'right');
+    if (toastT > 0) { ctx.globalAlpha = Math.min(1, toastT / 20); txt(toast, W / 2, 92, toast.length > 26 ? 26 : 34, upset && toastT > 0 && toast.includes('BEAVS') ? '#DC4405' : '#fff'); ctx.globalAlpha = 1; }
+  }
+  function draw() {
+    ctx.save();
+    if (shake) ctx.translate(Math.sin(t * 2.3) * shake, Math.cos(t * 3.1) * shake * .6);
+    drawBg();
+    for (const s of shots) if (!s.log) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ell(s.tx - camX, s.ty, 6 + 10 * s.k / s.dur, 3 + 3 * s.k / s.dur); }
+    for (const p of pies) { const b = Math.sin(t / 8) * 2; ctx.fillStyle = 'rgba(0,0,0,.3)'; ell(p.x - camX, p.y, 12, 4); ctx.fillStyle = '#d9a35b'; ell(p.x - camX, p.y - 10 + b, 13, 7); ctx.fillStyle = '#6a1b9a'; ell(p.x - camX, p.y - 12 + b, 9, 4); }
+    const list = enemies.concat([P]).sort((a, b) => a.y - b.y);
+    for (const o of list) o === P ? drawBenny() : drawEnemy(o);
+    for (const s of shots) {
+      if (s.spud) { ctx.fillStyle = '#b08a55'; ell(s.x - camX, s.y - 34, 9, 7); }
+      else if (s.log) { const x = s.x - camX; ctx.fillStyle = 'rgba(0,0,0,.3)'; ell(x, s.y, 30, 5); ctx.fillStyle = '#7a4a1e'; rr(x - 30, s.y - 30, 60, 26, 12); ctx.fillStyle = '#c99a63'; ell(x + Math.sign(s.vx) * 26, s.y - 17, 6, 12); ctx.strokeStyle = '#5a3a1c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 20, s.y - 22 + (t % 6)); ctx.lineTo(x + 14, s.y - 22 + (t % 6)); ctx.stroke(); }
+      else { const k = s.k / s.dur; ctx.fillStyle = '#b08a55'; ell(s.x0 + (s.tx - s.x0) * k - camX, s.y0 - 34 + (s.ty - s.y0 + 34) * k - Math.sin(Math.PI * k) * 95, 8, 6); }
+    }
+    for (const f of fx) { ctx.fillStyle = f.col; ctx.fillRect(f.x - camX, f.y, f.s, f.s); }
+    for (const p of pops) { ctx.globalAlpha = Math.min(1, p.life / 12); txt(p.txt, p.x - camX, p.y, 18, p.col); } ctx.globalAlpha = 1;
+    ctx.restore();
+    drawHud();
+  }
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

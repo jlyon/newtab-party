@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Stingy Scribbles</title>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #19a7a0; --secondary: #ff3366; --bg: #fdf6e3; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #2b2b2b; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 16px; font-size: clamp(11px, 3vw, 14px); }
+  #ink { color: var(--primary); font-weight: 700; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (380 / 560))); height: auto; border-radius: 6px; box-shadow: 0 6px 24px rgba(60,40,10,.25); cursor: crosshair; }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 150px; border: 0; border-radius: 10px; font-size: 18px; font-family: 'Permanent Marker', system-ui, sans-serif; color: #2b2b2b;
+         background: rgba(25,167,160,.18); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); color: #fff; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(20,18,14,.84); color: #fff; z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-family: 'Permanent Marker', system-ui, sans-serif; font-weight: 400; font-size: clamp(32px, 8vw, 62px); color: var(--primary); transform: rotate(-3deg); text-shadow: 3px 3px 0 var(--secondary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'Permanent Marker', system-ui, sans-serif; font-size: clamp(15px, 3.5vw, 19px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: #fff; cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  @media (orientation: landscape) and (max-height: 520px) {
+    canvas { width: min(70vw, calc((100dvh - 40px) * (380 / 560))); }
+    body.touch #touch-controls { position: fixed; right: 16px; top: 50%; transform: translateY(-50%); flex-direction: column; width: auto; }
+    #touch-controls .btn { flex: none; width: 64px; height: 56px; }
+  }
+  /* ── Landing screen — gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.42) 72%, rgba(0,0,0,0.7)),
+      url('backgrounds/stingy-scribbles.jpg') center/cover no-repeat, #0b0a10;
+    color: #fff;
+  }
+  #start-overlay .panel { background: rgba(10,8,10,0.6); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: 28px 24px; max-width: 520px; }
+  #start-overlay h2 {
+    font-family: 'Permanent Marker', system-ui, sans-serif; font-size: clamp(34px, 8vw, 60px); line-height: 0.98; color: #fff;
+    text-shadow: 0 3px 34px rgba(0,0,0,0.85), 0 0 26px rgba(25,167,160,.6);
+  }
+  #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); margin: 0 auto; }
+  #start-overlay button {
+    font-family: 'Permanent Marker', system-ui, sans-serif; margin-top: 22px; padding: 15px 50px; letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 40px; cursor: pointer; color: #10100f; background: #19a7a0;
+    box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease;
+  }
+  #start-overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="lvl">Page 1</span><span id="ink">Ink: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="380" height="560"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-undo">Erase</button>
+    <button class="btn" id="btn-drop">Drop!</button>
+  </div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <div class="panel">
+  <img src="logos/stingy-scribbles.png" alt="Stingy Scribbles" onerror="this.remove()" onload="this.nextElementSibling.style.display='none'" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <h2>Stingy Scribbles</h2>
+  <p>Draw lines with your finger or mouse so the ball rolls into the cup, then drop it (Space or the Drop button). Ink is shared across the whole run and every drop costs 50. Clearing a page refills some, and stingy pages score big. Z / Erase removes your last line (no refunds). Out of ink = out of luck.</p>
+  <button id="start-btn">Play</button>
+  </div>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 380, H = 560;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); return; }
+    if (e.repeat) return;
+    if (e.key === ' ' || e.key === 'ArrowDown') drop();
+    if (e.key === 'z' || e.key === 'Z' || e.key === 'Backspace') undo();
+  });
+  function tapBtn(id, fn) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); el.classList.add('held'); fn(); };
+    const up = e => { e.preventDefault(); el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  tapBtn('btn-drop', () => drop()); tapBtn('btn-undo', () => undo());
+
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION =====
+  const R = 9, G = 0.3, DROP_COST = 50, INK_START = 1500, INK_CAP = 2200, SUB = 4;
+  const CUP_W = 62, CUP_H = 44;
+  let score = 0, level, ink, inkUsed, lines, drawn, statics, spikes, startPt, cup, ball, phase, timer, stillT, floaters, drawing;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function hud() {
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    document.getElementById('ink').textContent = 'Ink: ' + Math.floor(ink);
+    document.getElementById('lvl').textContent = 'Page ' + level;
+  }
+  function rectSegs(r) {
+    const { x, y, w, h } = r;
+    return [[x, y, x + w, y], [x + w, y, x + w, y + h], [x + w, y + h, x, y + h], [x, y + h, x, y]];
+  }
+  function overlaps(a, b, pad) { return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y; }
+  function genLevel() {
+    startPt = { x: rnd(50, W - 50), y: 44 };
+    let cx;
+    do { cx = rnd(20, W - 20 - CUP_W); } while (Math.abs(cx + CUP_W / 2 - startPt.x) < 100);
+    cup = { x: cx, y: H - 34 - CUP_H, w: CUP_W, h: CUP_H };
+    statics = [
+      [cup.x, cup.y, cup.x, cup.y + cup.h], [cup.x, cup.y + cup.h, cup.x + cup.w, cup.y + cup.h], [cup.x + cup.w, cup.y + cup.h, cup.x + cup.w, cup.y],
+    ];
+    spikes = [];
+    const blocks = [], n = Math.min(1 + Math.floor(level / 2), 6);
+    const keepOut = [{ x: cup.x - 30, y: cup.y - 90, w: cup.w + 60, h: 200 }, { x: startPt.x - 30, y: 0, w: 60, h: 100 }];
+    for (let tries = 0; blocks.length < n && tries < 200; tries++) {
+      const b = { x: rnd(10, W - 140), y: rnd(130, 400), w: rnd(50, 130), h: rnd(12, 18) };
+      if (keepOut.some(k => overlaps(b, k, 0)) || blocks.some(o => overlaps(b, o, 26))) continue;
+      b.spike = level >= 3 && Math.random() < 0.35;
+      blocks.push(b);
+    }
+    for (const b of blocks) { if (b.spike) spikes.push(b); else statics.push(...rectSegs(b)); }
+    lines = []; drawn = []; inkUsed = 0; drawing = null;
+    resetBall(); phase = 'draw';
+  }
+  function resetBall() { ball = { x: startPt.x, y: startPt.y, vx: 0, vy: 0 }; timer = 0; stillT = 0; }
+  function reset() {
+    score = 0; level = 1; ink = INK_START; floaters = [];
+    genLevel(); hud();
+  }
+  function floater(x, y, text, color) { floaters.push({ x, y, text, color, life: 80 }); }
+  function drop() {
+    if (!running || phase !== 'draw' || ink < DROP_COST) return;
+    drawing = null;
+    ink -= DROP_COST; inkUsed += DROP_COST;
+    resetBall(); phase = 'roll'; hud();
+  }
+  function undo() {
+    if (!running || phase !== 'draw' || !lines.length) return;
+    lines.pop(); drawing = null; rebuildDrawn();
+  }
+  function rebuildDrawn() {
+    drawn = [];
+    for (const l of lines) for (let i = 1; i < l.length; i++) drawn.push([l[i - 1].x, l[i - 1].y, l[i].x, l[i].y]);
+  }
+  function collide(s) {
+    const [x1, y1, x2, y2] = s, dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy || 1;
+    let t = ((ball.x - x1) * dx + (ball.y - y1) * dy) / L2; t = Math.max(0, Math.min(1, t));
+    const qx = x1 + t * dx, qy = y1 + t * dy;
+    let nx = ball.x - qx, ny = ball.y - qy; const d = Math.hypot(nx, ny);
+    if (d >= R) return;
+    if (d < 1e-6) { nx = -dy; ny = dx; const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l; } else { nx /= d; ny /= d; }
+    ball.x = qx + nx * R; ball.y = qy + ny * R;
+    const vn = ball.vx * nx + ball.vy * ny;
+    if (vn < 0) { ball.vx -= 1.3 * vn * nx; ball.vy -= 1.3 * vn * ny; ball.vx *= 0.995; ball.vy *= 0.995; }
+  }
+  function lose(why) {
+    floater(Math.min(W - 60, Math.max(60, ball.x)), Math.min(H - 60, Math.max(80, ball.y)), why, '#ff3366');
+    resetBall(); phase = 'draw';
+  }
+  function step() {
+    for (const f of floaters) { f.y -= 0.5; f.life--; }
+    floaters = floaters.filter(f => f.life > 0);
+    if (phase === 'won') { if (--timer <= 0) { level++; genLevel(); hud(); } return; }
+    if (phase === 'draw') {
+      if (ink < DROP_COST) gameOver('Bone dry', `Out of ink on page ${level}. Should've been stingier.`);
+      return;
+    }
+    timer++;
+    for (let i = 0; i < SUB; i++) {
+      ball.vy += G / SUB;
+      const sp = Math.hypot(ball.vx, ball.vy); if (sp > 14) { ball.vx *= 14 / sp; ball.vy *= 14 / sp; }
+      ball.x += ball.vx / SUB; ball.y += ball.vy / SUB;
+      for (const s of statics) collide(s);
+      for (const s of drawn) collide(s);
+      if (ball.x < R) { ball.x = R; ball.vx = Math.abs(ball.vx) * 0.5; }
+      if (ball.x > W - R) { ball.x = W - R; ball.vx = -Math.abs(ball.vx) * 0.5; }
+    }
+    for (const sp of spikes) {
+      const qx = Math.max(sp.x, Math.min(ball.x, sp.x + sp.w)), qy = Math.max(sp.y, Math.min(ball.y, sp.y + sp.h));
+      if (Math.hypot(ball.x - qx, ball.y - qy) < R) return lose('POP!');
+    }
+    if (ball.x > cup.x && ball.x < cup.x + cup.w && ball.y > cup.y + 8 && ball.y < cup.y + cup.h) {
+      const thrift = Math.max(0, 400 - Math.round(inkUsed));
+      const pts = 100 + level * 25 + thrift;
+      score += pts;
+      ink = Math.min(INK_CAP, ink + 450);
+      floater(cup.x + cup.w / 2, cup.y - 20, '+' + pts + (thrift > 250 ? ' STINGY!' : ''), '#19a7a0');
+      phase = 'won'; timer = 70; hud();
+      return;
+    }
+    if (ball.y > H + 30) return lose('Splat.');
+    stillT = Math.hypot(ball.vx, ball.vy) < 0.2 ? stillT + 1 : 0;
+    if (stillT > 90 || timer > 60 * 20) lose('Stuck.');
+  }
+
+  function draw() {
+    ctx.fillStyle = '#fdf6e3'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(70,130,200,.16)'; ctx.lineWidth = 1;
+    for (let y = 30; y < H; y += 24) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,51,102,.25)'; ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(34, H); ctx.stroke();
+    if (!cup) return;
+    // ink tank
+    ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(W - 112, 10, 100, 10);
+    ctx.fillStyle = ink < 300 ? '#ff3366' : '#19a7a0'; ctx.fillRect(W - 112, 10, 100 * Math.min(1, ink / INK_CAP), 10);
+    // static blocks
+    ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (const s of statics.slice(3)) { ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(43,43,43,.12)';
+    for (let i = 3; i < statics.length; i += 4) { const a = statics[i], c = statics[i + 2]; ctx.fillRect(Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.abs(c[0] - a[0]), Math.abs(c[1] - a[1])); }
+    // spikes
+    ctx.fillStyle = '#ff3366';
+    for (const sp of spikes) {
+      ctx.beginPath(); ctx.moveTo(sp.x, sp.y + sp.h);
+      const n = Math.max(3, Math.round(sp.w / 12));
+      for (let i = 0; i < n; i++) { ctx.lineTo(sp.x + (i + 0.5) * sp.w / n, sp.y - 4); ctx.lineTo(sp.x + (i + 1) * sp.w / n, sp.y + sp.h); }
+      ctx.closePath(); ctx.fill();
+    }
+    // cup
+    ctx.fillStyle = 'rgba(25,167,160,.2)'; ctx.fillRect(cup.x, cup.y, cup.w, cup.h);
+    ctx.strokeStyle = '#19a7a0'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(cup.x, cup.y); ctx.lineTo(cup.x, cup.y + cup.h); ctx.lineTo(cup.x + cup.w, cup.y + cup.h); ctx.lineTo(cup.x + cup.w, cup.y); ctx.stroke();
+    ctx.fillStyle = '#19a7a0'; ctx.font = "13px 'Permanent Marker', system-ui"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('cup', cup.x + cup.w / 2, cup.y + cup.h / 2 + 4);
+    // drawn ink
+    ctx.strokeStyle = '#137f7a'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    for (const l of lines) { if (l.length < 2) continue; ctx.beginPath(); ctx.moveTo(l[0].x, l[0].y); for (const p of l) ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    // start marker + ball
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,51,102,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(startPt.x, startPt.y, R + 5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ff3366'; ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(ball.x - 3, ball.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+    if (phase === 'draw' && !lines.length && level === 1) {
+      ctx.fillStyle = 'rgba(43,43,43,.55)'; ctx.font = "16px 'Permanent Marker', system-ui";
+      ctx.fillText('draw a ramp, then drop!', W / 2, 110);
+    }
+    ctx.font = "18px 'Permanent Marker', system-ui";
+    for (const f of floaters) { ctx.globalAlpha = Math.min(1, f.life / 30); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
+    ctx.globalAlpha = 1;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (!running || phase !== 'draw') return;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    drawing = [toLogical(e.clientX, e.clientY)]; lines.push(drawing);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drawing || phase !== 'draw') return;
+    const p = toLogical(e.clientX, e.clientY), last = drawing[drawing.length - 1];
+    const d = Math.hypot(p.x - last.x, p.y - last.y);
+    if (d < 5) return;
+    if (ink - d < DROP_COST) { drawing = null; floater(p.x, p.y, 'save some for the drop!', '#ff3366'); return; }
+    ink -= d; inkUsed += d; drawing.push(p);
+    drawn.push([last.x, last.y, p.x, p.y]);
+    document.getElementById('ink').textContent = 'Ink: ' + Math.floor(ink);
+  });
+  const endStroke = () => {
+    if (drawing && drawing.length < 2) lines.splice(lines.indexOf(drawing), 1);
+    drawing = null;
+  };
+  canvas.addEventListener('pointerup', endStroke); canvas.addEventListener('pointercancel', endStroke);
+  // ==================================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

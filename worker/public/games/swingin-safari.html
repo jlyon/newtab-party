@@ -150,7 +150,7 @@
   }
 
   // ===== GAME =====
-  const GRAV = 0.32, REACH = 230, GROUND = 150, MR = 11;
+  const GRAV = 0.32, REACH = 255, GROUND = 150, MR = 11;
   const rand = (a, b) => a + Math.random() * (b - a);
   const LINES = ['The floor was lava. You knew that.', 'Monkey flambé, extra crispy.', 'You had one job: hold on.', 'Bananas foster, but it\'s you.'];
   const decor = Array.from({ length: 9 }, (_, i) => ({ x: 20 + i * 42 + rand(-10, 10), len: rand(60, 200), ph: Math.random() * 6 }));
@@ -159,14 +159,15 @@
   function reset() {
     score = 0; t = 0; nanas = 0; att = null; L = 0; wasHeld = false; dying = 0; pops = []; bubbles = [];
     x = px = W / 2; y = py = GROUND - MR; minY = y;
-    anchors = []; bananas = []; nextY = 30;
+    anchors = []; bananas = []; nextY = 40;
+    genAnchor(W / 2 + (Math.random() < 0.5 ? -1 : 1) * rand(95, 125));
     while (nextY > -H) genAnchor();
     lavaY = GROUND + 260; camY = y - H * 0.6;
     document.getElementById('score').textContent = 'Score: 0';
   }
-  function genAnchor() {
+  function genAnchor(forceX) {
     const prev = anchors[anchors.length - 1];
-    let ax = rand(40, W - 40);
+    let ax = forceX !== undefined ? forceX : rand(40, W - 40);
     if (prev && Math.abs(ax - prev.x) < 60) ax = prev.x < W / 2 ? prev.x + rand(70, 150) : prev.x - rand(70, 150);
     ax = Math.max(30, Math.min(W - 30, ax));
     anchors.push({ x: ax, y: nextY });
@@ -188,13 +189,17 @@
     if (dying) { dying--; for (const b of bubbles) b.y -= 1; if (!dying) gameOver('Toasted!', LINES[Math.floor(Math.random() * LINES.length)]); return; }
     const h = holding();
     if (h && !wasHeld) { const a = bestAnchor(); if (a) { att = a; L = Math.max(40, Math.hypot(a.x - x, a.y - y)); } }
+    if (!h && att) {                                // fling: release boosts you along the swing
+      const fvx = x - px, fvy = y - py, fs = Math.hypot(fvx, fvy);
+      if (fs > 1) { const k = Math.min(15, fs * 1.35 + 2.5) / fs; px = x - fvx * k; py = y - fvy * k + (fvy < 0 ? 2.5 : 0); }
+    }
     if (!h) att = null;
     wasHeld = h;
     let vx = (x - px) * 0.995, vy = (y - py) * 0.995;
     const sp = Math.hypot(vx, vy); if (sp > 15) { vx *= 15 / sp; vy *= 15 / sp; }
     px = x; py = y; x += vx; y += vy + GRAV;
     if (att) {
-      L = Math.max(40, L - 0.7);
+      L = Math.max(40, L - 1.3);
       const dx = x - att.x, dy = y - att.y, d = Math.hypot(dx, dy);
       if (d > L) { x = att.x + dx / d * L; y = att.y + dy / d * L; }
     }

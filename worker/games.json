@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "scheduleEpoch": "2026-11-07",
+  "scheduleEpoch": "2026-11-11",
   "schedule": [
-    "the-jen-10",
-    "troll-toll",
-    "toad-tower",
-    "swingin-safari",
+    "hold-the-door",
+    "shady-business",
+    "stingy-scribbles",
+    "bennys-blue-turf-brawl",
     "red-light-green-fight",
     "echo-location",
     "moonslayer",
@@ -31,7 +31,11 @@
     "wild-cats",
     "tendy-slapper",
     "opposites-attract",
-    "slingshot-sally"
+    "slingshot-sally",
+    "the-jen-10",
+    "troll-toll",
+    "toad-tower",
+    "swingin-safari"
   ],
   "scheduleHistory": [
     {
@@ -172,6 +176,41 @@
         "vertigo",
         "wild-cats",
         "the-jen-10"
+      ]
+    },
+    {
+      "scheduleEpoch": "2026-11-07",
+      "schedule": [
+        "the-jen-10",
+        "troll-toll",
+        "toad-tower",
+        "swingin-safari",
+        "red-light-green-fight",
+        "echo-location",
+        "moonslayer",
+        "burnin-glory",
+        "build-the-boardwalk",
+        "sweep-the-strait",
+        "deja-loop",
+        "weiners-and-tubs",
+        "oligarchs-dilemma",
+        "fly-by-the-seat-of-your-pants",
+        "frosty-freefall",
+        "penalty-panic",
+        "blouncerroozal",
+        "prompter-payday",
+        "bend-it-like-maxi",
+        "abominable-speedway",
+        "rack-attack",
+        "smithereens",
+        "yedric-bombs",
+        "maze-muncher-sugar-rush",
+        "fogwatch",
+        "vertigo",
+        "wild-cats",
+        "tendy-slapper",
+        "opposites-attract",
+        "slingshot-sally"
       ]
     }
   ],
@@ -591,6 +630,46 @@
       "type": "platformer",
       "logo": "a green frog wizard in a purple pointy hat with a gold star, holding a glowing wand, a big green magic bubble with an angry lit candle trapped inside, round midnight-purple tower crest with gold trim",
       "model": "claude-opus-5-5"
+    },
+    {
+      "id": "hold-the-door",
+      "name": "Hold the Door!",
+      "file": "games/hold-the-door.html",
+      "description": "You are the elevator. Passengers pile up on eight floors with their destination in a bubble that goes red as their patience runs out. Deliver them fast, treat the VIPs right, and three walkouts gets the building condemned.",
+      "controls": "Tap or click a floor to send the car there. Arrow keys or 1-8 work too.",
+      "type": "arcade",
+      "logo": "a grumpy brass elevator car with a smug face, its doors held open by a tiny businessman with a briefcase, gold up/down call buttons, art deco midnight-purple crest with gold trim",
+      "model": "claude-opus-5-5"
+    },
+    {
+      "id": "shady-business",
+      "name": "Shady Business",
+      "file": "games/shady-business.html",
+      "description": "A noir shadow puzzle. Spin a block-built suspect under the lamp until its shadow fills the outline on the wall. Every match buys time, and matching in par turns pays double.",
+      "controls": "Arrow keys or WASD turn the object 90 degrees. On touch, swipe or use the buttons.",
+      "type": "puzzle",
+      "logo": "a purple voxel cube block in a detective fedora casting a long dramatic shadow under a yellow hanging lamp, 1940s film-noir badge crest, black and lamp-yellow",
+      "model": "claude-opus-5-5"
+    },
+    {
+      "id": "stingy-scribbles",
+      "name": "Stingy Scribbles",
+      "file": "games/stingy-scribbles.html",
+      "description": "Draw ramps on notebook paper to roll a ball into the cup. Ink is shared across the whole run, every drop costs ink, and the stingier your page, the bigger the score.",
+      "controls": "Drag to draw lines, Space or Drop to release the ball, Z or Erase removes your last line.",
+      "type": "puzzle",
+      "logo": "a cheeky pink bouncing ball wearing tiny round glasses rolling down a teal marker scribble into a paper cup, a fountain pen nib dripping teal ink, doodled notebook-paper crest",
+      "model": "claude-opus-5-5"
+    },
+    {
+      "id": "bennys-blue-turf-brawl",
+      "name": "Benny's Blue Turf Brawl",
+      "file": "games/bennys-blue-turf-brawl.html",
+      "description": "Gameday in Boise and the Beavs are 28-point underdogs. Brawl Benny the Beaver from the tailgate lot onto the blue turf, beat Buster, and pull off the upset.",
+      "controls": "Arrows/WASD move, Space punches (third hit chomps), X tail slaps, double-tap a direction to dash.",
+      "type": "beat-em-up",
+      "logo": "a scrappy brown cartoon beaver in an orange and black football jersey with buck teeth and a big flat tail, flexing on bright blue football turf, collegiate athletic crest",
+      "model": "claude-fable-5-2"
     }
   ]
 }
