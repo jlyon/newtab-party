@@ -90,7 +90,6 @@ async function init() {
       closeAbout();
       closeLeaderboard();
       skipName();
-      document.getElementById("game-title-wrap").classList.remove("show");
     } else {
       const anyModalOpen =
         document.getElementById("lb-overlay").classList.contains("open") ||
@@ -138,15 +137,15 @@ async function init() {
     if (e.key === "Escape") skipName();
   });
 
-  // How-to-play tooltip: tapping the title/icon toggles it on touch devices
-  // (desktop gets it on hover via CSS).
-  const titleWrap = document.getElementById("game-title-wrap");
-  titleWrap.addEventListener("click", (e) => {
-    if (!titleWrap.classList.contains("has-tip")) return;
-    e.stopPropagation();
-    titleWrap.classList.toggle("show");
+  // 🥳 reloads the new tab (today's game); the game name reloads just the game,
+  // back to its title screen, keeping the session best.
+  document.getElementById("game-brand").addEventListener("click", (e) => {
+    e.preventDefault();
+    location.reload();
   });
-  document.addEventListener("click", () => titleWrap.classList.remove("show"));
+  document.getElementById("game-title").addEventListener("click", () => {
+    if (currentGame) loadFrame(currentGame);
+  });
 }
 
 // Focus the game frame (and its inner window, for the cross-origin iframe) so
@@ -218,20 +217,12 @@ function loadGame(game) {
   document.getElementById("high-score").textContent = "";
   document.getElementById("high-score").classList.remove("new-best");
 
-  const wrap = document.getElementById("game-title-wrap");
-  wrap.classList.remove("show");
-  if (game.description || game.controls) {
-    document.getElementById("game-tooltip-desc").textContent =
-      game.description || "";
-    document.getElementById("game-tooltip-controls").textContent =
-      game.controls || "";
-    wrap.classList.add("has-tip");
-  } else {
-    wrap.classList.remove("has-tip");
-  }
+  loadFrame(game);
+}
 
-  // Games carry their own title screen with instructions now, so just load the
-  // frame behind the loading shimmer — no pre-game how-to overlay here.
+// Games carry their own title screen with instructions, so just load the frame
+// behind the loading shimmer (no pre-game how-to overlay or tooltip here).
+function loadFrame(game) {
   const frame = document.getElementById("game-frame");
   const loading = document.getElementById("loading");
   loading.classList.remove("hidden");

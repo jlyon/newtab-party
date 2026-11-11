@@ -28,14 +28,8 @@
   #start-overlay .cast { font-size: clamp(28px, 8vw, 40px); letter-spacing: 6px; margin: 4px 0; }
   #start-overlay .hint { color: var(--secondary); }
   /* ── Landing screen — gameplay background + themed title ── */
-  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
-  #start-overlay { background: #0b0b10; }
-  #start-overlay::before {
-    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.55), rgba(0,0,0,0.4) 72%, rgba(0,0,0,0.7)), url('backgrounds/troll-toll.jpg') center/cover no-repeat;
-    filter: blur(6px) saturate(0.75) brightness(0.8);
-  }
+  /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+  #start-overlay { background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f); }
   #start-overlay p { color: rgba(255,255,255,0.92); text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
   #start-overlay .hint { color: var(--secondary); }
   #start-overlay button { box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }

@@ -56,7 +56,7 @@ newtab-party/
     │   ├── db.ts              # D1 queries
     │   ├── render.ts          # Arcade, leaderboard, replay and /games pages
     │   └── types.ts
-    ├── public/games/          # Game HTML, plus logos/ and backgrounds/
+    ├── public/games/          # Game HTML, plus logos/ (backgrounds/ is unused)
     ├── games.json             # Game registry and air schedule (source of truth)
     ├── schema.sql
     └── wrangler.toml

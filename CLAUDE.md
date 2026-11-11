@@ -15,7 +15,7 @@ A Chrome extension (MV3) + Cloudflare Worker. The extension replaces the new tab
 | `worker/src/index.ts` | Fetch handler + all routes. Intercepts `/games/*` to strip `X-Frame-Options`. |
 | `worker/src/db.ts` | All D1 query logic (async). Score reads pass through `moderate()`, which blanks names that fail the filter or were reported. |
 | `worker/src/moderation.ts` | Leaderboard name filter (`isNameAllowed`, checked on save and on display) and report helpers. `POST /api/plays/:id/report` records a report; a name with `REPORT_HIDE_THRESHOLD` distinct reporters is hidden everywhere. Required for App Store guideline 1.2. |
-| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()`, `renderGamesCalendar()` (`/games`), `renderRetiredGames()` (`/games/retired`), `renderPrivacy()` (`/privacy`) — server-rendered HTML. Topbar how-to-play tooltip (hover on desktop / tap the title on mobile), name prompt, recent-games about section. |
+| `worker/src/render.ts` | `renderArcade()`, `renderLeaderboard()`, `renderReplay()`, `renderGamesCalendar()` (`/games`), `renderRetiredGames()` (`/games/retired`), `renderPrivacy()` (`/privacy`) — server-rendered HTML. Topbar (🥳 links home, the game name restarts the game at its title screen), name prompt, recent-games about section. |
 | `worker/src/types.ts` | `Game`, `Play`, `DailyEntry`, `Env` interfaces. |
 | `worker/schema.sql` | D1 table + index definitions. Run once to initialize. |
 | `worker/wrangler.toml` | Worker name, D1 binding, assets directory, custom domain route. |
@@ -71,7 +71,7 @@ If `schedule` is absent, both clients fall back to the legacy `index = ((dayNumb
 5. Logo: `npm run logos` generates every missing logo (or `npm run logos -- <id>` for one; Gemini key in `.env`, see `.env.example`) It also writes the 1200x630 link-preview card (`worker/public/games/share/<id>.jpg`, the og:image for `/`); `npm run share` builds any missing cards from existing logos.
 6. `npm run deploy` — any time of day; live immediately, no extension update needed
 
-Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card. The game's `description`/`controls` instead surface as a how-to-play tooltip on the topbar title — shown on hover (desktop) or by tapping the title (mobile).
+Every game carries its own title screen with instructions (see the game-builder skill), so the web player and extension no longer show a pre-game info card or a how-to tooltip. Title screens have no gameplay screenshot behind them: a dark backdrop with a soft glow in the game's `--primary` color (`worker/public/games/backgrounds/` is no longer used). In the topbar, the 🥳 goes home (today's game; in the extension it reloads the new tab) and the game name reloads the game back to its title screen.
 
 ### Rotation rules — read before touching games.json
 

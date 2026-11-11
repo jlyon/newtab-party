@@ -475,12 +475,18 @@
         gap: 6px;
         min-width: 0;
       }
-      #game-title-wrap.has-tip {
-        cursor: help;
-      }
+      /* 🥳 goes home (today's game); the game name restarts the game at its title screen. */
       #game-brand {
         font-size: 13px;
         flex-shrink: 0;
+        text-decoration: none;
+        display: inline-block;
+        padding: 6px;
+        margin: -6px;
+        transition: transform 0.12s ease;
+      }
+      #game-brand:hover {
+        transform: scale(1.15) rotate(-8deg);
       }
       #game-title {
         font-size: 11px;
@@ -489,25 +495,16 @@
         text-transform: uppercase;
         color: rgba(255, 255, 255, 0.55);
         white-space: nowrap;
+        background: none;
+        border: 0;
+        padding: 0;
+        font-family: inherit;
+        cursor: pointer;
+        transition: color 0.12s;
       }
-      #game-tooltip {
-        display: none;
-        position: absolute;
-        top: calc(100% + 10px);
-        left: 0;
-        background: #1a1a28;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 7px;
-        padding: 12px 14px;
-        min-width: 200px;
-        max-width: 320px;
-        z-index: 50;
-        pointer-events: none;
-        white-space: normal;
-      }
-      #game-title-wrap.has-tip:hover #game-tooltip,
-      #game-title-wrap.has-tip.show #game-tooltip {
-        display: block;
+      #game-title:hover,
+      #game-title:focus-visible {
+        color: #fff;
       }
       @media (max-width: 600px) {
         #game-title-wrap {
@@ -521,17 +518,6 @@
           white-space: nowrap;
           min-width: 0;
         }
-      }
-      #game-tooltip-desc {
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.6);
-        line-height: 1.5;
-        margin-bottom: 6px;
-      }
-      #game-tooltip-controls {
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.35);
-        font-style: italic;
       }
 
       /* ── Recent game cards (calendar-style tiles) ────── */
@@ -648,13 +634,9 @@
   <body>
     <div id="app">
       <div id="topbar">
-        <div id="game-title-wrap" role="button" tabindex="0" aria-label="Show how to play">
-          <span id="game-brand">🥳</span>
-          <span id="game-title"></span>
-          <div id="game-tooltip">
-            <div id="game-tooltip-desc"></div>
-            <div id="game-tooltip-controls"></div>
-          </div>
+        <div id="game-title-wrap">
+          <a id="game-brand" href="newtab.html" aria-label="newtab.party: today's game" title="Today's game">🥳</a>
+          <button id="game-title" type="button" title="Back to the title screen"></button>
         </div>
         <span id="game-date"></span>
         <span id="high-score"></span>

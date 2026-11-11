@@ -48,14 +48,8 @@
   .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 
   /* ── Landing screen — gameplay background + themed title ── */
-  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
-  #start-overlay { background: #0f3d56; }
-  #start-overlay::before {
-    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(84% 68% at 50% 45%, rgba(8,30,44,0.45), rgba(8,30,44,0.36) 72%, rgba(8,30,44,0.7)), url('backgrounds/build-the-boardwalk.jpg') center/cover no-repeat;
-    filter: blur(6px) saturate(0.75) brightness(0.8);
-  }
+  /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+  #start-overlay { background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f); }
   #start-overlay .panel { background: rgba(8,30,44,0.66); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); border-radius: 18px; padding: clamp(18px, 5vw, 32px); max-width: 560px; max-height: 100%; overflow-y: auto; touch-action: pan-y; }
   #start-logo { display: block; width: min(82%, 400px); max-height: 32vh; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
   #start-overlay h2 { font-size: clamp(28px, 7vw, 56px); text-shadow: 0 4px 0 var(--primary), 0 3px 34px rgba(0,0,0,0.85); }

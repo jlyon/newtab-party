@@ -65,14 +65,8 @@
   #overlay button:active { transform: scale(0.97); }
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
-  /* The screenshot sits on a blurred, dimmed layer so a busy scene stays behind the title. */
-  #start-overlay { background: #0b0b10; }
-  #start-overlay::before {
-    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(84% 68% at 50% 44%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.64)), linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/bend-it-like-maxi.jpg') center/cover no-repeat;
-    filter: blur(6px) saturate(0.75) brightness(0.8);
-  }
+  /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+  #start-overlay { background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f); }
   #start-card {
     max-width: 520px;
     background: rgba(6,12,20,0.6);

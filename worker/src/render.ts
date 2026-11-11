@@ -131,13 +131,11 @@ ${FAVICON}
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
   #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-  #game-title-wrap.has-tip { cursor: help; }
-  #game-brand { font-size: 13px; flex-shrink: 0; }
-  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; }
-  #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
-  #game-title-wrap.has-tip:hover #game-tooltip, #game-title-wrap.has-tip.show #game-tooltip { display: block; }
-  #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
-  #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
+  /* 🥳 goes home (today's game); the game name restarts the game at its title screen. */
+  #game-brand { font-size: 13px; flex-shrink: 0; text-decoration: none; display: inline-block; padding: 6px; margin: -6px; transition: transform 0.12s ease; }
+  #game-brand:hover { transform: scale(1.15) rotate(-8deg); }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; transition: color 0.12s; }
+  #game-title:hover, #game-title:focus-visible { color: #fff; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; flex: 1; }
   #high-score { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; transition: color 0.3s; min-width: 80px; text-align: center; }
   #high-score.new-best { color: #ffd700; animation: scorePop 0.35s ease; }
@@ -200,13 +198,9 @@ ${FAVICON}
 <body>
 <div id="app">
   <div id="topbar">
-    <div id="game-title-wrap" role="button" tabindex="0" aria-label="Show how to play">
-      <span id="game-brand">🥳</span>
-      <span id="game-title"></span>
-      <div id="game-tooltip">
-        <div id="game-tooltip-desc"></div>
-        <div id="game-tooltip-controls"></div>
-      </div>
+    <div id="game-title-wrap">
+      <a id="game-brand" href="/" aria-label="newtab.party: today's game" title="Today's game">🥳</a>
+      <button id="game-title" type="button" title="Back to the title screen"></button>
     </div>
     <span id="game-date"></span>
     <span id="high-score"></span>
@@ -317,7 +311,7 @@ async function init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) focusGame(); });
   document.addEventListener('pointerdown', () => { setTimeout(focusGame, 0); });
   document.addEventListener('keydown', e => {
-    if (e.key==='Escape') { closeAbout(); skipName(); document.getElementById('game-title-wrap').classList.remove('show'); return; }
+    if (e.key==='Escape') { closeAbout(); skipName(); return; }
     const anyModalOpen = document.getElementById('about-overlay').classList.contains('open') ||
       document.getElementById('name-overlay').classList.contains('open');
     if (anyModalOpen) return;
@@ -337,15 +331,8 @@ async function init() {
   document.getElementById('about-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeAbout(); });
   document.getElementById('name-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) skipName(); });
   document.getElementById('name-input').addEventListener('keydown', e => { if (e.key==='Enter') submitName(); if (e.key==='Escape') skipName(); });
-  // Tapping the title/icon toggles the how-to-play tooltip (for touch devices,
-  // where there's no hover). Desktop still gets it on hover via CSS.
-  const titleWrap = document.getElementById('game-title-wrap');
-  titleWrap.addEventListener('click', e => {
-    if (!titleWrap.classList.contains('has-tip')) return;
-    e.stopPropagation();
-    titleWrap.classList.toggle('show');
-  });
-  document.addEventListener('click', () => titleWrap.classList.remove('show'));
+  // The game name reloads the game, back to its title screen. The session best stays.
+  document.getElementById('game-title').addEventListener('click', () => { if (currentGame) loadFrame(currentGame); });
 }
 
 async function loadRecentGames() {
@@ -389,17 +376,12 @@ function loadGame(game) {
   document.getElementById('game-date').textContent = todayLabel();
   document.getElementById('high-score').textContent = '';
   document.getElementById('high-score').classList.remove('new-best');
-  const wrap = document.getElementById('game-title-wrap');
-  wrap.classList.remove('show');
-  if (game.description || game.controls) {
-    document.getElementById('game-tooltip-desc').textContent = game.description || '';
-    document.getElementById('game-tooltip-controls').textContent = game.controls || '';
-    wrap.classList.add('has-tip');
-  } else {
-    wrap.classList.remove('has-tip');
-  }
-  // Games carry their own title screen with instructions now, so just load the
-  // frame behind the loading shimmer — no pre-game how-to overlay here.
+  loadFrame(game);
+}
+
+// Games carry their own title screen with instructions, so just load the frame
+// behind the loading shimmer (no pre-game how-to overlay or tooltip here).
+function loadFrame(game) {
   const frame = document.getElementById('game-frame');
   const loading = document.getElementById('loading');
   loading.classList.remove('hidden'); loading.textContent = 'Loading…';
@@ -956,13 +938,11 @@ ${FAVICON}
   #app { display: flex; flex-direction: column; height: 100%; }
   #topbar { display: flex; align-items: baseline; padding: 0 16px; height: 40px; line-height: 40px; flex-shrink: 0; background: rgba(8,8,16,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255,255,255,0.07); gap: 12px; z-index: 10; overflow: visible; }
   #game-title-wrap { position: relative; line-height: normal; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-  #game-title-wrap.has-tip { cursor: help; }
-  #game-brand { font-size: 13px; flex-shrink: 0; }
-  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; }
-  #game-tooltip { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: #1a1a28; border: 1px solid rgba(255,255,255,0.12); border-radius: 7px; padding: 12px 14px; min-width: 200px; max-width: 320px; z-index: 50; pointer-events: none; white-space: normal; }
-  #game-title-wrap.has-tip:hover #game-tooltip, #game-title-wrap.has-tip.show #game-tooltip { display: block; }
-  #game-tooltip-desc { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-bottom: 6px; }
-  #game-tooltip-controls { font-size: 11px; color: rgba(255,255,255,0.35); font-style: italic; }
+  /* 🥳 goes home (today's game); the game name restarts the game at its title screen. */
+  #game-brand { font-size: 13px; flex-shrink: 0; text-decoration: none; display: inline-block; padding: 6px; margin: -6px; transition: transform 0.12s ease; }
+  #game-brand:hover { transform: scale(1.15) rotate(-8deg); }
+  #game-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.55); white-space: nowrap; background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; transition: color 0.12s; }
+  #game-title:hover, #game-title:focus-visible { color: #fff; }
   #game-date { font-size: 10px; color: rgba(255,255,255,0.25); white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
   #high-score { font-size: 11px; color: rgba(255,255,255,0.4); white-space: nowrap; min-width: 80px; text-align: center; }
   #high-score.new-best { color: #ffd700; animation: scorePop 0.35s ease; }
@@ -1014,13 +994,9 @@ ${REPORT_CSS}
 <body>
 <div id="app">
   <div id="topbar">
-    <div id="game-title-wrap"${game.description || game.controls ? ' class="has-tip" role="button" tabindex="0" aria-label="Show how to play"' : ''}>
-      <span id="game-brand">🥳</span>
-      <span id="game-title">${esc(game.name)}</span>
-      ${game.description || game.controls ? `<div id="game-tooltip">
-        <div id="game-tooltip-desc">${esc(game.description || '')}</div>
-        <div id="game-tooltip-controls">${esc(game.controls || '')}</div>
-      </div>` : ''}
+    <div id="game-title-wrap">
+      <a id="game-brand" href="/" aria-label="newtab.party: today's game" title="Today's game">🥳</a>
+      <button id="game-title" type="button" title="Back to the title screen">${esc(game.name)}</button>
     </div>
     <span id="game-date">${esc(dateLabel)}</span>
     <span id="high-score"></span>
@@ -1083,24 +1059,15 @@ window.addEventListener('message', function(e) {
 const frame = document.getElementById('game-frame');
 const loadingEl = document.getElementById('loading');
 let gameLoaded = false;
-function loadGameFrame() {
-  if (gameLoaded) return;
+function loadGameFrame(force) {
+  if (gameLoaded && !force) return;
   gameLoaded = true;
   loadingEl.classList.remove('hidden');
   frame.onload = () => loadingEl.classList.add('hidden');
   frame.src = '/${game.file}';
 }
-// Tapping the title/icon toggles the how-to-play tooltip on touch devices
-// (desktop gets it on hover via CSS).
-const titleWrap = document.getElementById('game-title-wrap');
-if (titleWrap) {
-  titleWrap.addEventListener('click', e => {
-    if (!titleWrap.classList.contains('has-tip')) return;
-    e.stopPropagation();
-    titleWrap.classList.toggle('show');
-  });
-  document.addEventListener('click', () => titleWrap.classList.remove('show'));
-}
+// The game name reloads the game, back to its title screen.
+document.getElementById('game-title').addEventListener('click', () => { scoresOverlay.classList.remove('open'); loadGameFrame(true); });
 const scoresOverlay = document.getElementById('scores-overlay');
 function closeScores() { scoresOverlay.classList.remove('open'); loadGameFrame(); }
 scoresOverlay.addEventListener('click', e => { if (e.target === e.currentTarget) closeScores(); });

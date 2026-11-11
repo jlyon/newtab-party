@@ -98,9 +98,8 @@
   #start-overlay {
     background:
       radial-gradient(80% 66% at 50% 44%, rgba(0,0,0,0.5), rgba(58,31,14,0.55) 66%, rgba(30,16,7,0.84));
-    background:
-      radial-gradient(80% 66% at 50% 44%, rgba(0,0,0,0.5), rgba(58,31,14,0.55) 66%, rgba(30,16,7,0.84)),
-      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/stump-grandpa.jpg') center/cover no-repeat;
+    /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+    background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f);
   }
   #start-overlay h2 {
     font-family: 'Special Elite', 'Courier New', monospace;

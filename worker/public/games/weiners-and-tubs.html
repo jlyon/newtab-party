@@ -64,9 +64,8 @@
   /* Title on this screen is the SVG badge (no text heading), so the display font
      is applied to the Play button; the badge/logo stays as-is. */
   #start-overlay {
-    background:
-      radial-gradient(84% 68% at 50% 44%, rgba(0,0,0,0.5), rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.66)),
-      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/weiners-and-tubs.jpg') center/contain no-repeat;
+    /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+    background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f);
   }
   #start-overlay .card {
     background: rgba(12,14,18,0.6);

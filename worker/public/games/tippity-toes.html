@@ -69,9 +69,8 @@
 
   /* ── Landing page (start screen) — themed redesign ────────────── */
   #start-overlay {
-    background:
-      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.42), rgba(0,0,0,0.28) 70%, rgba(0,0,0,0.58)),
-      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('backgrounds/tippity-toes.jpg') center/cover no-repeat;
+    /* Title screen: no gameplay screenshot, just a soft glow in the game's colors. */
+    background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--primary, #888) 18%, transparent), transparent 70%), color-mix(in srgb, var(--bg, #0b0b12) 16%, #09090f);
   }
   #start-overlay h2 {
     font-family: 'Chewy', cursive;
