@@ -251,6 +251,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > hiScore) { hiScore = b; hiEl.textContent = 'Best: ' + hiScore; }
+  });
 
   function endGame(reason) {
     running = false;
@@ -263,7 +269,7 @@
       ? PLAYER_NAME + ' stopped to catch his breath. Beavers do not rest.'
       : 'A pack of ' + lastRival + ' flattened ' + PLAYER_NAME + '. Brutal.';
     const best = score >= hiScore && score > 0;
-    overScore.textContent = 'Score: ' + score + (best ? ' — new personal best!' : '  ·  Best: ' + hiScore);
+    overScore.textContent = 'Score: ' + score + (best ? ' — new best!' : '  ·  Best: ' + hiScore);
     updateHud();
     overlay.style.display = 'flex';
   }

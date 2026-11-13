@@ -238,6 +238,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > hiScore) { hiScore = b; hiTime = null; hiEl.textContent = 'Best: ' + hiScore.toLocaleString(); }
+  });
 
   function safeRevealed(){ let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (revealed[r][c] && board[r][c] !== -1) n++; return n; }
   function updateScore(won) {

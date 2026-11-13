@@ -355,6 +355,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > best) best = b;
+  });
 
   let player, bullets, asteroids, score, lives, lastShot, lastSpawn, running;
   let scroll, columns, gap, frac, invuln, shake;
@@ -443,7 +449,7 @@
     document.getElementById('overScore').textContent = 'Score: ' + finalScore.toLocaleString();
     overMsg.textContent = 'You flew ' + finalScore + ' clicks before the galaxy won.';
     postHi(finalScore);
-    if (finalScore > best) { best = finalScore; bestMsg.textContent = 'New personal best! ' + best; }
+    if (finalScore > best) { best = finalScore; bestMsg.textContent = 'New best! ' + best; }
     else { bestMsg.textContent = 'Best: ' + best; }
     overlay.style.display = 'flex';
   }

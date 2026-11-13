@@ -217,6 +217,17 @@ export default {
     }
 
     // Would this score make today's top-N board? (no insert — just a check)
+    // ── GET /api/best?gameId= — the leaderboard top score a game's "Best" shows ──
+    // Today's game: today's board. Any other game (practice): its last airing's board.
+    if (pathname === '/api/best' && method === 'GET') {
+      const gameId = (url.searchParams.get('gameId') || '').trim();
+      if (!gameId) return json({ error: 'gameId required' }, 400);
+      const today = todayUTC();
+      const isToday = getDailyGame(getGames(), today)?.id === gameId;
+      const { date, best } = await db.getBoardBest(env.DB, gameId, today, isToday);
+      return json({ gameId, date, best });
+    }
+
     if (pathname === '/api/qualify' && method === 'GET') {
       const gameId = (url.searchParams.get('gameId') || '').trim();
       const score = Number(url.searchParams.get('score'));
@@ -365,11 +376,14 @@ export default {
       }
       const game = getDailyGame(getGames(), dateStr);
       if (!game) return html('<p>No games configured</p>', 503);
-      const [scores, count] = await Promise.all([
+      const today = todayUTC();
+      const [scores, count, board] = await Promise.all([
         db.getDailyScores(env.DB, game.id, dateStr),
         db.getDailyCount(env.DB, game.id, dateStr),
+        // Practice "Best": the top score from the last time this game was in the rotation.
+        db.getBoardBest(env.DB, game.id, today, getDailyGame(getGames(), today)?.id === game.id),
       ]);
-      return html(renderReplay(game, dateStr, scores, count, url.searchParams.has('scores')));
+      return html(renderReplay(game, dateStr, scores, count, url.searchParams.has('scores'), board.best));
     }
 
     return env.ASSETS.fetch(request);

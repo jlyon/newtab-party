@@ -106,6 +106,8 @@ function postHi(n) {
 }
 ```
 
+**Best comes from the leaderboard.** The arcade (worker `renderArcade()`/`renderReplay()` and the extension) sends each game `postMessage({ leaderboardBest: N }, …)` once the frame loads and whenever a score tops it; games with a Best readout listen and raise their best to `N` (scaffold games: `_hi` + `#best`). `N` comes from `GET /api/best?gameId=` / `db.getBoardBest()`: today's board for today's game, and for a practice replay the most recent day the game aired with scores. The topbar "Best" shows the same number. Games without an in-game Best readout (e.g. Rack Attack, Penalty Panic) rely on the topbar.
+
 Call `postHi(finalScore)` once on every game end (win, loss, timeout), never per-frame and never gated on a local best. **Scores are not normalized**: the integer shown on the game-over screen as `Score` is exactly the value posted and saved to the leaderboard (no `SCORE_SCALE`, no remapping). The newtab wrapper listens, checks whether it makes today's top 10, and forwards it to `POST /api/plays`.
 
 ### Frame-rate independence

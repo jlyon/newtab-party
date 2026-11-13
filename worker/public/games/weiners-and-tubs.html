@@ -323,6 +323,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > hiScore) { hiScore = b; hiEl.textContent = 'Best: ' + hiScore.toLocaleString(); }
+  });
   function popBubbles(x, y, color, n) {
     for (let i = 0; i < (n||8); i++) bubbles.push({ x, y, vx:(Math.random()-0.5)*3, vy:-Math.random()*3-1, life:24, color });
   }

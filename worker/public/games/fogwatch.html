@@ -140,6 +140,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > _hi) { _hi = b; const el = document.getElementById('best'); if (el) el.textContent = 'Best: ' + _hi.toLocaleString(); }
+  });
 
   const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
   const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');

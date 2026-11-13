@@ -364,7 +364,8 @@
   let busy = false;
   let playerShots = 0;
 
-  function getBest(){ try{ return parseInt(localStorage.getItem('yarrmada_best')||'0',10)||0; }catch(e){ return 0; } }
+  let lbBest = 0;   // leaderboard top score from newtab.party (see the message listener below)
+  function getBest(){ try{ return Math.max(lbBest, parseInt(localStorage.getItem('yarrmada_best')||'0',10)||0); }catch(e){ return lbBest; } }
   function setBest(v){ try{ localStorage.setItem('yarrmada_best', String(v)); }catch(e){} }
   let _hi = 0;   // in-game "best" readout only
   // Posts the run's final score, exactly as shown on screen. Always posts (every game end).
@@ -373,6 +374,12 @@
     if (n > _hi) _hi = n;
     try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
   }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > lbBest) { lbBest = b; const el = document.getElementById('startBest'); if (el) el.textContent = 'Best score: ' + getBest(); }
+  });
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   // Back-swipe guard: a stray edge swipe on phones stays on the page instead of leaving the arcade.
   window.addEventListener('touchstart', () => { try { history.pushState(null, '', location.href); } catch (e) {} }, { once: true, passive: true });

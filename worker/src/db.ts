@@ -147,6 +147,26 @@ export async function deletePlay(
   return (result.meta.changes as number) > 0;
 }
 
+// The "Best" a game shows: the top score on its most recent leaderboard on or
+// before `date`. For today's game that's today's board (0 until someone scores);
+// for a practice game it's the last day it aired with plays.
+export async function getBoardBest(
+  db: D1Database,
+  gameId: string,
+  date: string,
+  todayOnly: boolean,
+): Promise<{ date: string | null; best: number }> {
+  const row = await db
+    .prepare(
+      `SELECT date(played_at) AS date, MAX(score) AS best FROM plays
+       WHERE game_id = ? AND date(played_at) ${todayOnly ? '=' : '<='} ?
+       GROUP BY date(played_at) ORDER BY date(played_at) DESC LIMIT 1`,
+    )
+    .bind(gameId, date)
+    .first<{ date: string; best: number }>();
+  return { date: row?.date ?? null, best: row?.best ?? 0 };
+}
+
 // All-time totals per game for the /games sort views. Only the aired day's plays are
 // recorded, so distinct play days = days the game had a leaderboard.
 export async function getGameStats(db: D1Database): Promise<GameStats[]> {

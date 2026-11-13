@@ -48,7 +48,7 @@ let games = [],
   schedule = [],
   scheduleEpoch = null,
   currentGame = null,
-  sessionHighScore = 0;
+  boardBest = 0;
 let sessionPlayId = null;
 let lastEvaluatedScore = -1;
 
@@ -209,15 +209,50 @@ function showServerError() {
 function loadGame(game) {
   if (!game) return;
   currentGame = game;
-  sessionHighScore = 0;
+  boardBest = 0;
   sessionPlayId = null;
 
   document.getElementById("game-title").textContent = game.name;
+  document.title = `🥳 Todays game is ${game.name} - newtab.party`;
   document.getElementById("game-date").textContent = todayLabel();
   document.getElementById("high-score").textContent = "";
   document.getElementById("high-score").classList.remove("new-best");
 
   loadFrame(game);
+  refreshBoardBest(game);
+}
+
+// "Best" is the top score on today's leaderboard (not just this visit). The game
+// gets it too, via postMessage({ leaderboardBest }), for its own Best readout.
+async function refreshBoardBest(game) {
+  try {
+    const j = await fetch(
+      `${SERVER_URL}/api/best?gameId=${encodeURIComponent(game.id)}`,
+    ).then((r) => (r.ok ? r.json() : null));
+    if (!j || currentGame !== game) return;
+    setBoardBest(Number(j.best) || 0, false);
+  } catch {}
+}
+
+function setBoardBest(n, pop) {
+  if (n < boardBest) return;
+  boardBest = n;
+  const el = document.getElementById("high-score");
+  el.textContent = boardBest > 0 ? `Best: ${boardBest.toLocaleString()}` : "";
+  if (pop) {
+    el.classList.remove("new-best");
+    void el.offsetWidth;
+    el.classList.add("new-best");
+  }
+  sendBestToGame();
+}
+
+function sendBestToGame() {
+  try {
+    document
+      .getElementById("game-frame")
+      .contentWindow.postMessage({ leaderboardBest: boardBest }, SERVER_URL);
+  } catch {}
 }
 
 // Games carry their own title screen with instructions, so just load the frame
@@ -227,7 +262,7 @@ function loadFrame(game) {
   const loading = document.getElementById("loading");
   loading.classList.remove("hidden");
   loading.textContent = "Loading…";
-  frame.onload = () => { loading.classList.add("hidden"); focusGame(); };
+  frame.onload = () => { loading.classList.add("hidden"); focusGame(); sendBestToGame(); };
   frame.src = `${SERVER_URL}/${game.file}`;
 }
 
@@ -238,15 +273,8 @@ function handleMessage(event) {
   const score = Math.floor(d.highScore);
   if (score <= 0) return;
 
-  // Topbar "Best" reflects the best score of this local session.
-  if (score > sessionHighScore) {
-    sessionHighScore = score;
-    const el = document.getElementById("high-score");
-    el.textContent = `Best: ${score.toLocaleString()}`;
-    el.classList.remove("new-best");
-    void el.offsetWidth;
-    el.classList.add("new-best");
-  }
+  // A score that tops today's board becomes the new Best right away.
+  if (score > boardBest) setBoardBest(score, true);
 
   if (!currentGame) return;
   // Offer the leaderboard whenever the score makes the day's top board — not

@@ -158,6 +158,7 @@ Scores must reward skill **without a ceiling**, and the leaderboard stores **exa
    }
    ```
    Call `postHi(runScore)` unconditionally at game over — never wrap it in `if (runScore > best)`. Post **only at game over**, never per-frame during play (the arcade would pop the name prompt mid-game and flood the qualify check). The arcade de-dupes identical scores and decides whether to prompt.
+   **"Best" is the leaderboard's top score, not just this session's.** The arcade sends the game `postMessage({ leaderboardBest: N })` after it loads (today's board for today's game; for a practice replay, the board from the last time the game was in the rotation) and again when a score tops it. The scaffold's listener raises `_hi` to `N` and refreshes `#best`; keep it, and if your Best readout uses another variable or element, point the listener at those instead. So a "new best!" on the game-over screen means the run beat the leaderboard. Opened on its own (no arcade), the game just keeps this session's best.
 5. **Don't let one lucky moment dominate.** Prefer accumulating skill (distance, hits, combos, time survived) over single jackpot payouts, so the scale stays meaningful.
 
 ### Frame-rate independence (mandatory — same speed on every screen)

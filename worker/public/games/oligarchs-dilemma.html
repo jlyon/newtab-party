@@ -328,6 +328,12 @@ function postHi(n){
   if(n > _hi) _hi = n;
   try{ window.parent.postMessage({highScore:n}, "*"); }catch(e){}
 }
+// Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+// Opened on its own, the game keeps this session's best.
+window.addEventListener('message', (e) => {
+  const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+  if (b > bestWin) bestWin = b;
+});
 function grabFocus(){ try{ window.focus(); }catch(e){} }
 grabFocus(); window.addEventListener("pointerdown", grabFocus);
 window.addEventListener("touchstart", () => {
@@ -482,7 +488,7 @@ function showEnd(win){
              win>=1000000?"Solidly rich. Buy a small media outlet.":
              win>=100000?"Comfortable. Suspiciously comfortable.":
              "The reflecting pond is lovely this time of year.";
-  ov.innerHTML=`<div class="score-lbl">Score</div><h2>${fmt(win)}</h2><p>${rank}<br><br>Best haul this session: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
+  ov.innerHTML=`<div class="score-lbl">Score</div><h2>${fmt(win)}</h2><p>${rank}<br><br>Best haul: <b>${fmt(bestWin)}</b></p><button class="play" id="againBtn">Play Again</button>`;
   $("wrap").appendChild(ov);
   $("againBtn").onclick=()=>{ grabFocus(); restart(); };
 }

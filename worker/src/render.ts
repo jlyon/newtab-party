@@ -122,7 +122,7 @@ export function renderArcade({ game = null, origin = 'https://newtab.party' }: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Arcade</title>
+<title>${game ? `🥳 Todays game is ${esc(game.name)} - newtab.party` : 'newtab.party'}</title>
 ${shareMeta(game, origin)}
 ${FAVICON}
 <style>
@@ -267,7 +267,7 @@ window.addEventListener('touchstart', function () {
   window.addEventListener('popstate', function () { try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {} });
 }, { once: true, passive: true });
 const DAY_EPOCH = Date.UTC(2026, 4, 1);
-let games = [], schedule = [], scheduleEpoch = null, currentGame = null, sessionHighScore = 0;
+let games = [], schedule = [], scheduleEpoch = null, currentGame = null, boardBest = 0;
 let sessionPlayId = null;
 let lastEvaluatedScore = -1;
 
@@ -371,12 +371,35 @@ function focusGame() {
 
 function loadGame(game) {
   if (!game) return;
-  currentGame = game; sessionHighScore = 0; sessionPlayId = null;
+  currentGame = game; boardBest = 0; sessionPlayId = null;
   document.getElementById('game-title').textContent = game.name;
+  document.title = '🥳 Todays game is ' + game.name + ' - newtab.party';
   document.getElementById('game-date').textContent = todayLabel();
   document.getElementById('high-score').textContent = '';
   document.getElementById('high-score').classList.remove('new-best');
   loadFrame(game);
+  refreshBoardBest(game);
+}
+
+// "Best" is the top score on today's leaderboard (not just this visit). The game
+// gets it too, via postMessage({ leaderboardBest }), for its own Best readout.
+async function refreshBoardBest(game) {
+  try {
+    const j = await fetch('/api/best?gameId=' + encodeURIComponent(game.id)).then(r => r.ok ? r.json() : null);
+    if (!j || currentGame !== game) return;
+    setBoardBest(Number(j.best) || 0, false);
+  } catch {}
+}
+function setBoardBest(n, pop) {
+  if (n < boardBest) return;
+  boardBest = n;
+  const el = document.getElementById('high-score');
+  el.textContent = boardBest > 0 ? 'Best: ' + boardBest.toLocaleString() : '';
+  if (pop) { el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best'); }
+  sendBestToGame();
+}
+function sendBestToGame() {
+  try { document.getElementById('game-frame').contentWindow.postMessage({ leaderboardBest: boardBest }, '*'); } catch (e) {}
 }
 
 // Games carry their own title screen with instructions, so just load the frame
@@ -385,7 +408,7 @@ function loadFrame(game) {
   const frame = document.getElementById('game-frame');
   const loading = document.getElementById('loading');
   loading.classList.remove('hidden'); loading.textContent = 'Loading…';
-  frame.onload = () => { loading.classList.add('hidden'); focusGame(); };
+  frame.onload = () => { loading.classList.add('hidden'); focusGame(); sendBestToGame(); };
   frame.src = '/' + game.file;
 }
 
@@ -394,13 +417,8 @@ function handleMessage(event) {
   if (!d || typeof d.highScore !== 'number') return;
   const score = Math.floor(d.highScore);
   if (score <= 0) return;
-  // Topbar "Best" reflects the best score of this local session.
-  if (score > sessionHighScore) {
-    sessionHighScore = score;
-    const el = document.getElementById('high-score');
-    el.textContent = 'Best: ' + score.toLocaleString();
-    el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best');
-  }
+  // A score that tops today's board becomes the new Best right away.
+  if (score > boardBest) setBoardBest(score, true);
   if (!currentGame) return;
   // Offer the leaderboard whenever the score makes the day's top board —
   // not only when it beats the local session best. Dedupe identical scores
@@ -639,7 +657,7 @@ export function renderGamesCalendar({ today, cells, retiredCount = 0, sort = nul
     const badge = c.isToday ? `<span class="cal-badge">Today · counts</span>` : '';
     const href = c.isToday ? '/' : `/play/${c.date}`;
     const cls = c.isToday ? 'cal-cell is-today' : 'cal-cell is-past';
-    const label = c.isToday ? `Play today's game, ${name}` : `Practice ${name} from ${c.date}`;
+    const label = c.isToday ? `Play today's game, ${c.game.name}` : `Practice ${c.game.name} from ${c.date}`;
     return `<a class="${cls}" href="${href}" aria-label="${esc(label)}"${rev}><span class="cal-day">${dayNum}</span>${logo}${badge}</a>`;
   };
 
@@ -672,7 +690,7 @@ export function renderGamesCalendar({ today, cells, retiredCount = 0, sort = nul
     const cap = `<div class="rank-cap">${name}<small>${statLine(r)}</small></div>`;
     const href = r.isToday ? '/' : r.lastAired ? `/play/${r.lastAired}` : '';
     if (!href) return `<div class="rank-item">${tile}${cap}</div>`;
-    const label = r.isToday ? `Play today's game, ${name}` : `Practice ${name}`;
+    const label = r.isToday ? `Play today's game, ${r.game.name}` : `Practice ${r.game.name}`;
     return `<a class="rank-item" href="${href}" aria-label="${esc(label)}">${tile}${cap}</a>`;
   };
   const sortNav = `<nav class="sort" aria-label="Sort games"><span class="sort-label">Sort</span>${
@@ -913,6 +931,7 @@ export function renderReplay(
   scores: Play[],
   totalPlays: number,
   openScores = false,
+  boardBest = 0,   // top score from the last time this game was in the rotation
 ): string {
   const dateLabel = fmtDate(date);
 
@@ -1045,16 +1064,23 @@ window.addEventListener('touchstart', function () {
   try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {}
   window.addEventListener('popstate', function () { try { history.pushState({ arcade: 1 }, '', location.href); } catch (e) {} });
 }, { once: true, passive: true });
-let hi = 0;
+// Practice "Best" starts at the leaderboard top from the last time this game was in
+// the rotation; the game gets it via postMessage({ leaderboardBest }) for its own readout.
+let hi = ${Math.max(0, Math.round(boardBest))};
+function showHi(pop) {
+  const el = document.getElementById('high-score');
+  el.textContent = hi > 0 ? 'Best: ' + hi.toLocaleString() : '';
+  if (pop) { el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best'); }
+}
+function sendHi() { try { frame.contentWindow.postMessage({ leaderboardBest: hi }, '*'); } catch (e) {} }
+showHi(false);
 window.addEventListener('message', function(e) {
   const d = e.data;
   if (!d || typeof d.highScore !== 'number') return;
   const score = Math.floor(d.highScore);
   if (score <= hi) return;
   hi = score;
-  const el = document.getElementById('high-score');
-  el.textContent = 'Best: ' + score.toLocaleString();
-  el.classList.remove('new-best'); void el.offsetWidth; el.classList.add('new-best');
+  showHi(true);
 });
 const frame = document.getElementById('game-frame');
 const loadingEl = document.getElementById('loading');
@@ -1063,7 +1089,7 @@ function loadGameFrame(force) {
   if (gameLoaded && !force) return;
   gameLoaded = true;
   loadingEl.classList.remove('hidden');
-  frame.onload = () => loadingEl.classList.add('hidden');
+  frame.onload = () => { loadingEl.classList.add('hidden'); sendHi(); };
   frame.src = '/${game.file}';
 }
 // The game name reloads the game, back to its title screen.
