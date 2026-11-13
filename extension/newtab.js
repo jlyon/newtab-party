@@ -213,7 +213,7 @@ function loadGame(game) {
   sessionPlayId = null;
 
   document.getElementById("game-title").textContent = game.name;
-  document.title = `Todays game is ${game.name} - newtab.party`;
+  document.title = `${game.name} is today's game @ newtab.party`;
   document.getElementById("game-date").textContent = todayLabel();
   document.getElementById("high-score").textContent = "";
   document.getElementById("high-score").classList.remove("new-best");
