@@ -122,7 +122,7 @@ export function renderArcade({ game = null, origin = 'https://newtab.party' }: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>${game ? `🥳 Todays game is ${esc(game.name)} - newtab.party` : 'newtab.party'}</title>
+<title>${game ? `Todays game is ${esc(game.name)} - newtab.party` : 'newtab.party'}</title>
 ${shareMeta(game, origin)}
 ${FAVICON}
 <style>
@@ -373,7 +373,7 @@ function loadGame(game) {
   if (!game) return;
   currentGame = game; boardBest = 0; sessionPlayId = null;
   document.getElementById('game-title').textContent = game.name;
-  document.title = '🥳 Todays game is ' + game.name + ' - newtab.party';
+  document.title = 'Todays game is ' + game.name + ' - newtab.party';
   document.getElementById('game-date').textContent = todayLabel();
   document.getElementById('high-score').textContent = '';
   document.getElementById('high-score').classList.remove('new-best');
