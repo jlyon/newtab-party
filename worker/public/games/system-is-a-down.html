@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>System Is a Down</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #33ff66; --secondary: #ffb000; --bg: #050a06; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #c8ffd6; font-family: 'VT323', ui-monospace, Menlo, monospace; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 6px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 22px; font-size: clamp(16px, 4vw, 20px); color: var(--primary); }
+  #best { color: var(--secondary); }
+  /* Logical size is 420 x 580; CSS scales it to fit the viewport minus the HUD and hint (~110px reserved). */
+  canvas { display: block; width: min(95vw, calc((100dvh - 110px) * (420 / 580))); height: auto; border-radius: 6px; border: 1px solid #143d20; box-shadow: 0 0 40px rgba(51,255,102,.12); cursor: pointer; }
+  #hint { font-size: clamp(13px, 3.4vw, 16px); color: #5fae74; text-align: center; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; z-index: 20;
+             background: radial-gradient(70% 55% at 50% 42%, rgba(51,255,102,.16), rgba(5,10,6,.96) 70%), #050a06; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-weight: 400; font-size: clamp(40px, 11vw, 78px); line-height: .95; color: var(--primary); text-shadow: 0 0 22px rgba(51,255,102,.55); }
+  .overlay p { max-width: 44ch; margin: 6px 0; line-height: 1.3; font-size: clamp(17px, 4.2vw, 22px); color: #c8ffd6; }
+  .overlay p.dim { color: var(--secondary); }
+  .overlay button { margin-top: 18px; padding: 12px 40px; font-family: inherit; font-size: clamp(20px, 5vw, 26px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 6px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #over-overlay h2 { color: #ff4d4d; text-shadow: 0 0 22px rgba(255,77,77,.5); }
+  /* Short landscape phones: HUD beside the board, compact overlays. */
+  @media (orientation: landscape) and (max-height: 480px) {
+    #wrap { flex-direction: row; gap: 16px; }
+    #hud { flex-direction: column; gap: 6px; }
+    #hint { max-width: 22ch; }
+    canvas { width: min(60vw, calc((100dvh - 12px) * (420 / 580))); }
+    .overlay { padding: 8px 20px; }
+    .overlay h2 { font-size: clamp(30px, 12vh, 48px); margin-bottom: 2px; }
+    .overlay p { max-width: 70ch; margin: 2px 0; font-size: clamp(14px, 5vh, 18px); line-height: 1.15; }
+    .overlay button { margin-top: 8px; padding: 8px 34px; font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="420" height="580"></canvas>
+  <div id="hint">Tap a node to rotate it · mash a downed node to reboot it</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img src="logos/system-is-a-down.png" alt="System Is a Down" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">
+  <h2>System Is a Down</h2>
+  <p>Packets drop in from the data centers up top. Tap / click a node to rotate it and route every packet to the bottom.</p>
+  <p class="dim">Kyle the intern keeps patching nodes offline. Reroute around them, or mash a downed node to reboot it faster. Keyboard: arrows + Space.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score" class="dim">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 420, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); return; }
+    if (!running) return;
+    const mv = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] }[e.key];
+    if (mv) { showCur = true; cur.c = Math.max(0, Math.min(COLS - 1, cur.c + mv[0])); cur.r = Math.max(0, Math.min(ROWS - 1, cur.r + mv[1])); }
+    else if (e.key === ' ') { showCur = true; if (!e.repeat) tap(cur.c, cur.r); }
+  });
+
+  // Scoring: the integer on screen IS the leaderboard value. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+  addEventListener('message', e => {           // arcade sends today's leaderboard best
+    const n = e.data && Number(e.data.leaderboardBest);
+    if (n > _hi) { _hi = Math.round(n); document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString(); }
+  });
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME =====
+  // Directions: 0 = N, 1 = E, 2 = S, 3 = W. Node types: S straight, L elbow, X crossover.
+  const COLS = 6, ROWS = 7, T = 66, GX = 12, GY = 84;
+  const INLETS = [1, 4], OUTLETS = [0, 2, 5];
+  const OUT_LABEL = { 0: 'grandma', 2: 'smart fridge', 5: 'fantasy lg' };
+  const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  const ERRS = ['404', '503', 'TIMEOUT', 'ECONNRESET', '502', 'NXDOMAIN'];
+  const KYLE = [
+    'kyle: pushing hotfix_final_v2 to @',
+    'kyle: "it\'s just a small patch" (@)',
+    'kyle: rotating certs on @. brb',
+    'kyle: @ needs a quick reboot',
+    'kyle: applying CVE-2026-# to @',
+    'kyle: who needs staging? patching @',
+    'kyle: @ failed compliance. updating',
+    'kyle: force-pushing firmware to @',
+  ];
+  const FONT = (px) => px + "px 'VT323', ui-monospace, Menlo, monospace";
+  const rnd = n => Math.floor(Math.random() * n);
+
+  let score = 0, grid = [], packets = [], floats = [], frame = 0, outage = 0, spawnT = [0, 0], updT = 0;
+  let ticker = '', lit = [], outLit = {}, inletB = false, shake = 0, showCur = false;
+  const cur = { c: 1, r: 0 };
+
+  function openings(t) { return t.type === 'X' ? [0, 1, 2, 3] : t.type === 'S' ? [t.rot % 2, t.rot % 2 + 2] : [t.rot, (t.rot + 1) % 4]; }
+  function exitFor(t, entry) {
+    if (t.type === 'X') return (entry + 2) % 4;
+    const o = openings(t);
+    return o[0] === entry ? o[1] : o[1] === entry ? o[0] : null;
+  }
+  function shapeFor(a, b) {
+    if ((a + 2) % 4 === b) return { type: 'S', rot: a % 2 };
+    for (let k = 0; k < 4; k++) if ((k === a && (k + 1) % 4 === b) || (k === b && (k + 1) % 4 === a)) return { type: 'L', rot: k };
+  }
+  // Lay a guaranteed route from an inlet to an outlet inside columns lo..hi so every board is solvable.
+  function layPath(lo, hi, startCol, ends, solved) {
+    let c = startCol;
+    for (let r = 0; r < ROWS; r++) {
+      const tgt = r === ROWS - 1 ? ends[rnd(ends.length)] : (Math.random() < 0.35 ? c : lo + rnd(hi - lo + 1));
+      let inn = 0;
+      while (c !== tgt) { const d = tgt > c ? 1 : 3; Object.assign(grid[r][c], shapeFor(inn, d), { solved }); c += DX[d]; inn = (d + 2) % 4; }
+      Object.assign(grid[r][c], shapeFor(inn, 2), { solved });
+    }
+  }
+  function say(s) { ticker = s; }
+  function nodeName(c, r) { return 'ABCDEF'[c] + (r + 1); }
+  function center(c, r) { return { x: GX + c * T + T / 2, y: GY + r * T + T / 2 }; }
+  function sidePt(c, r, d) { const p = center(c, r); return { x: p.x + DX[d] * T / 2, y: p.y + DY[d] * T / 2 }; }
+
+  function reset() {
+    score = 0; frame = 0; outage = 0; packets = []; floats = []; inletB = false; shake = 0;
+    spawnT = [90, 0]; updT = 420;
+    grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid.push([]);
+      for (let c = 0; c < COLS; c++) {
+        const k = Math.random();
+        grid[r].push({ type: k < 0.5 ? 'L' : k < 0.85 ? 'S' : 'X', rot: 0, warn: 0, down: 0, downMax: 1, anim: 0, solved: false });
+      }
+    }
+    layPath(0, 2, 1, [0, 2], true);
+    layPath(3, 5, 4, [5], false);
+    for (const row of grid) for (const t of row) if (!t.solved) t.rot = rnd(4);
+    say('kyle: "morning! anything need patching?"');
+    document.getElementById('score').textContent = 'Score: 0';
+    trace();
+  }
+
+  // Which nodes currently carry a live route from an active data center?
+  function trace() {
+    lit = grid.map(row => row.map(() => false)); outLit = {};
+    for (let i = 0; i < (inletB ? 2 : 1); i++) {
+      let c = INLETS[i], r = 0, entry = 0, n = 0;
+      while (n++ < 60) {
+        const t = grid[r][c];
+        if (t.down > 0) break;
+        const ex = exitFor(t, entry);
+        if (ex === null) break;
+        lit[r][c] = true;
+        c += DX[ex]; r += DY[ex];
+        if (r === ROWS) { if (OUTLETS.includes(c)) outLit[c] = true; break; }
+        if (r < 0 || c < 0 || c >= COLS) break;
+        entry = (ex + 2) % 4;
+      }
+    }
+  }
+
+  function addFloat(x, y, txt, color) { floats.push({ x, y, txt, color, life: 50 }); }
+  function drop(x, y) {
+    outage = Math.min(100, outage + 7); shake = 7;
+    addFloat(x, y, ERRS[rnd(ERRS.length)], '#ff4d4d');
+    if (outage >= 100 && running) {
+      gameOver('System Is a Down', 'The internet is officially a down. You delivered ' + score.toLocaleString() + ' packets before Kyle "fixed" everything.');
+    }
+  }
+  function deliver(c) {
+    score++; outage = Math.max(0, outage - 1);
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    addFloat(GX + c * T + T / 2, GY + ROWS * T - 6, '+1', '#33ff66');
+  }
+  function spawn(col) {
+    const t = grid[0][col];
+    if (t.down > 0 || exitFor(t, 0) === null) drop(GX + col * T + T / 2, GY + 14);
+    else packets.push({ c: col, r: 0, entry: 0, exit: null, t: 0 });
+  }
+  function pushUpdate(level) {
+    let busy = 0; const live = [], all = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const t = grid[r][c];
+      if (t.warn > 0 || t.down > 0) { busy++; continue; }
+      all.push([c, r]); if (lit[r][c]) live.push([c, r]);
+    }
+    if (busy >= 1 + Math.floor(level / 4) || !all.length) return;
+    const pool = live.length && Math.random() < 0.65 ? live : all;
+    const [c, r] = pool[rnd(pool.length)];
+    grid[r][c].warn = 180;
+    say(KYLE[rnd(KYLE.length)].replace('@', 'node ' + nodeName(c, r)).replace('#', String(1000 + rnd(9000))));
+  }
+  function tap(c, r) {
+    if (!running) return;
+    const t = grid[r][c], p = center(c, r);
+    if (t.down > 0) { t.down = Math.max(1, t.down - 40); addFloat(p.x, p.y - 8, '*kick*', '#ffb000'); }
+    else if (t.type !== 'X') { t.rot = (t.rot + 1) % 4; t.anim = 6; }
+  }
+  canvas.addEventListener('pointerdown', e => {
+    const p = toLogical(e.clientX, e.clientY);
+    const c = Math.floor((p.x - GX) / T), r = Math.floor((p.y - GY) / T);
+    showCur = false;
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) { cur.c = c; cur.r = r; tap(c, r); }
+  });
+
+  function step() {
+    frame++;
+    const level = Math.floor(score / 10);
+    const TR = Math.max(20, 50 - 2 * level);                 // frames for a packet to cross one node
+    if (shake > 0) shake--;
+    if (!inletB && score >= 12) { inletB = true; spawnT[1] = 150; say('kyle: "spun up a 2nd data center. you\'re welcome"'); }
+    for (let i = 0; i < (inletB ? 2 : 1); i++) {
+      if (--spawnT[i] <= 0) { spawnT[i] = Math.max(55, 150 - 7 * level); spawn(INLETS[i]); }
+    }
+    if (--updT <= 0) { updT = Math.max(140, 460 - 25 * level); pushUpdate(level); }
+
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const t = grid[r][c];
+      if (t.anim > 0) t.anim--;
+      if (t.warn > 0) { if (--t.warn === 0) { t.down = t.downMax = Math.min(480, 300 + level * 10); say('status: node ' + nodeName(c, r) + ' is a down'); } }
+      else if (t.down > 0) {
+        if (--t.down === 0) { t.rot = rnd(4); const p = center(c, r); addFloat(p.x, p.y, 'ONLINE', '#33ff66'); }
+      }
+    }
+
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i], t = grid[p.r][p.c];
+      p.t += 1 / TR;
+      if (p.exit === null && p.t >= 0.5) { const e = exitFor(t, p.entry); p.exit = e === null ? openings(t)[0] : e; }
+      if (p.t >= 1) {
+        const nc = p.c + DX[p.exit], nr = p.r + DY[p.exit], edge = sidePt(p.c, p.r, p.exit);
+        if (nr === ROWS && OUTLETS.includes(nc)) { packets.splice(i, 1); deliver(nc); continue; }
+        const inside = nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS, ne = (p.exit + 2) % 4;
+        if (!inside || grid[nr][nc].down > 0 || exitFor(grid[nr][nc], ne) === null) { packets.splice(i, 1); drop(edge.x, edge.y); if (!running) return; continue; }
+        p.c = nc; p.r = nr; p.entry = ne; p.exit = null; p.t -= 1;
+      }
+    }
+    for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.y -= 0.5; if (--f.life <= 0) floats.splice(i, 1); }
+    trace();
+  }
+
+  function rr(x, y, w, h, rad) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rad) : ctx.rect(x, y, w, h); }
+  function draw() {
+    ctx.save();
+    ctx.fillStyle = '#050a06'; ctx.fillRect(0, 0, W, H);
+    if (shake > 0) ctx.translate((shake % 2 ? 1 : -1) * shake * 0.5, 0);
+    ctx.textBaseline = 'middle';
+
+    // Kyle ticker + outage meter
+    ctx.textAlign = 'left'; ctx.font = FONT(18); ctx.fillStyle = '#ffb000';
+    ctx.fillText('> ' + ticker + (frame % 60 < 30 ? '_' : ''), 12, 14, W - 24);
+    ctx.fillStyle = '#0a140c'; rr(12, 28, W - 24, 18, 4); ctx.fill();
+    const oc = outage < 40 ? '#33ff66' : outage < 70 ? '#ffb000' : '#ff4d4d';
+    ctx.fillStyle = oc; rr(12, 28, (W - 24) * outage / 100, 18, 4); ctx.fill();
+    ctx.strokeStyle = '#1c6a34'; ctx.lineWidth = 1; rr(12, 28, W - 24, 18, 4); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.font = FONT(16); ctx.fillStyle = outage > 55 ? '#050a06' : '#c8ffd6';
+    ctx.fillText('OUTAGE ' + Math.round(outage) + '%', W / 2, 37.5);
+
+    // Data centers (inlets)
+    for (let i = 0; i < 2; i++) {
+      const x = GX + INLETS[i] * T + T / 2, on = i === 0 || inletB;
+      ctx.fillStyle = on ? '#33ff66' : '#1c4a28'; ctx.font = FONT(17);
+      ctx.fillText(on ? 'DC-' + (i + 1) + ' ▼' : 'DC-2 offline', x, 68, T * 1.6);
+    }
+
+    // Nodes
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const t = grid[r][c], x = GX + c * T, y = GY + r * T, isDown = t.down > 0, warn = t.warn > 0;
+      ctx.fillStyle = isDown ? '#240707' : '#0a140c'; rr(x + 2, y + 2, T - 4, T - 4, 7); ctx.fill();
+      ctx.lineWidth = warn ? 2.5 : 1;
+      ctx.strokeStyle = isDown ? '#7a1f1f' : warn ? (frame % 20 < 10 ? '#ffb000' : '#5a4000') : '#143d20';
+      rr(x + 2, y + 2, T - 4, T - 4, 7); ctx.stroke();
+      ctx.save();
+      ctx.translate(x + T / 2, y + T / 2);
+      ctx.rotate((t.rot - t.anim / 6) * Math.PI / 2);
+      ctx.strokeStyle = isDown ? '#5a1c1c' : lit[r][c] ? '#33ff66' : '#1c6a34';
+      ctx.lineWidth = 11; ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+      const e = T / 2 - 2;
+      ctx.beginPath();
+      if (t.type === 'S') { ctx.moveTo(0, -e); ctx.lineTo(0, e); }
+      else if (t.type === 'L') { ctx.moveTo(0, -e); ctx.lineTo(0, 0); ctx.lineTo(e, 0); }
+      else { ctx.moveTo(0, -e); ctx.lineTo(0, e); ctx.moveTo(-e, 0); ctx.lineTo(e, 0); }
+      ctx.stroke();
+      ctx.restore();
+      if (warn) {
+        ctx.fillStyle = 'rgba(5,10,6,.72)'; rr(x + 8, y + 20, T - 16, 26, 4); ctx.fill();
+        ctx.fillStyle = '#ffb000'; ctx.font = FONT(19); ctx.fillText('PATCH ' + Math.ceil(t.warn / 60), x + T / 2, y + T / 2, T - 20);
+      } else if (isDown) {
+        ctx.fillStyle = 'rgba(20,4,4,.78)'; rr(x + 6, y + 14, T - 12, 40, 4); ctx.fill();
+        ctx.fillStyle = '#ff4d4d'; ctx.font = FONT(17); ctx.fillText('REBOOT', x + T / 2, y + 25, T - 16);
+        if (frame % 40 < 26) { ctx.fillStyle = '#ffb000'; ctx.fillText('MASH!', x + T / 2, y + 40); }
+        ctx.fillStyle = '#3a0d0d'; ctx.fillRect(x + 9, y + T - 13, T - 18, 5);
+        ctx.fillStyle = '#ff4d4d'; ctx.fillRect(x + 9, y + T - 13, (T - 18) * (1 - t.down / t.downMax), 5);
+      }
+    }
+    if (showCur) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; rr(GX + cur.c * T + 1, GY + cur.r * T + 1, T - 2, T - 2, 8); ctx.stroke(); }
+
+    // Destinations (outlets)
+    ctx.font = FONT(15);
+    for (const c of OUTLETS) {
+      const half = ctx.measureText(OUT_LABEL[c]).width / 2 + 4, x = Math.max(half, Math.min(W - half, GX + c * T + T / 2));
+      ctx.fillStyle = outLit[c] ? '#33ff66' : '#2c7a44';
+      ctx.fillText('▼', GX + c * T + T / 2, GY + ROWS * T + 9);
+      ctx.fillText(OUT_LABEL[c], x, GY + ROWS * T + 24);
+    }
+
+    // Packets
+    for (const p of packets) {
+      const a = p.t < 0.5 || p.exit === null ? sidePt(p.c, p.r, p.entry) : center(p.c, p.r);
+      const b = p.t < 0.5 || p.exit === null ? center(p.c, p.r) : sidePt(p.c, p.r, p.exit);
+      const k = Math.min(1, p.t < 0.5 || p.exit === null ? p.t * 2 : (p.t - 0.5) * 2);
+      const x = a.x + (b.x - a.x) * k, y = a.y + (b.y - a.y) * k;
+      ctx.shadowColor = '#eaffef'; ctx.shadowBlur = 10;
+      ctx.fillStyle = '#eaffef'; ctx.fillRect(x - 5, y - 5, 10, 10);
+      ctx.shadowBlur = 0;
+    }
+    // Floating status codes
+    ctx.font = FONT(20);
+    for (const f of floats) {
+      ctx.globalAlpha = Math.min(1, f.life / 20); ctx.fillStyle = f.color;
+      ctx.fillText(f.txt, Math.max(34, Math.min(W - 34, f.x)), f.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  reset();
+  requestAnimationFrame(loop);                      // started exactly once per page load
+})();
+</script>
+</body>
+</html>

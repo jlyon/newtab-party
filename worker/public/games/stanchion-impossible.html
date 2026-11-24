@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Stanchion: Impossible</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #e3222b; --secondary: #ffd400; --bg: #0d0d0f; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 12px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; }
+  /* Logical size is W x H (below); CSS scales it to fit the viewport minus the HUD/controls (~150px reserved). */
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (400 / 600))); height: auto; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  /* On-screen controls: hidden until the first touch, so desktop stays clean. */
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 120px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(0,0,0,.82); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-size: clamp(30px, 8vw, 64px); color: var(--primary); }
+  .overlay p { max-width: 46ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-size: clamp(14px, 3.5vw, 17px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  #hud { align-items: center; }
+  #chaos { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--secondary); }
+  #chaos i { display: block; width: clamp(70px, 26vw, 130px); height: 10px; border-radius: 6px; background: rgba(255,255,255,.14); overflow: hidden; }
+  #chaos-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--secondary), var(--primary)); }
+  #hud { font-family: 'Bangers', Impact, system-ui, sans-serif; letter-spacing: 1.2px; font-size: clamp(14px, 3.8vw, 18px); opacity: 1; }
+  #chaos i { box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+  canvas { box-shadow: 0 0 0 2px #2c2c33, 0 12px 40px rgba(0,0,0,.7); }
+  #hint { font-size: clamp(10px, 2.8vw, 13px); opacity: .6; text-align: center; }
+  canvas { cursor: crosshair; touch-action: none; }
+  .overlay h2, .overlay button { font-family: 'Bangers', Impact, system-ui, sans-serif; letter-spacing: 2px; }
+  .overlay h2 { text-shadow: 3px 3px 0 var(--secondary); transform: rotate(-3deg); }
+  @media (orientation: landscape) and (max-height: 560px) {
+    #wrap { flex-direction: row; gap: clamp(12px, 3vw, 32px); padding: 8px max(24px, env(safe-area-inset-right)) 8px max(24px, env(safe-area-inset-left)); }
+    #hud { flex-direction: column; align-items: flex-end; gap: 8px; width: clamp(110px, 20vw, 180px); font-size: clamp(12px, 3.4vh, 18px); }
+    #chaos { flex-direction: column; align-items: flex-end; gap: 3px; }
+    #hint { width: clamp(110px, 20vw, 180px); text-align: left; font-size: clamp(11px, 3.4vh, 15px); }
+    canvas { width: auto; height: calc(100dvh - 16px); aspect-ratio: 400 / 600; }
+  }
+  /* ── Landing screen: gameplay background + themed title ── */
+  #start-overlay {
+    background:
+      radial-gradient(84% 68% at 50% 45%, rgba(0,0,0,0.62), rgba(0,0,0,0.5) 72%, rgba(0,0,0,0.8)),
+      url('backgrounds/stanchion-impossible.jpg') center/cover no-repeat, #0d0d0f;
+  }
+  #start-overlay h2 { font-size: clamp(36px, 9vw, 70px); line-height: 0.98; text-shadow: 3px 3px 0 var(--secondary), 0 3px 34px rgba(0,0,0,0.85); }
+  #start-overlay p { color: rgba(255,255,255,0.94); text-shadow: 0 2px 10px rgba(0,0,0,0.95); background: rgba(10,8,10,0.6); padding: 14px 18px; border-radius: 14px; }
+  #start-overlay button { margin-top: 22px; padding: 15px 50px; color: #10100f; box-shadow: 0 12px 44px rgba(0,0,0,0.5); transition: transform 0.14s ease, filter 0.14s ease; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="chaos">CHAOS <i><b id="chaos-fill"></b></i></span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="400" height="600"></canvas>
+  <div id="hint">Drag: stretch a rope · Tap: stop Carol or pull a rope</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img src="logos/stanchion-impossible.png" alt="Stanchion: Impossible" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));">
+  <h2>Stanchion: Impossible</h2>
+  <p>Drag to stretch a velvet rope. Shoppers slide along it. Steer each color into its matching department, keep the herd off the display pyramids, and tap Coupon Carol before she wrecks one. Four ropes max. Tap a rope to pull it.</p>
+  <button id="start-btn">Play</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Play again</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. Game logic goes in the marked section. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    // Back-swipe guard: a stray edge swipe would leave the arcade; re-push so it lands back here.
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 400, H = 600;                       // logical resolution: ALL game math uses these
+  function fitCanvas() {                            // crisp at any devicePixelRatio; CSS decides the size
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  // Screen → logical coordinates for pointer/touch input.
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};                       // keyboard state + on-screen button state
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {                       // mouse + touch, multi-touch safe
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  const left  = () => keys['ArrowLeft'] || keys['a'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || held.right;
+  const fire  = () => keys[' '] || held.fire;
+
+  // Scoring: the integer on screen IS the leaderboard value. No scaling. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > _hi) { _hi = b; const el = document.getElementById('best'); if (el) el.textContent = 'Best: ' + _hi.toLocaleString(); }
+  });
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);            // clamp long stalls (hidden tab)
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME-SPECIFIC SECTION: Stanchion: Impossible =====
+  const RED = '#e3222b', YEL = '#ffd400', WHT = '#f2f2ee';
+  const DEPT = [{ name: 'TVs', tag: 'TVs', col: RED, ink: '#fff' }, { name: 'AIR FRYERS', tag: 'FRYERS', col: YEL, ink: '#111' }, { name: '$4 TOWELS', tag: 'TOWELS', col: WHT, ink: '#111' }];
+  const DOORS = [70, 200, 330], BAY_Y = 50, R = 6, MAX_ROPES = 4, ROPE_MAX = 240, ROPE_HP = 480;
+  const OVER_LINES = [
+    'Deb has locked herself in the break room. Corporate has been notified.',
+    'The air fryers are gone. The towels are gone. Deb is gone.',
+    'Someone is wearing a TV box as armor. The shift is over.',
+    'The stanchions fought bravely. Deb is updating her resume.'
+  ];
+  const FONT = '"Bangers", Impact, system-ui, sans-serif';
+  let score = 0, chaos = 0, combo = 0, tick = 0, wave = 1, surgesDone = 0, nextSurge = 0, nextCarol = 0, nextDale = 0, shake = 0;
+  let shoppers = [], ropes = [], displays = [], surges = [], carols = [], dale = null, floaters = [], parts = [], drag = null, served = 0;
+  const scoreEl = document.getElementById('score'), chaosEl = document.getElementById('chaos-fill');
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function reset() {
+    score = 0; chaos = 0; combo = 0; tick = 0; wave = 1; surgesDone = 0; served = 0; shake = 0;
+    nextSurge = 40; nextCarol = 60 * 40; nextDale = 60 * 65;
+    shoppers = []; ropes = []; surges = []; carols = []; dale = null; floaters = []; parts = []; drag = null;
+    displays = [{ x: 135, y: 400 }, { x: 265, y: 310 }, { x: 135, y: 215 }].map(d => ({ ...d, hp: 10, down: 0, wob: 0 }));
+    scoreEl.textContent = 'Score: 0'; chaosEl.style.width = '0%';
+    say(W / 2, H / 2, 'DOORS OPEN!', YEL, 30);
+  }
+  function say(x, y, text, col, size) { floaters.push({ x: Math.max(50, Math.min(W - 50, x)), y, text, col: col || '#fff', size: size || 15, life: 70 }); }
+  function burst(x, y, col, n) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: rnd(-2, 2), vy: rnd(-2, 2), life: rnd(18, 36), col }); }
+  function addChaos(n) { chaos = Math.min(100, chaos + n); }
+  function addScore(n) { score += n; scoreEl.textContent = 'Score: ' + score.toLocaleString(); }
+  function topple(d) { d.hp = 0; d.down = 60 * 10; addChaos(6); shake = 14; burst(d.x, d.y, YEL, 14); burst(d.x, d.y, RED, 10); say(d.x, d.y - 26, 'CLEANUP, AISLE 5!', RED, 17); combo = 0; }
+  function segPoint(r, px, py) {
+    const dx = r.x2 - r.x1, dy = r.y2 - r.y1, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((px - r.x1) * dx + (py - r.y1) * dy) / L2));
+    return { x: r.x1 + dx * t, y: r.y1 + dy * t };
+  }
+
+  function step() {
+    tick++;
+    // ── surges: a door glows in a department color, then a herd pours out of it ──
+    if (--nextSurge <= 0) {
+      const busy = surges.map(s => s.door), free = [0, 1, 2].filter(d => !busy.includes(d));
+      if (free.length) {
+        const door = free[Math.floor(Math.random() * free.length)];
+        surges.push({ door, t: surgesDone < 2 ? door : Math.floor(Math.random() * 3), left: 4 + Math.min(wave, 8), warn: 170, cd: 0 });
+        surgesDone++;
+        const w = 1 + Math.floor(surgesDone / 4);
+        if (w > wave) { wave = w; say(W / 2, H / 2 + 40, 'WAVE ' + wave, YEL, 26); }
+      }
+      nextSurge = Math.max(170, 440 - wave * 18);
+    }
+    const spd = Math.min(1.6, 0.78 + wave * 0.035);
+    for (const s of surges) {
+      if (s.warn > 0) { s.warn--; continue; }
+      if (--s.cd <= 0) {
+        shoppers.push({ x: DOORS[s.door] + rnd(-20, 20), y: H + 8, t: s.t, spd: spd * rnd(0.9, 1.1), bump: 0, hx: 0, hy: -1, wig: rnd(0, 6) });
+        s.left--; s.cd = Math.max(7, 13 - wave * 0.3);
+      }
+    }
+    surges = surges.filter(s => s.left > 0);
+
+    // ── shoppers: walk straight up, shove each other, slide along ropes, crash into displays ──
+    for (const s of shoppers) { s.px = s.x; s.py = s.y; s.y -= s.spd; s.x += Math.sin((tick + s.wig * 20) / 17) * 0.12; if (s.bump > 0) s.bump--;
+      if (s.y < 210) { const dx = (s.t + 0.5) * W / 3 - s.x; if (Math.abs(dx) < 125) s.x += Math.sign(dx) * Math.min(Math.abs(dx), 0.6); } }   // they can read the signs. Barely.
+    for (let i = 0; i < shoppers.length; i++) for (let j = i + 1; j < shoppers.length; j++) {
+      const a = shoppers[i], b = shoppers[j], dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+      if (d2 < 4 * R * R && d2 > 0.0001) { const d = Math.sqrt(d2), p = (2 * R - d) / 2 * 0.6, nx = dx / d, ny = dy / d; a.x -= nx * p; a.y -= ny * p; b.x += nx * p; b.y += ny * p; }
+    }
+    for (const s of shoppers) {
+      for (const d of displays) {
+        if (d.down) continue;
+        const dx = s.x - d.x, dy = s.y - d.y, dist = Math.hypot(dx, dy) || 1, min = R + 20;
+        if (dist < min) {
+          s.x = d.x + dx / dist * min; s.y = d.y + dy / dist * min; s.x += (dx >= 0 ? 1 : -1) * 0.5;
+          if (s.bump <= 0) { s.bump = 40; d.hp--; d.wob = 10; addChaos(1); burst(s.x, s.y, YEL, 3); if (d.hp <= 0) topple(d); }
+        }
+      }
+      for (const r of ropes) {
+        const c = segPoint(r, s.x, s.y), dx = s.x - c.x, dy = s.y - c.y, dist = Math.hypot(dx, dy) || 0.01, min = R + 3;
+        if (dist < min) {
+          s.x = c.x + dx / dist * min; s.y = c.y + dy / dist * min;
+          let tx = r.x2 - r.x1, ty = r.y2 - r.y1; const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
+          if (ty > 0) { tx = -tx; ty = -ty; }
+          if (ty < -0.12) { const k = (1 + ty) * s.spd; s.x += tx * k; s.y += ty * k; }   // funnel at full speed
+          r.hp -= 0.25; r.hit = 6;
+        }
+      }
+      s.x = Math.max(R + 2, Math.min(W - R - 2, s.x));
+      const mx = s.x - s.px, my = s.y - s.py, m = Math.hypot(mx, my);
+      if (m > 0.2) { s.hx += (mx / m - s.hx) * 0.2; s.hy += (my / m - s.hy) * 0.2; }
+      if (s.y < BAY_Y) {
+        const bay = s.x < W / 3 ? 0 : s.x < 2 * W / 3 ? 1 : 2; s.dead = true;
+        if (bay === s.t) {
+          combo++; served++; chaos = Math.max(0, chaos - 0.35); const mult = Math.min(5, 1 + Math.floor(combo / 10)); addScore(10 * mult);
+          burst(s.x, BAY_Y, DEPT[s.t].col, 3);
+          if (combo % 10 === 0) say(s.x, BAY_Y + 30, 'x' + Math.min(5, 1 + combo / 10) + ' COMBO!', YEL, 18);
+        } else { combo = 0; addChaos(3); shake = 6; say(s.x, BAY_Y + 26, 'WRONG AISLE!', RED, 15); }
+      }
+    }
+    shoppers = shoppers.filter(s => !s.dead);
+
+    // ── Coupon Carol: ducks every rope, heads for a display. Tap her. ──
+    if (--nextCarol <= 0) {
+      nextCarol = Math.max(60 * 12, 60 * 26 - wave * 40);
+      if (displays.some(d => !d.down)) { carols.push({ x: DOORS[Math.floor(Math.random() * 3)], y: H + 10, state: 'go', flash: 0 }); say(W / 2, H - 70, 'COUPON CAROL INCOMING', '#ff5ad1', 15); }
+    }
+    for (const c of carols) {
+      if (c.state === 'go') {
+        let best = null, bd = 1e9;
+        for (const d of displays) if (!d.down) { const dd = Math.hypot(d.x - c.x, d.y - c.y); if (dd < bd) { bd = dd; best = d; } }
+        if (!best) c.state = 'done';
+        else { const v = 0.6 + wave * 0.015; c.x += (best.x - c.x) / bd * v; c.y += (best.y - c.y) / bd * v;
+          if (bd < 27) { topple(best); say(c.x, c.y + 30, '"I HAVE A COUPON"', '#ff5ad1', 14); c.state = 'done'; } }
+      } else if (c.state === 'done') c.y -= 1.6; else c.y += 2.2;
+      if (c.y < BAY_Y || c.y > H + 30) c.dead = true;
+    }
+    carols = carols.filter(c => !c.dead);
+
+    // ── Officer Dale: Segway, zero awareness. Snaps every rope he crosses. ──
+    if (--nextDale <= 0 && !dale) {
+      nextDale = Math.max(60 * 16, 60 * 32 - wave * 30);
+      const dir = Math.random() < 0.5 ? 1 : -1; dale = { dir, x: dir > 0 ? -20 : W + 20, y: rnd(130, 470), warn: 90 };
+    }
+    if (dale) {
+      if (dale.warn > 0) dale.warn--;
+      else {
+        dale.x += dale.dir * 3.2;
+        for (const r of ropes) { const c = segPoint(r, dale.x, dale.y); if (Math.hypot(c.x - dale.x, c.y - dale.y) < 13 && r.hp > 0) { r.hp = 0; say(dale.x, dale.y - 20, 'SNAP! "MY BAD"', '#7fc4ff', 14); } }
+        if (dale.x < -30 || dale.x > W + 30) dale = null;
+      }
+    }
+
+    for (const r of ropes) { if (r.hit > 0) r.hit--; if (r.hp <= 0) { burst((r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, RED, 12); burst(r.x1, r.y1, YEL, 4); burst(r.x2, r.y2, YEL, 4); } }
+    ropes = ropes.filter(r => r.hp > 0);
+    for (const d of displays) { if (d.wob > 0) d.wob--; if (d.down && --d.down <= 0) { d.hp = 10; say(d.x, d.y - 26, 'RESTOCKED', WHT, 13); } }
+    for (const f of floaters) { f.y -= 0.45; f.life--; } floaters = floaters.filter(f => f.life > 0);
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy *= 0.93; p.life--; } parts = parts.filter(p => p.life > 0);
+    if (shake > 0) shake--;
+    chaosEl.style.width = chaos.toFixed(0) + '%';
+    if (chaos >= 100) return gameOver('RIOT!', OVER_LINES[Math.floor(Math.random() * OVER_LINES.length)] + ' You herded ' + served + ' shoppers and survived to wave ' + wave + '.');
+    chaos = Math.max(0, chaos - 0.02);
+  }
+
+  // ── input: drag = stretch a rope, tap = stop Carol / pull a rope ──
+  canvas.addEventListener('pointerdown', e => {
+    if (!running) return; e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    const p = toLogical(e.clientX, e.clientY); drag = { x1: p.x, y1: p.y, x2: p.x, y2: p.y, id: e.pointerId };
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const p = toLogical(e.clientX, e.clientY); let dx = p.x - drag.x1, dy = p.y - drag.y1; const L = Math.hypot(dx, dy);
+    if (L > ROPE_MAX) { dx *= ROPE_MAX / L; dy *= ROPE_MAX / L; }
+    drag.x2 = drag.x1 + dx; drag.y2 = drag.y1 + dy;
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null; if (!running) return;
+    const L = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
+    if (L < 16) {                                    // a tap
+      for (const c of carols) if (c.state === 'go' && Math.hypot(c.x - d.x1, c.y - d.y1) < 42) { c.state = 'leave'; addScore(25); say(c.x, c.y - 22, "MA'AM.  +25", YEL, 18); burst(c.x, c.y, '#ff5ad1', 8); return; }
+      for (const r of ropes) { const c = segPoint(r, d.x1, d.y1); if (Math.hypot(c.x - d.x1, c.y - d.y1) < 14) { r.hp = 0; return; } }
+      return;
+    }
+    if (L < 28) return;
+    const cl = v => Math.max(6, Math.min(W - 6, v)), cy = v => Math.max(BAY_Y + 22, Math.min(H - 44, v));
+    ropes.push({ x1: cl(d.x1), y1: cy(d.y1), x2: cl(d.x2), y2: cy(d.y2), hp: ROPE_HP, hit: 0 });
+    if (ropes.length > MAX_ROPES) ropes.shift();
+  }
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+
+  // ── rendering (pure) ──
+  let g = ctx;                                       // current drawing target (screen, or the cached backdrop)
+  const HAIR = ['#2b1d14', '#5a3a1e', '#c9a04a', '#111', '#8a8d96', '#a5432a'], SKIN = ['#f1c9a5', '#d9a273', '#a86f47', '#6f4528'];
+  const LOOT = ['#39b6ff', '#ff8fb0', '#7be07b', '#ffb347', '#c9a0ff', '#fff'];
+  function circle(x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); }
+  function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function label(text, x, y, size, col, stroke, sw) {
+    g.font = size + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (stroke) { g.lineWidth = sw || 4; g.strokeStyle = stroke; g.lineJoin = 'round'; g.strokeText(text, x, y); }
+    g.fillStyle = col; g.fillText(text, x, y);
+  }
+  function shade(hex, k) {                           // k<0 darker, k>0 lighter
+    const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k)));
+    return 'rgb(' + f(n >> 16) + ',' + f((n >> 8) & 255) + ',' + f(n & 255) + ')';
+  }
+  function icon(t, x, y, s) {
+    g.save(); g.translate(x, y); g.scale(s || 1, s || 1);
+    g.fillStyle = 'rgba(12,12,16,.9)'; circle(0, 0, 11); g.fill();
+    if (t === 0) {
+      g.fillStyle = '#d9dde6'; rr(-7.5, -6, 15, 10, 1.5); g.fill();
+      g.fillStyle = '#2aa8ff'; g.fillRect(-6.5, -5, 13, 8);
+      g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.moveTo(-6.5, -5); g.lineTo(-1, -5); g.lineTo(-6.5, 1); g.fill();
+      g.fillStyle = '#d9dde6'; g.fillRect(-3.5, 4.5, 7, 1.6);
+    } else if (t === 1) {
+      g.fillStyle = '#cfd2da'; rr(-5.5, -7.5, 11, 14, 3.5); g.fill();
+      g.fillStyle = '#22242b'; rr(-4, -1, 8, 6, 1.2); g.fill();
+      g.fillStyle = YEL; g.fillRect(-2, 1.2, 4, 1.4);
+      g.fillStyle = '#ff5a3c'; circle(0, -4.2, 1.4); g.fill();
+    } else {
+      [['#58c7e8', -6.5], ['#fff', -2], ['#ff8fb0', 2.5]].forEach(([c, yy]) => { g.fillStyle = c; rr(-7, yy, 14, 4, 1.8); g.fill(); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(-7, yy + 2.8, 14, 0.8); });
+    }
+    g.restore();
+  }
+
+  // Static backdrop, painted once at 2x and blitted every frame.
+  const bg = document.createElement('canvas'); bg.width = W * 2; bg.height = H * 2;
+  function buildBg() {
+    const b = bg.getContext('2d'); g = b; b.setTransform(2, 0, 0, 2, 0, 0);
+    // polished tile
+    for (let y = 0; y < H; y += 40) for (let x = 0; x < W; x += 40) {
+      const k = ((x + y) / 40) % 2 === 0, gr = b.createLinearGradient(x, y, x + 40, y + 40);
+      gr.addColorStop(0, k ? '#2a2b33' : '#23242b'); gr.addColorStop(1, k ? '#202128' : '#1a1b21');
+      b.fillStyle = gr; b.fillRect(x, y, 40, 40);
+      b.fillStyle = 'rgba(255,255,255,.035)'; b.fillRect(x + 1, y + 1, 38, 1.5);
+    }
+    b.strokeStyle = '#101014'; b.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { b.beginPath(); b.moveTo(x, 0); b.lineTo(x, H); b.stroke(); }
+    for (let y = 0; y <= H; y += 40) { b.beginPath(); b.moveTo(0, y); b.lineTo(W, y); b.stroke(); }
+    // fluorescent light pools + scuffs
+    for (let y = 140; y < H; y += 150) for (const x of DOORS) { const gr = b.createRadialGradient(x, y, 4, x, y, 95); gr.addColorStop(0, 'rgba(255,250,225,.11)'); gr.addColorStop(1, 'rgba(255,250,225,0)'); b.fillStyle = gr; b.fillRect(x - 95, y - 95, 190, 190); }
+    b.strokeStyle = 'rgba(0,0,0,.22)'; b.lineWidth = 1.2; b.lineCap = 'round';
+    for (let i = 0; i < 46; i++) { const x = (i * 97) % W, y = 90 + (i * 211) % (H - 150), a = i * 1.3; b.beginPath(); b.moveTo(x, y); b.quadraticCurveTo(x + Math.cos(a) * 14, y + Math.sin(a) * 9, x + Math.cos(a + 0.5) * 26, y + Math.sin(a + 0.5) * 20); b.stroke(); }
+    // painted lane arrows
+    for (const dx of DOORS) for (let y = 120; y < H - 70; y += 86) {
+      b.fillStyle = 'rgba(255,212,0,.13)'; b.beginPath(); b.moveTo(dx, y - 13); b.lineTo(dx + 12, y + 1); b.lineTo(dx + 4.5, y + 1); b.lineTo(dx + 4.5, y + 14); b.lineTo(dx - 4.5, y + 14); b.lineTo(dx - 4.5, y + 1); b.lineTo(dx - 12, y + 1); b.fill();
+    }
+    // shelving down both walls
+    for (const sx of [0, W - 7]) {
+      b.fillStyle = '#0e0e12'; b.fillRect(sx, BAY_Y + 30, 7, H - BAY_Y - 60);
+      for (let y = BAY_Y + 34, i = 0; y < H - 40; y += 9, i++) { b.fillStyle = [RED, YEL, '#39b6ff', '#f2f2ee', '#ff8fb0', '#7be07b'][(i * 7 + (sx ? 3 : 0)) % 6]; b.globalAlpha = 0.75; b.fillRect(sx + 1, y, 5, 7); b.globalAlpha = 1; }
+    }
+    // department storefronts
+    for (let i = 0; i < 3; i++) {
+      const x = i * W / 3, d = DEPT[i], w = W / 3;
+      const carpet = b.createLinearGradient(0, BAY_Y - 6, 0, BAY_Y + 46); carpet.addColorStop(0, d.col); carpet.addColorStop(1, 'rgba(0,0,0,0)');
+      b.globalAlpha = 0.3; b.fillStyle = carpet; b.fillRect(x + 4, BAY_Y - 6, w - 8, 52); b.globalAlpha = 1;
+      b.fillStyle = d.col; b.globalAlpha = 0.5;
+      for (let k = 0; k < 3; k++) { const cx = x + w / 2 + (k - 1) * 30, cy = BAY_Y + 14; b.beginPath(); b.moveTo(cx - 8, cy + 5); b.lineTo(cx, cy - 4); b.lineTo(cx + 8, cy + 5); b.lineTo(cx + 5, cy + 5); b.lineTo(cx, cy); b.lineTo(cx - 5, cy + 5); b.fill(); }
+      b.globalAlpha = 1;
+      b.fillStyle = 'rgba(0,0,0,.5)'; rr(x + 5, 4, w - 8, BAY_Y - 6, 7); b.fill();
+      const sg = b.createLinearGradient(0, 0, 0, BAY_Y - 6); sg.addColorStop(0, shade(d.col, 0.22)); sg.addColorStop(0.55, d.col); sg.addColorStop(1, shade(d.col, -0.32));
+      b.fillStyle = sg; rr(x + 4, 1, w - 8, BAY_Y - 6, 7); b.fill();
+      b.strokeStyle = 'rgba(255,255,255,.45)'; b.lineWidth = 1; rr(x + 5.5, 2.5, w - 11, BAY_Y - 9, 6); b.stroke();
+      b.fillStyle = 'rgba(255,255,255,.16)'; rr(x + 7, 3.5, w - 14, 14, 5); b.fill();
+      icon(i, x + 21, 22, 1.15);
+      let fs = i === 0 ? 24 : 20; b.font = fs + 'px ' + FONT; while (fs > 9 && b.measureText(d.name).width > w - 48) { fs--; b.font = fs + 'px ' + FONT; }
+      label(d.name, x + w / 2 + 14, 24, fs, d.ink, i === 0 ? 'rgba(0,0,0,.35)' : null, 3);
+      for (let k = 0; k < 7; k++) { b.fillStyle = k % 2 ? '#fff' : '#fff6b0'; b.globalAlpha = 0.9; circle(x + 12 + k * (w - 24) / 6, BAY_Y - 5, 1.5); b.fill(); b.globalAlpha = 1; }
+    }
+    for (const px of [W / 3, 2 * W / 3]) { const pg = b.createLinearGradient(px - 4, 0, px + 4, 0); pg.addColorStop(0, '#5a5b66'); pg.addColorStop(0.5, '#8a8c99'); pg.addColorStop(1, '#3a3b44'); b.fillStyle = pg; rr(px - 4, -4, 8, BAY_Y + 36, 3); b.fill(); }
+    // storefront wall + door frames
+    const wg = b.createLinearGradient(0, H - 30, 0, H); wg.addColorStop(0, '#34353e'); wg.addColorStop(0.2, '#17181d'); wg.addColorStop(1, '#0a0a0d'); b.fillStyle = wg; b.fillRect(0, H - 28, W, 28);
+    b.fillStyle = YEL; b.fillRect(0, H - 29, W, 1.5);
+    for (const x of DOORS) { b.fillStyle = '#050507'; b.fillRect(x - 33, H - 25, 66, 25); b.strokeStyle = '#8a8c99'; b.lineWidth = 2; b.strokeRect(x - 34, H - 26, 68, 28);
+      b.fillStyle = '#3b2a12'; rr(x - 30, H - 36, 60, 8, 2); b.fill(); label('WELCOME', x, H - 31.5, 7, 'rgba(255,212,0,.55)'); }
+    // vignette
+    const vg = b.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.72); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); b.fillStyle = vg; b.fillRect(0, 0, W, H);
+    g = ctx;
+  }
+  buildBg();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildBg).catch(() => {});
+
+  function drawPost(x, y) {
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(x + 2, y + 4, 9, 6, 0, 0, Math.PI * 2); g.fill();
+    let gr = g.createRadialGradient(x - 2, y - 1, 1, x, y + 1, 9); gr.addColorStop(0, '#d9a514'); gr.addColorStop(1, '#6b4a00');
+    g.fillStyle = gr; circle(x, y + 1, 8.5); g.fill();
+    gr = g.createRadialGradient(x - 2, y - 3, 0.5, x, y - 1, 6); gr.addColorStop(0, '#fffbe0'); gr.addColorStop(0.35, YEL); gr.addColorStop(1, '#a87400');
+    g.fillStyle = gr; circle(x, y - 1, 5.2); g.fill();
+    g.strokeStyle = 'rgba(60,35,0,.7)'; g.lineWidth = 0.8; circle(x, y - 1, 5.2); g.stroke();
+  }
+  function drawRope(r, alpha, hp) {
+    const jig = r.hit ? Math.sin(tick * 1.7) * 1.6 : 0, mx = (r.x1 + r.x2) / 2 + jig, my = (r.y1 + r.y2) / 2 + 7 + jig;
+    const path = oy => { g.beginPath(); g.moveTo(r.x1, r.y1 + oy); g.quadraticCurveTo(mx, my + oy, r.x2, r.y2 + oy); };
+    g.globalAlpha = alpha; g.lineCap = 'round';
+    g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 8; path(5); g.stroke();
+    if (hp < 0.3) g.setLineDash([9, 5]);
+    g.strokeStyle = '#6d0a10'; g.lineWidth = 3.5 + 4 * hp; path(0); g.stroke();
+    g.strokeStyle = hp < 0.3 ? '#ff5f66' : RED; g.lineWidth = 1.8 + 3.2 * hp; path(-0.6); g.stroke();
+    g.strokeStyle = 'rgba(255,170,175,.75)'; g.lineWidth = 1; path(-1.8 - hp); g.stroke();
+    g.setLineDash([]);
+    drawPost(r.x1, r.y1); drawPost(r.x2, r.y2);
+    g.globalAlpha = 1;
+  }
+  function drawShopper(s) {
+    const col = DEPT[s.t].col, a = Math.atan2(s.hy, s.hx), wob = Math.sin((tick + s.wig * 30) / 4) * 0.9, hi = Math.floor(s.wig * 7);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(s.x + 2, s.y + 3.5, 8, 6, 0, 0, Math.PI * 2); g.fill();
+    g.save(); g.translate(s.x, s.y); g.rotate(a); g.scale(1.2, 1.2); g.translate(-3, 0);
+    // cart
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(8.5, -4, 10, 10);
+    g.fillStyle = 'rgba(210,214,224,.22)'; g.fillRect(7, -5, 10, 10);
+    g.fillStyle = LOOT[hi % 6]; g.fillRect(9, -3 + (hi % 3), 5, 5);
+    g.strokeStyle = '#d5d8e0'; g.lineWidth = 1.1; g.strokeRect(7, -5, 10, 10);
+    g.beginPath(); g.moveTo(10.3, -5); g.lineTo(10.3, 5); g.moveTo(13.6, -5); g.lineTo(13.6, 5); g.globalAlpha = 0.45; g.stroke(); g.globalAlpha = 1;
+    // arms
+    g.strokeStyle = shade(col, -0.25); g.lineWidth = 2.2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(1, -5); g.lineTo(6.5, -4 + wob * 0.3); g.moveTo(1, 5); g.lineTo(6.5, 4 + wob * 0.3); g.stroke();
+    // torso + head
+    g.fillStyle = col; g.beginPath(); g.ellipse(0, 0, 4.4 + Math.abs(wob) * 0.2, 6.6, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.65)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.ellipse(-1, -2.5, 2, 2.6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = HAIR[hi % 6]; circle(0, 0, 3.5); g.fill();
+    g.fillStyle = SKIN[hi % 4]; g.beginPath(); g.arc(0.4, 0, 3.1, -1.1, 1.1); g.fill();
+    g.restore();
+    if (s.bump > 26) { g.fillStyle = '#fff'; g.globalAlpha = (s.bump - 26) / 14; label('✦', s.x + 6, s.y - 9, 11, '#fff'); g.globalAlpha = 1; }
+  }
+  function drawDisplay(d) {
+    if (d.down) {
+      const seed = d.x * 7 + d.y;
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(d.x, d.y + 3, 30, 22, 0, 0, Math.PI * 2); g.fill();
+      for (let k = 0; k < 13; k++) {
+        const a = k * 2.4 + seed, r0 = 7 + (k * 37 % 22), c = k % 3 === 0 ? YEL : k % 3 === 1 ? RED : '#f2f2ee';
+        g.save(); g.translate(d.x + Math.cos(a) * r0, d.y + Math.sin(a) * r0 * 0.8); g.rotate(a * 1.7);
+        g.fillStyle = shade(c.length === 7 ? c : '#f2f2ee', -0.35); g.fillRect(-4, -3, 8, 8); g.fillStyle = c; g.fillRect(-4, -4.5, 8, 7); g.restore();
+      }
+      // wet-floor sign + restock countdown
+      g.fillStyle = YEL; g.beginPath(); g.moveTo(d.x, d.y - 15); g.lineTo(d.x + 9, d.y + 5); g.lineTo(d.x - 9, d.y + 5); g.fill();
+      g.strokeStyle = '#7a5c00'; g.lineWidth = 1; g.stroke(); label('!', d.x, d.y - 2.5, 11, '#111');
+      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2.5; g.beginPath(); g.arc(d.x, d.y - 3, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - d.down / 600)); g.stroke();
+      return;
+    }
+    const wob = d.wob ? Math.sin(tick * 1.5) * 1.3 : 0;
+    g.fillStyle = 'rgba(0,0,0,.42)'; g.beginPath(); g.ellipse(d.x + 4, d.y + 8, 25, 18, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3b2a12'; rr(d.x - 22, d.y - 16, 44, 38, 3); g.fill();                    // pallet
+    g.fillStyle = '#5c4320'; for (let k = 0; k < 4; k++) g.fillRect(d.x - 21, d.y - 14 + k * 9.5, 42, 6);
+    [[19, RED, 0], [13, YEL, 1], [7.5, RED, 2]].forEach(([h, c, k]) => {
+      const x = d.x - h + wob * k, y = d.y - h - k * 6 + 3;
+      g.fillStyle = shade(c, -0.45); g.fillRect(x, y + 6, h * 2, h * 2);                     // side
+      g.fillStyle = c; g.fillRect(x, y, h * 2, h * 2);                                      // top
+      g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 0.8;
+      if (h > 6) { const n = Math.round(h / 4.75); g.beginPath(); for (let q = 1; q < n; q++) { const o = q * h * 2 / n; g.moveTo(x + o, y); g.lineTo(x + o, y + h * 2); g.moveTo(x, y + o); g.lineTo(x + h * 2, y + o); } g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(x, y, h * 2, 1.6);
+    });
+    // SALE burst on top
+    const bx = d.x + wob * 3 + 15, by = d.y - 24;
+    g.fillStyle = '#fff'; g.beginPath(); for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8 + tick / 90, r0 = k % 2 ? 9 : 12.5; g.lineTo(bx + Math.cos(a) * r0, by + Math.sin(a) * r0); } g.fill();
+    g.strokeStyle = RED; g.lineWidth = 1.2; g.stroke(); label('SALE', bx, by + 0.5, 8.5, RED);
+    g.fillStyle = 'rgba(0,0,0,.6)'; rr(d.x - 21, d.y + 27, 42, 6, 3); g.fill();
+    g.fillStyle = d.hp > 5 ? '#55d66b' : d.hp > 2 ? YEL : RED; rr(d.x - 20, d.y + 28, Math.max(4, 40 * d.hp / 10), 4, 2); g.fill();
+  }
+  function drawCarol(c) {
+    const live = c.state === 'go', sway = Math.sin(tick / 6) * 1.5;
+    if (live) {
+      g.strokeStyle = '#ff5ad1'; g.lineWidth = 2.5; g.globalAlpha = 0.45 + 0.4 * Math.sin(tick / 5); g.setLineDash([8, 6]); g.lineDashOffset = -tick / 2;
+      circle(c.x, c.y, 22 + Math.sin(tick / 5) * 2); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+    }
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(c.x + 3, c.y + 5, 13, 9, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ff5ad1'; g.beginPath(); g.ellipse(c.x, c.y + 1, 11, 8.5, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#7a1460'; g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = '#8a4b1a'; rr(c.x + 8, c.y + 1, 7, 8, 2); g.fill();                         // purse
+    g.save(); g.translate(c.x - 11, c.y - 4); g.rotate(-0.5 + sway * 0.06);                  // coupon fan
+    for (let k = 0; k < 3; k++) { g.rotate(0.28); g.fillStyle = '#fff'; g.fillRect(-2.5, -11, 5, 10); g.fillStyle = RED; g.fillRect(-1.5, -9, 3, 1.4); }
+    g.restore();
+    g.fillStyle = '#f3d77a'; for (const [ox, oy, r0] of [[-5, -3, 5.5], [5, -3, 5.5], [0, -6.5, 6.5], [-3, 2, 4.5], [3, 2, 4.5]]) { circle(c.x + ox, c.y + oy - 1, r0); g.fill(); }
+    g.fillStyle = '#ffe9a8'; circle(c.x - 2, c.y - 6, 3); g.fill();
+    g.fillStyle = '#f1c9a5'; circle(c.x, c.y - 0.5, 3.6); g.fill();
+    if (live) { g.fillStyle = '#ff5ad1'; rr(c.x - 17, c.y - 38 + sway, 34, 14, 7); g.fill(); label('TAP!', c.x, c.y - 30.5 + sway, 12, '#111'); }
+  }
+  function drawDale() {
+    if (dale.warn > 0) {
+      const ex = dale.dir > 0 ? 18 : W - 18;
+      g.strokeStyle = 'rgba(127,196,255,.3)'; g.setLineDash([6, 8]); g.lineDashOffset = -tick * dale.dir; g.lineWidth = 2; g.beginPath(); g.moveTo(0, dale.y); g.lineTo(W, dale.y); g.stroke(); g.setLineDash([]);
+      const on = Math.floor(tick / 8) % 2; g.fillStyle = on ? '#7fc4ff' : RED; circle(ex, dale.y, 13); g.fill(); g.strokeStyle = '#06223a'; g.lineWidth = 2; g.stroke(); label('!', ex, dale.y + 1, 19, '#06223a');
+      return;
+    }
+    const x = dale.x, y = dale.y, on = Math.floor(tick / 5) % 2;
+    g.strokeStyle = 'rgba(127,196,255,.35)'; g.lineWidth = 2; g.lineCap = 'round';
+    for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(x - dale.dir * (18 + k * 9), y - 6 + k * 6); g.lineTo(x - dale.dir * (30 + k * 9), y - 6 + k * 6); g.stroke(); }
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(x + 2, y + 9, 15, 7, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#15161b'; rr(x - 14, y - 2, 6, 14, 2.5); g.fill(); rr(x + 8, y - 2, 6, 14, 2.5); g.fill();   // wheels
+    g.fillStyle = '#c9ccd4'; rr(x - 9, y + 1, 18, 8, 2); g.fill();
+    g.fillStyle = '#1f4f8f'; g.beginPath(); g.ellipse(x, y, 9, 7, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#0b2140'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#10243d'; circle(x, y - 0.5, 4.6); g.fill(); g.fillStyle = YEL; circle(x, y - 0.5, 1.4); g.fill();
+    const lg = g.createRadialGradient(x, y - 13, 1, x, y - 13, 16); lg.addColorStop(0, on ? 'rgba(255,60,60,.8)' : 'rgba(110,190,255,.8)'); lg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = lg; g.fillRect(x - 16, y - 29, 32, 32); g.fillStyle = on ? RED : '#7fc4ff'; circle(x, y - 13, 3); g.fill();
+  }
+  function drawDoors() {
+    for (let i = 0; i < 3; i++) {
+      const s = surges.find(q => q.door === i), x = DOORS[i], open = !s ? 0 : s.warn > 0 ? Math.max(0, 1 - s.warn / 18) : 1, d = s && DEPT[s.t];
+      if (s) {                                         // light spilling in from the parking lot
+        const sp = g.createLinearGradient(0, H - 26, 0, H - 120); sp.addColorStop(0, d.col); sp.addColorStop(1, 'rgba(0,0,0,0)');
+        g.globalAlpha = 0.1 + 0.16 * open; g.fillStyle = sp; g.beginPath(); g.moveTo(x - 32, H - 26); g.lineTo(x + 32, H - 26); g.lineTo(x + 52, H - 120); g.lineTo(x - 52, H - 120); g.fill(); g.globalAlpha = 1;
+      }
+      for (const side of [-1, 1]) {                    // sliding glass
+        const px = x + side * (16.5 + open * 27) - 15.5, gl = g.createLinearGradient(px, 0, px + 31, 0);
+        gl.addColorStop(0, 'rgba(150,205,235,.5)'); gl.addColorStop(0.5, 'rgba(215,240,255,.72)'); gl.addColorStop(1, 'rgba(120,180,215,.5)');
+        g.save(); g.beginPath(); g.rect(x - 33, H - 25, 66, 25); g.clip();
+        g.fillStyle = gl; g.fillRect(px, H - 25, 31, 25); g.strokeStyle = '#9aa0ad'; g.lineWidth = 1.2; g.strokeRect(px, H - 25, 31, 25);
+        g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(px + 5, H - 3); g.lineTo(px + 14, H - 24); g.lineTo(px + 18, H - 24); g.lineTo(px + 9, H - 3); g.fill();
+        g.restore();
+      }
+      if (!s) continue;
+      const by = H - 52 - (s.warn > 0 ? Math.abs(Math.sin(tick / 9)) * 5 : 0);       // incoming sign
+      g.fillStyle = 'rgba(0,0,0,.5)'; rr(x - 37, by - 9, 78, 22, 11); g.fill();
+      g.fillStyle = d.col; rr(x - 39, by - 11, 78, 22, 11); g.fill(); g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.2; g.stroke();
+      icon(s.t, x - 27, by, 0.8); label(d.tag, x + 9, by + 0.5, 14, d.ink);
+      if (s.warn > 0) { g.fillStyle = 'rgba(0,0,0,.55)'; rr(x - 30, by + 14, 60, 4, 2); g.fill(); g.fillStyle = d.col; rr(x - 30, by + 14, Math.max(4, 60 * (1 - s.warn / 170)), 4, 2); g.fill(); }
+      else { g.fillStyle = d.col; g.beginPath(); g.moveTo(x, by - 25 - (tick % 16) / 3); g.lineTo(x + 7, by - 15 - (tick % 16) / 3); g.lineTo(x - 7, by - 15 - (tick % 16) / 3); g.fill(); }
+    }
+  }
+  function draw() {
+    g = ctx; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) ctx.translate(Math.sin(tick * 2.3) * shake * 0.4, Math.cos(tick * 3.1) * shake * 0.4);
+    ctx.drawImage(bg, 0, 0, W, H);
+    // neon flicker on the storefront bulbs
+    for (let i = 0; i < 3; i++) { const k = Math.floor(tick / 14 + i) % 7; ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.55; circle(i * W / 3 + 12 + k * (W / 3 - 24) / 6, BAY_Y - 5, 2.6); ctx.fill(); ctx.globalAlpha = 1; }
+    drawDoors();
+    for (const d of displays) if (d.down) drawDisplay(d);
+    for (const r of ropes) drawRope(r, 1, r.hp / ROPE_HP);
+    if (drag && Math.hypot(drag.x2 - drag.x1, drag.y2 - drag.y1) >= 16) drawRope({ ...drag, hit: 0 }, 0.6, 1);
+    // painter's order: things lower on the floor overlap things above them
+    const actors = [];
+    for (const s of shoppers) actors.push([s.y, 0, s]);
+    for (const d of displays) if (!d.down) actors.push([d.y + 10, 1, d]);
+    for (const c of carols) actors.push([c.y, 2, c]);
+    actors.sort((a, b) => a[0] - b[0]);
+    for (const [, kind, o] of actors) kind === 0 ? drawShopper(o) : kind === 1 ? drawDisplay(o) : drawCarol(o);
+    if (dale) drawDale();
+    for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life / 18); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.life * 0.35 + p.vx); ctx.fillStyle = p.col; ctx.fillRect(-2.5, -1.5, 5, 3); ctx.restore(); }
+    ctx.globalAlpha = 1;
+    for (const f of floaters) { const pop = f.life > 60 ? 1 + (f.life - 60) / 22 : 1; ctx.globalAlpha = Math.min(1, f.life / 25); label(f.text, f.x, f.y, f.size * pop, f.col, '#000', 5); }
+    ctx.globalAlpha = 1;
+    // rope inventory
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(237, H - 22, 56, 17, 8.5); ctx.fill();
+    for (let i = 0; i < MAX_ROPES; i++) { const x = 284.5 - i * 13, has = i < MAX_ROPES - ropes.length; ctx.fillStyle = has ? '#a87400' : '#2c2c33'; circle(x, H - 13, 5); ctx.fill(); ctx.fillStyle = has ? YEL : '#44444d'; circle(x, H - 14, 3.3); ctx.fill(); }
+    if (combo >= 10) { const m = Math.min(5, 1 + Math.floor(combo / 10)); ctx.fillStyle = RED; rr(108, H - 23, 54, 18, 9); ctx.fill(); label('x' + m + ' COMBO', 135, H - 13.5, 10.5, '#fff'); }
+    ctx.restore();
+    if (chaos > 60) {                                  // the walls close in as the riot brews
+      const a = (chaos - 60) / 40 * (0.3 + 0.12 * Math.sin(tick / 6)), vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.65);
+      vg.addColorStop(0, 'rgba(227,34,43,0)'); vg.addColorStop(1, 'rgba(227,34,43,' + a.toFixed(3) + ')'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    }
+  }
+  // =========================================================================
+
+  reset();
+  requestAnimationFrame(loop);                      // started exactly once per page load
+})();
+</script>
+</body>
+</html>

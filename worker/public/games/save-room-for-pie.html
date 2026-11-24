@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Save Room for Pie</title>
+<link href="https://fonts.googleapis.com/css2?family=Chewy&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #F28C28; --secondary: #FFF6E5; --bg: #101B3A; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .85; color: var(--secondary); }
+  canvas { display: block; width: min(calc(100vw - 48px), calc((100dvh - 70px) * (360 / 580))); height: auto; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 120px; border: 0; border-radius: 10px; font-size: 22px; color: #fff;
+         background: rgba(255,255,255,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  #btn-fire { font-family: 'Chewy', system-ui, sans-serif; font-size: 18px; letter-spacing: 1px; }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(8,13,32,.9); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-family: 'Chewy', system-ui, sans-serif; font-weight: 400; font-size: clamp(34px, 9vw, 68px); line-height: 1; color: var(--primary); text-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .overlay p { max-width: 44ch; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); color: var(--secondary); margin: 6px 0; }
+  .overlay .pie { font-size: clamp(44px, 12vw, 80px); margin-bottom: 4px; }
+  #over-score { font-family: 'Chewy', system-ui, sans-serif; font-size: clamp(22px, 6vw, 34px); color: #fff; }
+  .overlay button { font-family: 'Chewy', system-ui, sans-serif; margin-top: 18px; padding: 14px 44px; font-size: clamp(16px, 4vw, 20px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  .overlay { overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
+  @media (max-height: 430px) {   /* phone landscape: squeeze the overlays, give the canvas the HUD's room */
+    .overlay { padding: 8px 20px; }
+    .overlay .pie { display: none; }
+    .overlay h2 { font-size: 28px; margin-bottom: 4px; }
+    .overlay p { font-size: 12px; line-height: 1.35; max-width: 78ch; margin: 3px 0; }
+    #over-score { font-size: 20px; }
+    .overlay button { margin-top: 8px; padding: 9px 32px; font-size: 15px; }
+    #hud { display: none; }
+    canvas { width: min(calc(100vw - 48px), calc((100dvh - 12px) * (360 / 580))); }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="360" height="580"></canvas>
+</div>
+<div id="start-overlay" class="overlay show">
+  <div class="pie">🥧</div>
+  <h2>Save Room for Pie</h2>
+  <p><b>Tap a plate</b> to grab it (or keys <b>1 to 6</b>), then mash <b>CHEW</b> / <b>Space</b> to get it down. Mash too fast and you choke and lose the bite.</p>
+  <p>Every swallow fills your stomach. Hit 100% and you pop, losing half your score. <b>BELT</b> / <b>B</b> buys room 3 times. Dawdle and Aunt Linda feeds you Jell-O. Dessert rolls out for the last 15 seconds and pays big, so save room.</p>
+  <button id="start-btn">Dig in</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Seconds?</button>
+</div>
+<script>
+(() => {
+  // ── Boilerplate: focus, canvas, input, loop, scoring. ──
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 360, H = 580;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  const left  = () => keys['ArrowLeft'] || keys['a'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || held.right;
+  const fire  = () => keys[' '] || held.fire;
+
+  // Scoring: the integer on screen IS the leaderboard value. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > _hi) { _hi = b; const el = document.getElementById('best'); if (el) el.textContent = 'Best: ' + _hi.toLocaleString(); }
+  });
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME: eating contest masher =====
+  const TOTAL = 60 * 60, DESSERT_AT = 15 * 60, GX = 180, GY = 388;
+  const DINNER = [
+    { e: '🍗', pts: 60, full: 6,   chews: 8, w: 20 },
+    { e: '🥔', pts: 35, full: 4,   chews: 5, w: 20 },
+    { e: '🌽', pts: 25, full: 2,   chews: 5, w: 16 },
+    { e: '🥐', pts: 15, full: 3,   chews: 2, w: 16 },
+    { e: '🥦', pts: 5,  full: 0.5, chews: 6, w: 18 },   // the stall food
+  ];
+  const DESSERT = [
+    { e: '🥧', pts: 160, full: 9, chews: 7, w: 60, big: 'PIE!' },
+    { e: '🍨', pts: 90,  full: 5, chews: 3, w: 40, big: 'Ice cream!' },
+  ];
+  const JELLO = { e: '🍮', pts: 0, full: 7, chews: 4, jello: true };
+  const pick = list => { let r = Math.random() * list.reduce((s, f) => s + f.w, 0); for (const f of list) { if ((r -= f.w) <= 0) return f; } return list[0]; };
+  const SLOTS = [0, 1, 2, 3, 4, 5].map(i => ({ x: 66 + (i % 3) * 114, y: 134 + Math.floor(i / 3) * 104 }));
+  const CHEW_PAD = { x: 12, y: 500, w: 232, h: 68 }, BELT_PAD = { x: 254, y: 500, w: 94, h: 68 };
+
+  let score = 0, full, belts, timeLeft, slots, bite, choke, coughing, idle, streak, pops, parts, banner, shake, tick, chewAnim, beltGlow, popped, exploding, swallowAnim;
+  function reset() {
+    score = 0; full = 0; belts = 3; timeLeft = TOTAL; bite = null; choke = 0; coughing = 0; idle = -90; streak = 0;
+    slots = SLOTS.map((s, i) => ({ food: pick(DINNER), t: 0, born: -i * 3 }));
+    pops = []; parts = []; banner = null; shake = 0; tick = 0; chewAnim = 0; beltGlow = 0; popped = false; exploding = 0; swallowAnim = 0;
+    document.getElementById('score').textContent = 'Score: 0';
+  }
+  const mult = () => 1 + Math.min(streak, 20) * 0.1;
+  const live = () => running && !popped;
+  const pop = (x, y, text, color, big) => pops.push({ x: Math.max(70, Math.min(W - 70, x)), y, text, color, t: 60, big });
+  const say = (text, color) => { banner = { text, color: color || '#FFF6E5', t: 110 }; };
+
+  function grab(i) {
+    if (!live()) return;
+    const s = slots[i]; if (!s || !s.food) return;
+    if (coughing) { pop(GX, GY - 80, 'Still coughing!', '#FF8FA3'); return; }
+    if (bite) { pop(SLOTS[i].x, SLOTS[i].y - 40, 'Chew first!', '#FF8FA3'); return; }
+    bite = { food: s.food, chews: s.food.chews };
+    s.food = null; s.t = timeLeft <= DESSERT_AT ? 40 : 65; idle = 0;
+  }
+  function chew() {
+    if (!live() || coughing || !bite) return;
+    bite.chews--; chewAnim = 7; choke += 20;
+    if (choke >= 100) {            // mashed too fast: coughing fit, bite lost
+      coughing = 150; bite = null; streak = 0; choke = 45; shake = 12;
+      say('COUGH! COUGH! Slow down!', '#FF8FA3');
+    } else if (bite.chews <= 0) swallow();
+  }
+  function swallow() {
+    const f = bite.food; bite = null; idle = 0; swallowAnim = 12;
+    full += f.full;
+    if (f.jello) { streak = 0; pop(GX, GY - 68, 'Jell-O. Why.', '#9BE28A'); }
+    else { const pts = Math.round(f.pts * mult()); score += pts; streak++; pop(GX, GY - 68, '+' + pts + (f.big ? ' ' + f.big : ''), f.big ? '#FFD76A' : '#FFF6E5', !!f.big); }
+    if (full >= 100) {
+      full = 100; score = Math.floor(score / 2); exploding = 90; popped = true; shake = 24;
+      const bits = ['🍗', '🥔', '🌽', '🥐', '🥧', '🍨', '🍮', '🥦'];
+      for (let i = 0; i < 48; i++) { const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 9; parts.push({ x: GX, y: GY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3, e: bits[i % bits.length], r: Math.random() * 6 }); }
+    }
+  }
+  function belt() {
+    if (!live() || belts <= 0 || full < 1) return;
+    belts--; full = Math.max(0, full - 20); beltGlow = 30; pop(GX, GY - 68, 'Belt loosened. Ahhh.', '#8FD3FF');
+  }
+
+  function step() {
+    tick++;
+    if (shake > 0) shake--;
+    for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.r += 0.15; }
+    for (let i = pops.length - 1; i >= 0; i--) { pops[i].y -= 0.35; if (--pops[i].t <= 0) pops.splice(i, 1); }
+    if (banner && --banner.t <= 0) banner = null;
+    if (exploding > 0) {
+      if (--exploding === 0) gameOver('You popped!', 'Half your dinner is on the ceiling, so half your score went with it. (Psst: a coughing fit spits out a bite you regret.)');
+      return;
+    }
+    if (chewAnim > 0) chewAnim--;
+    if (swallowAnim > 0) swallowAnim--;
+    if (beltGlow > 0) beltGlow--;
+    choke = Math.max(0, choke - 1.5);
+    if (coughing > 0) { coughing--; idle = 0; }
+    else if (!bite && ++idle >= 150) {       // dawdle and Aunt Linda helps
+      bite = { food: JELLO, chews: JELLO.chews }; idle = 0;
+      say('Aunt Linda: "You look hungry!"', '#FF8FA3');
+    }
+    timeLeft--;
+    full = Math.max(0, full - 1 / 60);
+    const dessert = timeLeft <= DESSERT_AT;
+    if (timeLeft === DESSERT_AT + 5 * 60) say('Dessert in 5... got room?');
+    if (timeLeft === DESSERT_AT) { say('DESSERT IS SERVED!', '#FFD76A'); slots.forEach((s, i) => { s.food = null; s.t = 12 + i * 6; }); }
+    for (const s of slots) if (!s.food && --s.t <= 0) { s.food = pick(dessert ? DESSERT : DINNER); s.born = tick; }
+    document.getElementById('score').textContent = 'Score: ' + score.toLocaleString();
+    if (timeLeft <= 0) {
+      const msg = score >= 5000 ? 'A masterclass in disciplined gluttony. Grandma is proud and slightly afraid.'
+        : score >= 2500 ? 'Solid plate work. You saved room and it showed.'
+        : score >= 1200 ? 'Respectable. Somewhere, a pie went uneaten because of you.'
+        : 'You barely touched your plate. Are you feeling okay?';
+      gameOver('Dinner is over!', msg);
+    }
+  }
+
+  function emoji(e, x, y, size, rot) {
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot);
+    ctx.font = size + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e, 0, 0); ctx.restore();
+  }
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+  const isTouch = () => document.body.classList.contains('touch');
+
+  function drawTable(dessert) {
+    ctx.fillStyle = '#6B4423'; rr(8, 74, W - 16, 222, 18); ctx.fill();
+    ctx.fillStyle = dessert ? '#FFE3EC' : '#FFF6E5'; rr(16, 82, W - 32, 206, 12); ctx.fill();
+    ctx.fillStyle = dessert ? 'rgba(242,140,40,.22)' : 'rgba(242,140,40,.14)';
+    for (let y = 82; y < 288; y += 26) for (let x = 16 + ((y - 82) / 26 % 2) * 26; x < W - 20; x += 52) ctx.fillRect(x, y, Math.min(26, W - 16 - x), Math.min(26, 288 - y));
+    slots.forEach((s, i) => {
+      const { x, y } = SLOTS[i];
+      ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(x + 2, y + 4, 45, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 45, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#E3D8C4'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 33, 0, Math.PI * 2); ctx.stroke();
+      if (!isTouch()) { ctx.fillStyle = '#B9AD97'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, x - 34, y - 34); }
+      if (!s.food) return;
+      const sc = Math.min(1, (tick - s.born) / 8);
+      emoji(s.food.e, x, y - 6, 38 * (0.4 + 0.6 * sc));
+      ctx.font = '14px Chewy, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#B5651D'; ctx.fillText(s.food.pts + ' pts', x, y + 26);
+    });
+  }
+
+  function drawGary() {
+    const k = full / 100, rx = 58 + k * 22, ry = 60 + k * 6;
+    const g = Math.max(0, (k - 0.7) / 0.3), red = coughing ? 1 : Math.min(1, choke / 100) * 0.6;
+    const wob = coughing ? Math.sin(tick * 0.9) * 4 : 0, x = GX + wob, y = GY + (swallowAnim ? 3 : 0);
+    // shoulders + shirt
+    ctx.fillStyle = '#FFF6E5'; ctx.beginPath(); ctx.ellipse(GX, GY + 82, 96 + k * 40, 34, 0, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = beltGlow ? '#8FD3FF' : 'rgba(0,0,0,0)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(GX, GY + 82, 96 + k * 40, 34, 0, Math.PI, Math.PI * 2); ctx.stroke();
+    // head
+    ctx.fillStyle = `rgb(${Math.round(244 - g * 70 * (1 - red))},${Math.round(196 - g * 5 - red * 90)},${Math.round(160 - g * 40 - red * 70)})`;
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5A3A1C'; ctx.beginPath(); ctx.ellipse(x, y - 14, rx * 0.98, ry * 0.86, 0, Math.PI * 1.13, Math.PI * 1.87); ctx.fill();
+    // cheeks bulge while chewing
+    if (bite) { ctx.fillStyle = 'rgba(255,140,120,.5)'; const b = 10 + (chewAnim ? 4 : 0); ctx.beginPath(); ctx.arc(x - rx + 14, y + 16, b, 0, Math.PI * 2); ctx.arc(x + rx - 14, y + 16, b, 0, Math.PI * 2); ctx.fill(); }
+    // eyes
+    ctx.fillStyle = '#101B3A'; ctx.strokeStyle = '#101B3A'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    const ey = y - 16;
+    if (coughing || k > 0.88) { for (const dx of [-22, 22]) { ctx.beginPath(); ctx.moveTo(x + dx - 6, ey - 5); ctx.lineTo(x + dx + 6, ey + 5); ctx.moveTo(x + dx + 6, ey - 5); ctx.lineTo(x + dx - 6, ey + 5); ctx.stroke(); } }
+    else { ctx.beginPath(); ctx.arc(x - 22, ey, 5, 0, Math.PI * 2); ctx.arc(x + 22, ey, 5, 0, Math.PI * 2); ctx.fill(); }
+    // mouth
+    ctx.fillStyle = '#7A1F2B';
+    const open = coughing ? 14 + Math.sin(tick * 0.9) * 6 : bite ? (chewAnim > 3 ? 4 : 13) : 16;
+    ctx.beginPath(); ctx.ellipse(x, y + 24, 24, open, 0, 0, Math.PI * 2); ctx.fill();
+    if (bite) {
+      const f = bite.food, done = 1 - bite.chews / f.chews;
+      emoji(f.e, x, y + 24, 30 * (1 - done * 0.45), chewAnim ? 0.2 : -0.1);
+      // chews-left badge
+      ctx.fillStyle = '#101B3A'; ctx.beginPath(); ctx.arc(x + 46, y + 40, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#F28C28'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x + 46, y + 40, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * done); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '15px Chewy, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(bite.chews, x + 46, y + 41);
+    }
+    if (k > 0.75 || choke > 70) { ctx.fillStyle = '#8FD3FF'; ctx.beginPath(); ctx.ellipse(x + rx - 6, y - 30 + (tick % 40) * 0.5, 4, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+    // Aunt Linda's incoming Jell-O when you dawdle
+    if (!bite && !coughing && idle > 40) { const t = (idle - 40) / 110, lx = W + 30 - t * (W + 30 - (GX + 60)); ctx.fillStyle = '#C9CED8'; rr(lx, GY + 21, 200, 6, 3); ctx.fill(); emoji('🍮', lx, GY + 18, 30); }
+  }
+
+  function pad(r, color, label, sub, dim) {
+    ctx.globalAlpha = dim ? 0.4 : 1;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; rr(r.x, r.y + 4, r.w, r.h, 16); ctx.fill();
+    ctx.fillStyle = color; rr(r.x, r.y, r.w, r.h, 16); ctx.fill();
+    ctx.fillStyle = '#101B3A'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '26px Chewy, system-ui'; ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - (sub ? 8 : 0));
+    if (sub) { ctx.font = '12px system-ui'; ctx.fillText(sub, r.x + r.w / 2, r.y + r.h / 2 + 18); }
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    const dessert = timeLeft <= DESSERT_AT;
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, dessert ? '#3A1E4A' : '#16244D'); bg.addColorStop(1, '#0B1330');
+    ctx.fillStyle = bg; ctx.fillRect(-30, -30, W + 60, H + 60);
+
+    drawTable(dessert);
+    if (!popped) drawGary();
+
+    // choke gauge
+    ctx.font = '13px Chewy, system-ui'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    const hot = choke > 70 && tick % 12 < 6;
+    ctx.fillStyle = hot ? '#FF6B6B' : '#FFF6E5'; ctx.fillText('CHOKE', 18, 482);
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; rr(96, 475, W - 114, 14, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(229,72,77,.35)'; rr(96 + (W - 114) * 0.7, 475, (W - 114) * 0.3, 14, 7); ctx.fill();
+    if (choke > 1) { ctx.fillStyle = choke > 70 ? '#E5484D' : '#FFD76A'; rr(96, 475, (W - 114) * Math.min(1, choke / 100), 14, 7); ctx.fill(); }
+
+    // pads
+    const t = isTouch();
+    pad(CHEW_PAD, chewAnim ? '#FFD76A' : '#F28C28', coughing ? 'COUGHING...' : bite ? 'CHEW!' : 'GRAB A PLATE', t || coughing ? '' : bite ? 'mash Space' : 'click one, or keys 1 to 6', coughing || !bite);
+    pad(BELT_PAD, '#8FD3FF', 'BELT', '×' + belts + (t ? ' left' : ' left (B)'), belts <= 0);
+
+    for (const p of parts) emoji(p.e, p.x, p.y, 26, p.r);
+    if (popped) { ctx.fillStyle = '#FFD76A'; ctx.font = '72px Chewy, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('POP!', W / 2, GY); }
+
+    // HUD: clock
+    const secs = Math.max(0, Math.ceil(timeLeft / 60));
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; rr(10, 10, W - 20, 54, 10); ctx.fill();
+    ctx.font = '13px Chewy, system-ui'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#FFF6E5'; ctx.fillText(dessert ? 'DESSERT' : 'DINNER', 18, 22);
+    ctx.textAlign = 'right'; ctx.fillText(secs + 's', W - 18, 22);
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; rr(96, 17, W - 142, 10, 5); ctx.fill();
+    ctx.fillStyle = dessert ? '#FFD76A' : '#FFF6E5'; rr(96, 17, Math.max(0, (W - 142) * timeLeft / TOTAL), 10, 5); ctx.fill();
+    ctx.fillStyle = '#F28C28'; ctx.fillRect(96 + (W - 142) * DESSERT_AT / TOTAL - 1, 14, 2, 16);
+    // HUD: stomach (ghost segment = what the bite in your mouth will add)
+    const k = full / 100, bw = W - 202, danger = k > 0.8 && tick % 20 < 10;
+    ctx.textAlign = 'left'; ctx.fillStyle = danger ? '#FF6B6B' : '#FFF6E5'; ctx.fillText('STOMACH', 18, 46);
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; rr(96, 39, bw, 14, 7); ctx.fill();
+    if (bite) { const gk = Math.min(1, (full + bite.food.full) / 100); ctx.fillStyle = gk >= 1 ? (tick % 10 < 5 ? '#E5484D' : '#7A1F2B') : 'rgba(255,255,255,.4)'; rr(96, 39, bw * gk, 14, 7); ctx.fill(); }
+    ctx.fillStyle = k > 0.8 ? '#E5484D' : k > 0.55 ? '#F28C28' : '#7BD389';
+    if (k > 0.01) { rr(96, 39, bw * Math.min(1, k), 14, 7); ctx.fill(); }
+    ctx.fillStyle = '#FFF6E5'; ctx.fillText(Math.floor(full) + '%', W - 100, 46);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#FFD76A'; ctx.fillText('×' + mult().toFixed(1), W - 18, 46);
+    // banner + popups
+    if (banner) { ctx.globalAlpha = Math.min(1, banner.t / 20); ctx.textAlign = 'center'; ctx.font = '22px Chewy, system-ui'; ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(30, 290, W - 60, 34, 17); ctx.fill(); ctx.fillStyle = banner.color; ctx.fillText(banner.text, W / 2, 308); ctx.globalAlpha = 1; }
+    ctx.textAlign = 'center';
+    for (const p of pops) { ctx.globalAlpha = Math.min(1, p.t / 20); ctx.font = (p.big ? 24 : 17) + 'px Chewy, system-ui'; ctx.fillStyle = '#101B3A'; ctx.fillText(p.text, p.x + 1, p.y + 2); ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Input: tap plates to grab, tap Gary or the CHEW pad to chew, BELT pad to loosen.
+  const inRect = (p, r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y - 4 && p.y <= r.y + r.h + 8;
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const p = toLogical(e.clientX, e.clientY);
+    if (inRect(p, BELT_PAD)) return belt();
+    for (let i = 0; i < 6; i++) if (Math.hypot(p.x - SLOTS[i].x, p.y - SLOTS[i].y) < 52) return grab(i);
+    if (p.y > 300) chew();
+  });
+  addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.key === ' ') chew();
+    else if (e.key === 'b' || e.key === 'B') belt();
+    else if (e.key >= '1' && e.key <= '6') grab(+e.key - 1);
+  });
+  // =================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

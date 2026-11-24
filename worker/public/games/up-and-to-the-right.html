@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Up and to the Right</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #D4714A; --secondary: #F3EAD8; --bg: #1C1B19; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--secondary); font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+  #wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; gap: 8px; padding: 0 24px env(safe-area-inset-bottom); }
+  #hud { display: flex; gap: 18px; font-size: clamp(11px, 3vw, 14px); opacity: .9; font-variant-numeric: tabular-nums; }
+  canvas { display: block; width: min(95vw, calc((100dvh - 150px) * (440 / 480))); height: auto; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.5); cursor: grab; }
+  #touch-controls { display: none; gap: 10px; justify-content: center; width: 100%; }
+  body.touch #touch-controls { display: flex; }
+  #hint { display: none; font-size: 12px; opacity: .65; }
+  body.touch #hint { display: block; }
+  .btn { height: 56px; min-width: 64px; flex: 1; max-width: 160px; border: 0; border-radius: 10px; font-size: 22px; color: var(--secondary);
+         background: rgba(243,234,216,.12); user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .btn.held, .btn:active { background: var(--primary); }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+             background: radial-gradient(60% 45% at 50% 40%, rgba(212,113,74,.16), rgba(20,19,17,0) 70%), rgba(20,19,17,.93); z-index: 20; }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0 0 10px; font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: clamp(32px, 8vw, 64px); line-height: 1; color: var(--primary); }
+  .overlay p { max-width: 46ch; margin: 6px 0; line-height: 1.5; font-size: clamp(13px, 3vw, 16px); }
+  .overlay .fine { opacity: .55; font-size: 11px; }
+  .overlay button { margin-top: 18px; padding: 14px 40px; font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(16px, 3.5vw, 20px); letter-spacing: 2px; text-transform: uppercase; border: 0; border-radius: 40px; background: var(--primary); color: var(--bg); cursor: pointer; }
+  .overlay button:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  /* Phone landscape: canvas takes the full height, spin buttons sit beside it. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    #wrap { flex-direction: row; gap: 14px; }
+    #hud { position: fixed; top: 8px; left: 14px; flex-direction: column; gap: 2px; z-index: 2; }
+    canvas { width: calc((100dvh - 16px) * (440 / 480)); }
+    body.touch #touch-controls { display: contents; }
+    body.touch #hint { display: none; }
+    #btn-left { order: -1; } #btn-right { order: 1; }
+    .btn { height: 96px; flex: 0 0 96px; }
+    .overlay { padding: 8px 20px; }
+    .overlay h2 { font-size: 30px; margin-bottom: 4px; } .overlay h2 br { display: none; }
+    .overlay img { max-height: 28vh !important; margin-bottom: 4px !important; }
+    .overlay p { margin: 2px 0; font-size: 12px; line-height: 1.35; max-width: 78ch; }
+    .overlay .fine { display: none; }
+    .overlay button { margin-top: 8px; padding: 13px 34px; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud"><span id="score">Score: 0</span><span id="best">Best: 0</span></div>
+  <canvas id="game" width="440" height="480"></canvas>
+  <div id="touch-controls">
+    <button class="btn" id="btn-left">⟲</button>
+    <button class="btn" id="btn-right">⟳</button>
+  </div>
+  <div id="hint">Drag the wheel to spin the cap table</div>
+</div>
+<div id="start-overlay" class="overlay show">
+  <img src="logos/up-and-to-the-right.png" alt="Up and to the Right" style="display:block;width:min(82%,400px);max-height:40vh;margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45));" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">
+  <h2>Up and to <br>the Right</h2>
+  <p>You are the cap table. Spin it so everything flying in lands on the slice of its own color, all the way to IPO day.</p>
+  <p><b>← → / A D</b>, or <b>drag the wheel</b>, to spin. Every catch grows that slice and squeezes the rest. Any slice under 10% walks out and takes the company with it. Bears eat whatever they hit, so feed them your fattest slice.</p>
+  <p class="fine">An unofficial parody. Not investment advice. Past rounds do not guarantee future rounds.</p>
+  <button id="start-btn">Ring the bell</button>
+</div>
+<div id="over-overlay" class="overlay">
+  <h2 id="over-title">Game over</h2>
+  <p id="over-msg"></p>
+  <p id="over-score">Score: 0</p>
+  <button id="restart-btn">Refile</button>
+</div>
+<script>
+(() => {
+  function grabFocus() { try { window.focus(); } catch (e) {} }
+  window.addEventListener('load', grabFocus);
+  window.addEventListener('pointerdown', grabFocus);
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch');
+    try { history.pushState({ game: 1 }, '', location.href); } catch (e) {}
+    window.addEventListener('popstate', () => { try { history.pushState({ game: 1 }, '', location.href); } catch (e) {} });
+  }, { once: true, passive: true });
+
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = 440, H = 480;
+  function fitCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.getBoundingClientRect().width || W;
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssW * (H / W) * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  fitCanvas(); addEventListener('resize', fitCanvas);
+  const toLogical = (clientX, clientY) => { const r = canvas.getBoundingClientRect(); return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) }; };
+
+  const keys = {}, held = {};
+  addEventListener('keydown', e => { keys[e.key] = true; if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter') { if (startOverlay.classList.contains('show')) startBtn.click(); else if (overOverlay.classList.contains('show')) restartBtn.click(); } });
+  addEventListener('keyup', e => { keys[e.key] = false; });
+  function holdBtn(id, key) {
+    const el = document.getElementById(id);
+    const dn = e => { e.preventDefault(); held[key] = true; el.classList.add('held'); };
+    const up = e => { e.preventDefault(); held[key] = false; el.classList.remove('held'); };
+    el.addEventListener('mousedown', dn); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', dn, { passive: false }); el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdBtn('btn-left', 'left'); holdBtn('btn-right', 'right');
+  const left  = () => keys['ArrowLeft'] || keys['a'] || keys['A'] || held.left;
+  const right = () => keys['ArrowRight'] || keys['d'] || keys['D'] || held.right;
+
+  // Scoring: the integer on screen IS the leaderboard value. Post once per game end.
+  let _hi = 0;
+  function postHi(n) {
+    n = Math.max(0, Math.round(Number(n) || 0));
+    if (n > _hi) _hi = n;
+    try { window.parent.postMessage({ highScore: n }, '*'); } catch (e) {}
+  }
+  // Best = the leaderboard's top score, sent by newtab.party as postMessage({ leaderboardBest }).
+  // Opened on its own, the game keeps this session's best.
+  window.addEventListener('message', (e) => {
+    const b = Math.round(Number(e.data && e.data.leaderboardBest) || 0);
+    if (b > _hi) { _hi = b; const el = document.getElementById('best'); if (el) el.textContent = 'Best: ' + _hi.toLocaleString(); }
+  });
+
+  const startOverlay = document.getElementById('start-overlay'), overOverlay = document.getElementById('over-overlay');
+  const startBtn = document.getElementById('start-btn'), restartBtn = document.getElementById('restart-btn');
+  const scoreEl = document.getElementById('score');
+  let running = false;
+  function start() { startOverlay.classList.remove('show'); overOverlay.classList.remove('show'); grabFocus(); reset(); running = true; }
+  function gameOver(title, msg) {
+    running = false;
+    postHi(score);
+    document.getElementById('over-title').textContent = title;
+    document.getElementById('over-msg').textContent = msg;
+    document.getElementById('over-score').textContent = 'Score: ' + score.toLocaleString() + (score >= _hi && score > 0 ? ' · new best!' : '');
+    document.getElementById('best').textContent = 'Best: ' + _hi.toLocaleString();
+    overOverlay.classList.add('show');
+  }
+  startBtn.addEventListener('click', start); restartBtn.addEventListener('click', start);
+
+  // Fixed-step simulation: identical game speed at 60 / 120 / 144 Hz displays.
+  const STEP_MS = 1000 / 60;
+  let _acc = 0, _lastT = 0;
+  function loop(now) {
+    if (!_lastT) _lastT = now;
+    _acc += Math.min(now - _lastT, 250);
+    _lastT = now;
+    let n = 0;
+    while (_acc >= STEP_MS && n < 4) { if (running) step(now); _acc -= STEP_MS; n++; }
+    if (n === 4) _acc = 0;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ===== GAME: you are the cap table =====
+  const CLAY = '#D4714A', CREAM = '#F3EAD8', INK = '#1C1B19', GREEN = '#46B97C', RED = '#E2574C', ICE = '#8CC7E8', GOLD = '#F2C14E', BROWN = '#8a6a4f';
+  const CX = W / 2, CY = 258, R_OUT = 96, R_IN = 50, TR = 12, TAU = Math.PI * 2, MIN_FRAC = 0.10;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const norm = a => ((a % TAU) + TAU) % TAU;
+
+  const SLICE = {
+    fnd: { name: 'FOUNDERS', color: CLAY, good: ['Founder shares', 'Supervoting!', 'Buyback'], out: 'Founders ousted.', why: ['Diluted to dust. The founders now own a commemorative mug.', 'The board thanked the founders for their service. Past tense.'] },
+    emp: { name: 'TEAM', color: CREAM, good: ['Option grant', 'RSU refresh', 'Free lunch'], out: 'The team quit.', why: ['Options underwater. Everyone left to start a podcast.', 'The equity refresh never came. Neither did Monday standup.'] },
+    inv: { name: 'VCs', color: GREEN, good: ['Wire received', 'Oversubscribed!', 'Term sheet'], out: 'Investors bailed.', why: ['The term sheet has been un-termed.', 'The VCs pivoted to a company that returns their calls.'] },
+    pub: { name: 'PUBLIC', color: ICE, good: ['Retail piles in', 'Index inclusion', 'Buy rating'], out: 'Retail revolt.', why: ['The float sank. The forums are furious.', 'Public shareholders voted with their sell buttons.'] }
+  };
+  const ROUNDS = [[0, 'SEED'], [8, 'SERIES A'], [20, 'SERIES B'], [36, 'SERIES C'], [56, 'SERIES D'], [80, 'SERIES F (skipped E)'], [108, 'IPO DAY'], [150, 'FOLLOW-ON'], [200, 'S&P 500'], [270, 'TOO BIG TO FAIL']];
+  const MILESTONES = [
+    [100, '$1B', 'Unicorn. Adorable.'], [250, '$10B', 'Decacorn. Order the foosball table.'], [500, '$60B', 'Bankers sweating through their vests.'],
+    [800, '$100B', 'Hectocorn. Yes, that is a word now.'], [1200, '$350B', 'A man on TV is yelling BUY.'], [1700, '$1T', 'Four comma club.'],
+    [2300, '$10T', 'Bigger than most GDPs.'], [3000, '$100T', 'You are the economy now.'], [4000, 'ALL THE MONEY', 'Literally all of it.'],
+    [5500, 'BEYOND MONEY', 'Money is a legacy concept.'], [7500, 'POST-SCARCITY', 'Stock is somehow still up.']
+  ];
+  const VAL = [[0, 5e8], [100, 1e9], [250, 1e10], [500, 6e10], [800, 1e11], [1200, 3.5e11], [1700, 1e12], [2300, 1e13], [3000, 1e14], [4000, 1e15]];
+  function valuation(s) {
+    if (s >= 7500) return 'POST-SCARCITY';
+    if (s >= 5500) return 'BEYOND MONEY';
+    if (s >= 4000) return 'ALL THE MONEY';
+    let i = 0; while (i < VAL.length - 2 && s >= VAL[i + 1][0]) i++;
+    const [s0, v0] = VAL[i], [s1, v1] = VAL[i + 1];
+    const v = Math.pow(10, Math.log10(v0) + (Math.log10(v1) - Math.log10(v0)) * clamp((s - s0) / (s1 - s0), 0, 1));
+    if (v >= 1e12) return '$' + (v / 1e12).toFixed(v < 1e13 ? 2 : 0) + 'T';
+    if (v >= 1e9) return '$' + (v / 1e9).toFixed(v < 1e10 ? 2 : 0) + 'B';
+    return '$' + Math.round(v / 1e6) + 'M';
+  }
+
+  let score = 0, shownScore = -1, t = 0, rot = 0, rv = 0, slices = [], tokens = [], parts = [], toasts = [], chart = [];
+  let caught = 0, streak = 0, round = 0, nextMs = 0, extraMs = 10000, spawnT = 0, frozen = 0, boost = 0, shake = 0, mood = 0;
+
+  function toast(text, color, big, x, y) { toasts.push({ text, color: color || CREAM, life: big ? 170 : 70, max: big ? 170 : 70, big: !!big, x: x || CX, y: big ? 96 : y }); if (toasts.length > 7) toasts.shift(); }
+  function burst(x, y, color, n) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: rnd(-3, 3), vy: rnd(-3, 3), life: rnd(16, 30), color, s: rnd(2, 4) }); }
+  const idx = key => slices.findIndex(s => s.key === key);
+
+  // Grow or shrink one slice; everyone else is scaled to keep the table at 100%.
+  function adjust(i, d) {
+    const old = slices[i].f, nw = clamp(old + d, 0, 0.9), k = (1 - nw) / (1 - old);
+    slices.forEach((s, j) => { s.f = j === i ? nw : s.f * k; });
+  }
+
+  function reset() {
+    score = 0; shownScore = -1; t = 0; rot = -Math.PI / 2; rv = 0; caught = 0; streak = 0; round = 0; nextMs = 0; extraMs = 10000;
+    spawnT = 50; frozen = 0; boost = 0; shake = 0; mood = 0; dragging = false;
+    slices = [['fnd', 0.4], ['emp', 0.3], ['inv', 0.3]].map(([key, f]) => ({ key, f, d: f, flash: 0 }));
+    tokens = []; parts = []; toasts = []; chart = [0];
+    toast('SEED ROUND · Three slices. Keep everyone above 10%.', CREAM, true);
+    scoreEl.textContent = 'Score: 0';
+  }
+
+  function spawn() {
+    const diff = Math.min(1, t / 9000);
+    let type, r = Math.random();
+    if (r < 0.03 && round >= 1) type = 'bell';
+    else if (r < 0.06 && round >= 1) type = 'rocket';
+    else if (r < 0.06 + 0.07 + 0.05 * diff && round >= 1) type = 'bear';
+    else if (r < 0.2 + 0.05 * diff && round >= 3) type = 'sub';
+    else {
+      // pay tokens: VC money is the most common, so the VC slice is always trying to eat the table
+      const pool = ['inv', 'inv', 'inv', 'fnd', 'fnd', 'emp', 'emp']; if (idx('pub') >= 0) pool.push('pub', 'pub');
+      type = pick(pool);
+    }
+    let a = 0;
+    for (let k = 0; k < 8; k++) { a = rnd(0, TAU); if (!tokens.some(o => o.dist > 150 && Math.abs(norm(o.a - a + Math.PI) - Math.PI) < 0.3)) break; }
+    // start just off the edge of the screen along this angle
+    const c = Math.cos(a), s = Math.sin(a);
+    const edge = Math.min(c > 0 ? (W - CX) / c : c < 0 ? -CX / c : 1e9, s > 0 ? (H - CY) / s : s < 0 ? -CY / s : 1e9);
+    tokens.push({ type, a, dist: edge + 16, v: (0.95 + 1.5 * diff) * rnd(0.9, 1.12), spin: rnd(0, 6) });
+  }
+
+  function sliceAt(angle) {
+    let a = norm(angle - rot), acc = 0; const sum = slices.reduce((q, s) => q + s.d, 0);
+    for (let i = 0; i < slices.length; i++) { acc += slices[i].d / sum * TAU; if (a <= acc) return i; }
+    return slices.length - 1;
+  }
+
+  function land(tk) {
+    const i = sliceAt(tk.a), s = slices[i], S = SLICE[s.key];
+    const x = CX + Math.cos(tk.a) * (R_OUT + 4), y = CY + Math.sin(tk.a) * (R_OUT + 4);
+    const tx = clamp(CX + Math.cos(tk.a) * (R_OUT + 44), 60, W - 60), ty = clamp(CY + Math.sin(tk.a) * (R_OUT + 40), 50, H - 16);
+    s.flash = 14;
+    if (tk.type === 'bear') {
+      adjust(i, -0.07); streak = 0; shake = 8; burst(x, y, BROWN, 14);
+      toast('Bear ate ' + S.name + ' -7%', RED, false, tx, ty);
+    } else if (tk.type === 'sub') {
+      frozen = 50; streak = 0; shake = 6; burst(x, y, CREAM, 10);
+      toast('LEGAL HOLD', RED, false, tx, ty);
+    } else if (tk.type === 'bell') {
+      const n = slices.length; slices.forEach(q => { q.f += (1 / n - q.f) * 0.45; });
+      score += 50; burst(x, y, GOLD, 22); shake = 6; mood = 60;
+      toast('REBALANCE +50', GOLD, false, tx, ty);
+    } else if (tk.type === 'rocket') {
+      boost = 480; burst(x, y, GOLD, 18); mood = 60;
+      toast('MODEL LAUNCH: 2x for 8s', GOLD, false, tx, ty);
+    } else if (tk.type === s.key) {
+      caught++; streak++;
+      const mult = Math.min(6, 1 + Math.floor(streak / 5)) * (boost > 0 ? 2 : 1), pts = 10 * mult;
+      score += pts; adjust(i, 0.03); burst(x, y, S.color, 10); mood = 30;
+      toast((streak % 5 === 0 ? 'x' + Math.min(6, 1 + streak / 5) + ' STREAK ' : pick(S.good) + ' ') + '+' + pts, S.color, false, tx, ty);
+    } else {
+      const j = idx(tk.type), T = SLICE[tk.type];
+      const d = Math.min(0.05, slices[j].f); slices[j].f -= d; s.f += d;
+      streak = 0; shake = 9; burst(x, y, RED, 14); mood = -50;
+      toast(T.name + ' stiffed -5%', RED, false, tx, ty);
+    }
+  }
+
+  function step() {
+    t++;
+    // spin
+    if (frozen > 0) { frozen--; rv = 0; }
+    else {
+      const l = left(), r = right();
+      if (l && !r) rv -= 0.014; else if (r && !l) rv += 0.014; else rv *= 0.78;
+      rv = clamp(rv, -0.095, 0.095); rot += rv;
+    }
+
+    // arrivals
+    const diff = Math.min(1, t / 9000);
+    if (--spawnT <= 0) { spawn(); if (round >= 2 && Math.random() < 0.08 + 0.3 * diff) spawn(); spawnT = (92 - 56 * diff) * rnd(0.8, 1.2); }
+    for (const tk of tokens) { tk.dist -= tk.v; tk.spin += 0.04; if (tk.dist <= R_OUT + TR - 2) { tk.dead = true; land(tk); } }
+    tokens = tokens.filter(o => !o.dead);
+
+    // who walked out?
+    const gone = slices.find(s => s.f < MIN_FRAC);
+    if (gone) { const S = SLICE[gone.key]; shake = 14; return gameOver(S.out, pick(S.why) + ' Final valuation: ' + valuation(score) + ', reached in ' + ROUNDS[round][1] + '.'); }
+
+    // rounds
+    if (round < ROUNDS.length - 1 && caught >= ROUNDS[round + 1][0]) {
+      round++; shake = 8;
+      if (ROUNDS[round][1] === 'IPO DAY') {
+        // carve the float out of whoever can afford it, so nobody is pushed under the line by the listing itself
+        const spare = slices.reduce((q, s) => q + Math.max(0, s.f - 0.14), 0);
+        slices.forEach(s => { s.f -= 0.18 * Math.max(0, s.f - 0.14) / spare; }); slices.push({ key: 'pub', f: 0.18, d: 0.001, flash: 30 });
+        toast('IPO DAY · A wild PUBLIC slice appears. Feed it too.', ICE, true);
+      } else toast(ROUNDS[round][1] + ' · ' + pick(['New money, same wheel.', 'The deck now has a slide called "Moat".', 'Everyone gets diluted. Smile.', 'Lawyers billed 400 hours for this.', 'Faster now.']), CREAM, true);
+    }
+    if (nextMs < MILESTONES.length) { if (score >= MILESTONES[nextMs][0]) { const m = MILESTONES[nextMs++]; toast(m[1] + ' · ' + m[2], GOLD, true); shake = 8; } }
+    else if (score >= extraMs) { extraMs += 2500; toast('Still up and to the right.', GOLD, true); }
+
+    for (const s of slices) { s.d += (s.f - s.d) * 0.2; if (s.flash > 0) s.flash--; }
+    for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vx *= 0.94; q.vy *= 0.94; q.life--; }
+    parts = parts.filter(q => q.life > 0);
+    for (const o of toasts) { o.life--; if (!o.big) o.y -= 0.35; }
+    toasts = toasts.filter(o => o.life > 0);
+    if (shake > 0) shake--; if (boost > 0) boost--;
+    if (mood > 0) mood--; else if (mood < 0) mood++;
+    if (t % 20 === 0) { chart.push(score); if (chart.length > 400) chart = chart.filter((_, k) => k % 2 === 0); }
+    if (score !== shownScore) { shownScore = score; scoreEl.textContent = 'Score: ' + score.toLocaleString(); }
+  }
+
+  // ----- rendering -----
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function tokenColor(tk) { return tk.type === 'bear' ? BROWN : tk.type === 'sub' ? RED : tk.type === 'bell' || tk.type === 'rocket' ? GOLD : SLICE[tk.type].color; }
+
+  function drawToken(tk) {
+    const x = CX + Math.cos(tk.a) * tk.dist, y = CY + Math.sin(tk.a) * tk.dist, col = tokenColor(tk);
+    // flight lane
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.22; ctx.lineWidth = 1.5; ctx.setLineDash([3, 6]);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(CX + Math.cos(tk.a) * (R_OUT + 3), CY + Math.sin(tk.a) * (R_OUT + 3)); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.save(); ctx.translate(x, y);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (tk.type === 'bear') {
+      ctx.fillStyle = BROWN; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 9, -9, 4.5, 0, 7); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, 0, TR, 0, 7); ctx.fill(); ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#d9c2a3'; ctx.beginPath(); ctx.ellipse(0, 4, 5.5, 4.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(0, 2.5, 1.7, 0, 7); ctx.fill(); ctx.fillRect(-9, -5, 7, 4); ctx.fillRect(2, -5, 7, 4); ctx.fillRect(-3, -4.5, 6, 1.3);
+    } else if (tk.type === 'sub') {
+      ctx.rotate(Math.sin(tk.spin * 2) * 0.2);
+      ctx.fillStyle = CREAM; rr(-13, -9, 26, 18, 2); ctx.fill(); ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#b9ad97'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-13, -9); ctx.lineTo(0, 2); ctx.lineTo(13, -9); ctx.stroke();
+      ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(0, 3, 3.5, 0, 7); ctx.fill();
+    } else if (tk.type === 'bell') {
+      ctx.rotate(Math.sin(tk.spin * 3) * 0.3);
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.moveTo(-11, 8); ctx.quadraticCurveTo(-8, 4, -8, -3); ctx.arc(0, -3, 8, Math.PI, 0); ctx.quadraticCurveTo(8, 4, 11, 8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 10, 3, 0, 7); ctx.fill(); ctx.fillRect(-1.5, -14, 3, 4);
+      ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-5, -6, 2, 8);
+    } else if (tk.type === 'rocket') {
+      ctx.rotate(tk.a - Math.PI / 2);
+      ctx.fillStyle = CREAM; ctx.beginPath(); ctx.moveTo(0, -13); ctx.quadraticCurveTo(7, -3, 5, 8); ctx.lineTo(-5, 8); ctx.quadraticCurveTo(-7, -3, 0, -13); ctx.fill();
+      ctx.fillStyle = CLAY; ctx.beginPath(); ctx.moveTo(-5, 2); ctx.lineTo(-10, 10); ctx.lineTo(-5, 8); ctx.moveTo(5, 2); ctx.lineTo(10, 10); ctx.lineTo(5, 8); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -2, 2.5, 0, 7); ctx.fill();
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.moveTo(-3, 8); ctx.lineTo(0, 14 + (t % 6)); ctx.lineTo(3, 8); ctx.fill();
+    } else {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, TR, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, TR - 3, 3.6, 5.2); ctx.stroke();
+      ctx.fillStyle = INK;
+      if (tk.type === 'inv') { ctx.font = 'bold 15px system-ui'; ctx.fillText('$', 0, 1); }
+      else if (tk.type === 'fnd') { ctx.font = 'bold 14px system-ui'; ctx.fillText('★', 0, 1); }
+      else if (tk.type === 'emp') { ctx.font = 'bold 8px system-ui'; ctx.fillText('RSU', 0, 0.5); }
+      else { ctx.font = 'bold 8px system-ui'; ctx.fillText('IPO', 0, 0.5); }
+    }
+    ctx.restore(); ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawWheel() {
+    const sum = slices.reduce((q, s) => q + s.d, 0); let a = rot;
+    for (const s of slices) {
+      const sw = s.d / sum * TAU, S = SLICE[s.key], mid = a + sw / 2, danger = s.f < 0.16;
+      ctx.beginPath(); ctx.arc(CX, CY, R_OUT, a, a + sw); ctx.arc(CX, CY, R_IN, a + sw, a, true); ctx.closePath();
+      ctx.fillStyle = S.color; ctx.fill();
+      if (danger && (t >> 3) % 2) { ctx.fillStyle = 'rgba(226,87,76,.6)'; ctx.fill(); }
+      if (s.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (s.flash / 14 * 0.6) + ')'; ctx.fill(); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
+      const lx = CX + Math.cos(mid) * (R_OUT + R_IN) / 2, ly = CY + Math.sin(mid) * (R_OUT + R_IN) / 2;
+      ctx.fillStyle = INK; ctx.textAlign = 'center';
+      if (sw > 0.75) { ctx.font = 'bold 8px system-ui'; ctx.fillText(S.name, lx, ly - 4); ctx.font = 'bold 13px system-ui'; ctx.fillText(Math.round(s.f * 100) + '%', lx, ly + 10); }
+      else if (sw > 0.3) { ctx.font = 'bold 11px system-ui'; ctx.fillText(Math.round(s.f * 100) + '%', lx, ly + 4); }
+      a += sw;
+    }
+    if (frozen > 0) { ctx.strokeStyle = ICE; ctx.lineWidth = 4; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.arc(CX, CY, R_OUT + 5, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    if (boost > 0) { ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(CX, CY, R_OUT + 5, -Math.PI / 2, -Math.PI / 2 + TAU * boost / 480); ctx.stroke(); }
+  }
+
+  function drawBlob() {
+    // the company itself, living in the donut hole
+    const minF = slices.length ? Math.min(...slices.map(s => s.f)) : 1, worried = minF < 0.16 || mood < 0, R = 17;
+    let near = null; for (const tk of tokens) if (!near || tk.dist < near.dist) near = tk;
+    ctx.save(); ctx.translate(CX, CY + Math.sin(t * 0.07) * 1.5);
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(0, 0, R_IN - 2, 0, 7); ctx.fill();
+    ctx.fillStyle = CLAY; ctx.beginPath();
+    const N = 11;
+    for (let i = 0; i <= N * 2; i++) {
+      const a = (i / (N * 2)) * TAU + t * 0.012, out = i % 2 === 0;
+      const rad = out ? R + 8 + Math.sin(t * (worried ? 0.4 : 0.12) + i * 1.7) * 1.8 : R - 1;
+      const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(x, y); else { const am = a - Math.PI / (N * 2), rm = out ? R + 1 : R + 4; ctx.quadraticCurveTo(Math.cos(am) * rm, Math.sin(am) * rm, x, y); }
+    }
+    ctx.fill(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.beginPath(); ctx.arc(-5, -6, 7, 0, 7); ctx.fill();
+    const ex = near ? Math.cos(near.a) * 2.4 : 0, ey = near ? Math.sin(near.a) * 2.4 : 0;
+    for (const s of [-1, 1]) { ctx.fillStyle = CREAM; ctx.beginPath(); ctx.arc(s * 6, -3, 4.8, 0, 7); ctx.fill(); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(s * 6 + ex, -3 + ey, 2.2, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.beginPath();
+    if (worried) ctx.arc(0, 11, 4.5, 1.2 * Math.PI, 1.8 * Math.PI); else if (mood > 0) { ctx.arc(0, 4, 5.5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.closePath(); ctx.fillStyle = INK; ctx.fill(); } else ctx.arc(0, 4, 5, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate(Math.sin(shake * 2.3) * shake * 0.35, Math.cos(shake * 3.1) * shake * 0.35);
+    ctx.fillStyle = INK; ctx.fillRect(-10, -10, W + 20, H + 20);
+    // chart paper
+    ctx.lineWidth = 1;
+    for (let y = 46; y < H; y += 48) { ctx.strokeStyle = 'rgba(243,234,216,.05)'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    for (let x = 20; x < W; x += 50) { ctx.strokeStyle = 'rgba(243,234,216,.035)'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    // your actual valuation history, which had better go up and to the right
+    if (chart.length > 1) {
+      const top = Math.max(50, chart[chart.length - 1]), n = chart.length - 1;
+      ctx.beginPath();
+      chart.forEach((v, k) => { const x = 14 + (W - 28) * k / n, y = H - 16 - (H - 70) * Math.pow(v / top, 0.8); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+      ctx.strokeStyle = 'rgba(70,185,124,.3)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.lineTo(W - 14, H); ctx.lineTo(14, H); ctx.closePath(); ctx.fillStyle = 'rgba(70,185,124,.045)'; ctx.fill();
+    }
+
+    for (const tk of tokens) drawToken(tk);
+    if (slices.length) { drawWheel(); drawBlob(); }
+    for (const q of parts) { ctx.globalAlpha = clamp(q.life / 18, 0, 1); ctx.fillStyle = q.color; ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s); }
+    ctx.globalAlpha = 1;
+
+    // ticker tape
+    ctx.fillStyle = 'rgba(28,27,25,.85)'; ctx.fillRect(0, 0, W, 26);
+    ctx.fillStyle = CLAY; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left'; ctx.fillText('$BLOB', 8, 17);
+    ctx.fillStyle = GREEN; ctx.fillText('▲ ' + valuation(score), 56, 17);
+    ctx.textAlign = 'right'; ctx.font = 'bold 11px system-ui'; ctx.fillStyle = CREAM;
+    const mult = Math.min(6, 1 + Math.floor(streak / 5)) * (boost > 0 ? 2 : 1);
+    ctx.fillText((mult > 1 ? 'x' + mult + ' · ' : '') + ROUNDS[round][1], W - 8, 17);
+    if (frozen > 0) { ctx.fillStyle = ICE; ctx.textAlign = 'center'; ctx.font = 'bold 11px system-ui'; ctx.fillText('LEGAL HOLD: WHEEL FROZEN', CX, CY + R_OUT + 24); }
+
+    for (const o of toasts) {
+      const a = clamp(o.life / 20, 0, 1) * clamp((o.max - o.life) / 8, 0, 1);
+      ctx.globalAlpha = a; ctx.textAlign = 'center';
+      if (o.big) {
+        const p2 = o.text.split(' · ');
+        ctx.fillStyle = 'rgba(28,27,25,.88)'; rr(24, o.y - 32, W - 48, 60, 10); ctx.fill();
+        ctx.fillStyle = o.color; ctx.font = (p2[0].length > 14 ? '21px' : '27px') + " 'DM Serif Display', Georgia, serif"; ctx.fillText(p2[0], CX, o.y - 4);
+        if (p2[1]) { ctx.fillStyle = CREAM; ctx.font = '12px system-ui'; ctx.fillText(p2[1], CX, o.y + 16); }
+      } else {
+        ctx.font = 'bold 12px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.strokeText(o.text, o.x, o.y); ctx.fillStyle = o.color; ctx.fillText(o.text, o.x, o.y);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Drag anywhere to spin: the wheel follows the angle of your finger around its center.
+  let dragging = false, lastA = 0;
+  const angAt = e => { const p = toLogical(e.clientX, e.clientY); return Math.atan2(p.y - CY, p.x - CX); };
+  canvas.addEventListener('pointerdown', e => { dragging = true; lastA = angAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const a = angAt(e); let d = a - lastA; if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU; lastA = a;
+    if (running && frozen <= 0) { rot += d; rv = 0; }
+  });
+  const endDrag = () => { dragging = false; };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+  // ================
+
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
